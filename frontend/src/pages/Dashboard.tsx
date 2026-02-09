@@ -9,164 +9,145 @@ const demoPolicies = [
 ]
 
 export default function Dashboard() {
-    const [hoveredPolicy, setHoveredPolicy] = useState<string | null>(null)
-
-    const getRiskClass = (risk: string) => {
-        const classes: Record<string, string> = {
-            low: 'risk-low',
-            medium: 'risk-medium',
-            high: 'risk-high',
-            refer: 'risk-refer',
+    const getBadgeClass = (risk: string) => {
+        switch (risk) {
+            case 'low': return 'badge-success'
+            case 'medium': return 'badge-warning'
+            case 'high': return 'badge-danger'
+            case 'refer': return 'badge-purple'
+            default: return 'badge-success'
         }
-        return classes[risk] || classes.low
     }
 
     return (
-        <div className="space-y-8 animate-fadeIn">
-            {/* Header Section */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="animate-fadeIn">
+            {/* Page Header */}
+            <div className="page-header">
                 <div>
-                    <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">Dashboard</h1>
-                    <p className="text-slate-400 mt-2 text-lg">Underwriting risk overview and quick analysis</p>
+                    <h1 className="page-title">Dashboard</h1>
+                    <p className="page-subtitle">Underwriting risk overview and quick analysis</p>
                 </div>
-                <Link
-                    to="/analyze"
-                    className="btn-primary self-start sm:self-auto"
-                >
+                <Link to="/analyze" className="btn btn-primary">
                     <Sparkles className="w-4 h-4" />
                     Analyze Policy
                     <ArrowRight className="w-4 h-4" />
                 </Link>
             </div>
 
-            {/* Stats Cards */}
-            <div className="stats-grid">
-                <div className="stat-card">
-                    <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 bg-gradient-to-br from-blue-500/20 to-blue-600/20 rounded-2xl flex items-center justify-center border border-blue-500/30">
-                            <FileText className="w-7 h-7 text-blue-400" />
+            {/* Stats Grid */}
+            <div className="section">
+                <div className="stats-grid">
+                    <div className="stat-card">
+                        <div className="stat-icon blue">
+                            <FileText className="w-5 h-5" />
                         </div>
-                        <div>
-                            <p className="text-slate-400 text-sm font-medium">Total Policies</p>
-                            <p className="text-3xl font-bold text-white mt-0.5">3</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="stat-card">
-                    <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 bg-gradient-to-br from-emerald-500/20 to-emerald-600/20 rounded-2xl flex items-center justify-center border border-emerald-500/30">
-                            <CheckCircle className="w-7 h-7 text-emerald-400" />
-                        </div>
-                        <div>
-                            <p className="text-slate-400 text-sm font-medium">Low Risk</p>
-                            <p className="text-3xl font-bold text-white mt-0.5">1</p>
+                        <div className="stat-content">
+                            <div className="stat-label">Total Policies</div>
+                            <div className="stat-value">3</div>
                         </div>
                     </div>
-                </div>
 
-                <div className="stat-card">
-                    <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 bg-gradient-to-br from-amber-500/20 to-amber-600/20 rounded-2xl flex items-center justify-center border border-amber-500/30">
-                            <TrendingUp className="w-7 h-7 text-amber-400" />
+                    <div className="stat-card">
+                        <div className="stat-icon green">
+                            <CheckCircle className="w-5 h-5" />
                         </div>
-                        <div>
-                            <p className="text-slate-400 text-sm font-medium">Medium Risk</p>
-                            <p className="text-3xl font-bold text-white mt-0.5">0</p>
+                        <div className="stat-content">
+                            <div className="stat-label">Low Risk</div>
+                            <div className="stat-value">1</div>
                         </div>
                     </div>
-                </div>
 
-                <div className="stat-card">
-                    <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 bg-gradient-to-br from-red-500/20 to-red-600/20 rounded-2xl flex items-center justify-center border border-red-500/30">
-                            <AlertTriangle className="w-7 h-7 text-red-400" />
+                    <div className="stat-card">
+                        <div className="stat-icon amber">
+                            <TrendingUp className="w-5 h-5" />
                         </div>
-                        <div>
-                            <p className="text-slate-400 text-sm font-medium">Needs Review</p>
-                            <p className="text-3xl font-bold text-white mt-0.5">2</p>
+                        <div className="stat-content">
+                            <div className="stat-label">Medium Risk</div>
+                            <div className="stat-value">0</div>
+                        </div>
+                    </div>
+
+                    <div className="stat-card">
+                        <div className="stat-icon red">
+                            <AlertTriangle className="w-5 h-5" />
+                        </div>
+                        <div className="stat-content">
+                            <div className="stat-label">Needs Review</div>
+                            <div className="stat-value">2</div>
                         </div>
                     </div>
                 </div>
             </div>
 
             {/* Policies Table */}
-            <div className="glass-box overflow-hidden">
-                <div className="p-5 border-b border-slate-700/50 bg-gradient-to-r from-slate-800/50 to-transparent">
-                    <h2 className="text-xl font-semibold text-white">Demo Policies</h2>
-                    <p className="text-sm text-slate-400 mt-1">Click on any policy to run a full risk analysis</p>
-                </div>
-                <div className="overflow-x-auto">
-                    <table className="data-table">
-                        <thead>
-                            <tr>
-                                <th>Policy #</th>
-                                <th>Policyholder</th>
-                                <th className="text-center">Claims</th>
-                                <th className="text-right">Total Amount</th>
-                                <th className="text-center">Risk Level</th>
-                                <th className="text-right">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {demoPolicies.map((policy, index) => (
-                                <tr
-                                    key={policy.number}
-                                    className="cursor-pointer transition-all"
-                                    style={{ animationDelay: `${index * 100}ms` }}
-                                    onMouseEnter={() => setHoveredPolicy(policy.number)}
-                                    onMouseLeave={() => setHoveredPolicy(null)}
-                                >
-                                    <td>
-                                        <span className="font-mono text-blue-400 font-medium">{policy.number}</span>
-                                    </td>
-                                    <td>
-                                        <span className="text-white font-medium">{policy.name}</span>
-                                    </td>
-                                    <td className="text-center">
-                                        <span className="text-slate-300">{policy.claims}</span>
-                                    </td>
-                                    <td className="text-right">
-                                        <span className="text-slate-300 font-medium">{policy.amount}</span>
-                                    </td>
-                                    <td className="text-center">
-                                        <span className={`risk-badge ${getRiskClass(policy.risk)}`}>
-                                            {policy.risk}
-                                        </span>
-                                    </td>
-                                    <td className="text-right">
-                                        <Link
-                                            to={`/analyze?policy=${policy.number}`}
-                                            className="inline-flex items-center gap-1.5 text-blue-400 hover:text-blue-300 font-medium text-sm transition-colors group"
-                                        >
-                                            Full Analysis
-                                            <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                                        </Link>
-                                    </td>
+            <div className="section">
+                <div className="table-container">
+                    <div className="table-header">
+                        <h2>Demo Policies</h2>
+                        <p>Click on any policy to run a full risk analysis</p>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Policy #</th>
+                                    <th>Policyholder</th>
+                                    <th style={{ textAlign: 'center' }}>Claims</th>
+                                    <th style={{ textAlign: 'right' }}>Total Amount</th>
+                                    <th style={{ textAlign: 'center' }}>Risk Level</th>
+                                    <th style={{ textAlign: 'right' }}>Action</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {demoPolicies.map((policy) => (
+                                    <tr key={policy.number}>
+                                        <td>
+                                            <span style={{ fontFamily: 'monospace', color: 'var(--primary)', fontWeight: 500 }}>
+                                                {policy.number}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span style={{ fontWeight: 500 }}>{policy.name}</span>
+                                        </td>
+                                        <td style={{ textAlign: 'center' }}>{policy.claims}</td>
+                                        <td style={{ textAlign: 'right', fontWeight: 500 }}>{policy.amount}</td>
+                                        <td style={{ textAlign: 'center' }}>
+                                            <span className={`badge ${getBadgeClass(policy.risk)}`}>
+                                                {policy.risk}
+                                            </span>
+                                        </td>
+                                        <td style={{ textAlign: 'right' }}>
+                                            <Link to={`/analyze?policy=${policy.number}`} className="text-link">
+                                                Full Analysis
+                                                <ArrowRight className="w-4 h-4" />
+                                            </Link>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
             {/* Glass Box Info */}
-            <div className="glass-box p-6 pulse-glow">
-                <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-3">
-                    <span className="text-2xl">🔍</span>
-                    Glass Box Explainability
-                </h3>
-                <p className="text-slate-300 mb-5 text-lg leading-relaxed">
-                    Every risk decision shows exactly <strong className="text-white">what data was queried</strong>,
-                    <strong className="text-white"> what the analysis found</strong>, and
-                    <strong className="text-white"> which guideline</strong> drove the recommendation.
-                </p>
-                <div className="code-block">
-                    <code>
-                        <span className="text-purple-400">SELECT</span> COUNT(*), SUM(claim_amount) <span className="text-purple-400">FROM</span> claims <span className="text-purple-400">WHERE</span> policy_id = ?<br />
-                        <span className="text-slate-500">-- Results:</span> <span className="text-amber-400">5 claims</span>, <span className="text-amber-400">$75,500 total</span><br />
-                        <span className="text-slate-500">-- Guideline:</span> <span className="text-blue-400">Section 3.1.1 - High Frequency Threshold</span>
-                    </code>
+            <div className="section">
+                <div className="card">
+                    <div className="card-body">
+                        <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            🔍 Glass Box Explainability
+                        </h3>
+                        <p style={{ color: 'var(--text-secondary)', marginBottom: '1.25rem', lineHeight: 1.7 }}>
+                            Every risk decision shows exactly <strong>what data was queried</strong>,
+                            <strong> what the analysis found</strong>, and
+                            <strong> which guideline</strong> drove the recommendation.
+                        </p>
+                        <div className="code-block">
+                            <span className="keyword">SELECT</span> COUNT(*), SUM(claim_amount) <span className="keyword">FROM</span> claims <span className="keyword">WHERE</span> policy_id = ?<br />
+                            <span className="comment">-- Results:</span> <span className="number">5 claims</span>, <span className="number">$75,500 total</span><br />
+                            <span className="comment">-- Guideline:</span> <span className="string">Section 3.1.1 - High Frequency Threshold</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

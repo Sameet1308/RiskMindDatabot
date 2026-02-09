@@ -39,205 +39,257 @@ export default function PolicyAnalysis() {
     }
 
     const getRiskIcon = (level: string) => {
+        const iconStyle = { width: '2rem', height: '2rem' }
         switch (level) {
-            case 'low': return <CheckCircle className="w-10 h-10 text-emerald-400" />
-            case 'medium': return <Shield className="w-10 h-10 text-amber-400" />
-            case 'high': return <AlertTriangle className="w-10 h-10 text-red-400" />
-            case 'refer': return <AlertTriangle className="w-10 h-10 text-purple-400" />
-            default: return <Shield className="w-10 h-10 text-slate-400" />
+            case 'low': return <CheckCircle style={{ ...iconStyle, color: 'var(--success)' }} />
+            case 'medium': return <Shield style={{ ...iconStyle, color: 'var(--warning)' }} />
+            case 'high': return <AlertTriangle style={{ ...iconStyle, color: 'var(--danger)' }} />
+            case 'refer': return <AlertTriangle style={{ ...iconStyle, color: 'var(--purple)' }} />
+            default: return <Shield style={{ ...iconStyle, color: 'var(--text-light)' }} />
         }
     }
 
     const getRiskStyles = (level: string) => {
         switch (level) {
-            case 'low': return 'border-emerald-500/50 bg-gradient-to-br from-emerald-500/10 to-emerald-600/5'
-            case 'medium': return 'border-amber-500/50 bg-gradient-to-br from-amber-500/10 to-amber-600/5'
-            case 'high': return 'border-red-500/50 bg-gradient-to-br from-red-500/10 to-red-600/5'
-            case 'refer': return 'border-purple-500/50 bg-gradient-to-br from-purple-500/10 to-purple-600/5'
-            default: return 'border-slate-500/50 bg-slate-500/10'
+            case 'low': return { borderColor: '#86efac', background: '#f0fdf4' }
+            case 'medium': return { borderColor: '#fcd34d', background: '#fefce8' }
+            case 'high': return { borderColor: '#fca5a5', background: '#fef2f2' }
+            case 'refer': return { borderColor: '#c4b5fd', background: '#f5f3ff' }
+            default: return { borderColor: 'var(--border)', background: 'var(--surface)' }
+        }
+    }
+
+    const getBadgeClass = (level: string) => {
+        switch (level) {
+            case 'low': return 'badge-success'
+            case 'medium': return 'badge-warning'
+            case 'high': return 'badge-danger'
+            case 'refer': return 'badge-purple'
+            default: return 'badge-success'
         }
     }
 
     return (
-        <div className="space-y-8 animate-fadeIn">
-            {/* Header */}
-            <div>
-                <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">Policy Risk Analysis</h1>
-                <p className="text-slate-400 mt-2 text-lg">Enter a policy number to see full Glass Box analysis</p>
-            </div>
-
-            {/* Search Box */}
-            <div className="glass-box p-6">
-                <div className="flex flex-col lg:flex-row gap-4">
-                    <div className="flex-1">
-                        <label className="block text-sm font-semibold text-slate-300 mb-2">Policy Number</label>
-                        <input
-                            type="text"
-                            value={policyNumber}
-                            onChange={(e) => setPolicyNumber(e.target.value)}
-                            placeholder="Enter policy number (e.g., COMM-2024-001)"
-                            className="input-field"
-                            onKeyDown={(e) => e.key === 'Enter' && handleAnalyze()}
-                        />
-                    </div>
-                    <div className="flex items-end">
-                        <button
-                            onClick={() => handleAnalyze()}
-                            disabled={loading || !policyNumber.trim()}
-                            className="btn-primary w-full lg:w-auto"
-                        >
-                            {loading ? (
-                                <Loader2 className="w-5 h-5 animate-spin" />
-                            ) : (
-                                <Search className="w-5 h-5" />
-                            )}
-                            {loading ? 'Analyzing...' : 'Analyze Risk'}
-                        </button>
-                    </div>
-                </div>
-
-                {/* Quick Select */}
-                <div className="mt-5 pt-5 border-t border-slate-700/50">
-                    <p className="text-sm text-slate-400 mb-3 font-medium">Quick select demo policies:</p>
-                    <div className="flex flex-wrap gap-2">
-                        {demoPolicies.map((p) => (
-                            <button
-                                key={p}
-                                onClick={() => {
-                                    setPolicyNumber(p)
-                                    handleAnalyze(p)
-                                }}
-                                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-sm rounded-xl transition-all border border-slate-700 hover:border-blue-500/50 font-medium"
-                            >
-                                {p}
-                            </button>
-                        ))}
-                    </div>
+        <div className="animate-fadeIn">
+            {/* Page Header */}
+            <div className="page-header">
+                <div>
+                    <h1 className="page-title">Policy Risk Analysis</h1>
+                    <p className="page-subtitle">Enter a policy number for full Glass Box analysis</p>
                 </div>
             </div>
 
-            {/* Error Display */}
+            {/* Search Section */}
+            <div className="section">
+                <div className="card">
+                    <div className="card-body">
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                                <div style={{ flex: 1, minWidth: '250px' }}>
+                                    <label className="input-label">Policy Number</label>
+                                    <input
+                                        type="text"
+                                        value={policyNumber}
+                                        onChange={(e) => setPolicyNumber(e.target.value)}
+                                        placeholder="Enter policy number (e.g., COMM-2024-001)"
+                                        className="input-field"
+                                        onKeyDown={(e) => e.key === 'Enter' && handleAnalyze()}
+                                    />
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                                    <button
+                                        onClick={() => handleAnalyze()}
+                                        disabled={loading || !policyNumber.trim()}
+                                        className="btn btn-primary"
+                                    >
+                                        {loading ? (
+                                            <Loader2 style={{ width: '1.125rem', height: '1.125rem', animation: 'spin 1s linear infinite' }} />
+                                        ) : (
+                                            <Search style={{ width: '1.125rem', height: '1.125rem' }} />
+                                        )}
+                                        {loading ? 'Analyzing...' : 'Analyze'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="divider" />
+
+                            <div>
+                                <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>Quick select:</p>
+                                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                    {demoPolicies.map((p) => (
+                                        <button
+                                            key={p}
+                                            onClick={() => {
+                                                setPolicyNumber(p)
+                                                handleAnalyze(p)
+                                            }}
+                                            className="btn btn-secondary"
+                                            style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+                                        >
+                                            {p}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Error */}
             {error && (
-                <div className="glass-box p-5 border-red-500/50 bg-red-500/10">
-                    <div className="flex items-center gap-3 text-red-400">
-                        <AlertTriangle className="w-5 h-5 flex-shrink-0" />
-                        <span className="font-medium">{error}</span>
+                <div className="section">
+                    <div style={{
+                        background: 'var(--danger-light)',
+                        border: '1px solid #fca5a5',
+                        borderRadius: '0.75rem',
+                        padding: '1rem 1.25rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.75rem',
+                        color: 'var(--danger)'
+                    }}>
+                        <AlertTriangle style={{ width: '1.25rem', height: '1.25rem', flexShrink: 0 }} />
+                        <span style={{ fontWeight: 500 }}>{error}</span>
                     </div>
                 </div>
             )}
 
-            {/* Loading State */}
+            {/* Loading */}
             {loading && (
-                <div className="glass-box p-12 text-center">
-                    <Loader2 className="w-12 h-12 text-blue-400 animate-spin mx-auto" />
-                    <p className="text-slate-400 mt-4 text-lg">Analyzing policy risk...</p>
+                <div className="section">
+                    <div className="card">
+                        <div className="card-body" style={{ textAlign: 'center', padding: '4rem 2rem' }}>
+                            <Loader2 style={{ width: '3rem', height: '3rem', color: 'var(--primary)', animation: 'spin 1s linear infinite', margin: '0 auto' }} />
+                            <p style={{ color: 'var(--text-muted)', marginTop: '1rem', fontSize: '1.125rem' }}>Analyzing policy...</p>
+                        </div>
+                    </div>
                 </div>
             )}
 
             {/* Results */}
             {result && !loading && (
-                <div className="space-y-6 animate-fadeIn">
+                <>
                     {/* Recommendation Banner */}
-                    <div className={`glass-box p-6 sm:p-8 border-2 ${getRiskStyles(result.risk_level)}`}>
-                        <div className="flex flex-col sm:flex-row items-start gap-5">
-                            <div className="p-3 rounded-2xl bg-slate-800/50">
-                                {getRiskIcon(result.risk_level)}
-                            </div>
-                            <div className="flex-1">
-                                <h2 className="text-xl sm:text-2xl font-bold text-white">{result.recommendation}</h2>
-                                <p className="text-slate-300 mt-2 text-lg">{result.reason}</p>
-                                <div className="mt-4">
-                                    <span className={`risk-badge ${result.risk_level === 'low' ? 'risk-low' :
-                                            result.risk_level === 'medium' ? 'risk-medium' :
-                                                result.risk_level === 'high' ? 'risk-high' :
-                                                    'risk-refer'
-                                        }`} style={{ padding: '0.5rem 1.25rem', fontSize: '0.875rem' }}>
-                                        Risk Level: {result.risk_level.toUpperCase()}
-                                    </span>
+                    <div className="section">
+                        <div className="card" style={{ borderWidth: '2px', ...getRiskStyles(result.risk_level) }}>
+                            <div className="card-body">
+                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1.25rem' }}>
+                                    <div style={{
+                                        padding: '0.75rem',
+                                        borderRadius: '0.75rem',
+                                        background: 'white',
+                                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                                    }}>
+                                        {getRiskIcon(result.risk_level)}
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <h2 style={{ fontSize: '1.375rem', fontWeight: 700, color: 'var(--text)', marginBottom: '0.5rem' }}>
+                                            {result.recommendation}
+                                        </h2>
+                                        <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', lineHeight: 1.6 }}>
+                                            {result.reason}
+                                        </p>
+                                        <div style={{ marginTop: '1rem' }}>
+                                            <span className={`badge ${getBadgeClass(result.risk_level)}`} style={{ fontSize: '0.8125rem', padding: '0.5rem 1rem' }}>
+                                                {result.risk_level.toUpperCase()}
+                                            </span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     {/* Glass Box Evidence */}
-                    <div className="glass-box overflow-hidden">
-                        <div className="p-5 border-b border-slate-700/50 bg-gradient-to-r from-blue-500/10 to-transparent">
-                            <h3 className="text-xl font-semibold text-white flex items-center gap-3">
-                                <span className="text-2xl">🔍</span> Glass Box Evidence
-                            </h3>
-                            <p className="text-sm text-slate-400 mt-1">Full transparency into the analysis process</p>
-                        </div>
-
-                        <div className="p-6 space-y-8">
-                            {/* SQL Query */}
-                            <div className="animate-slideIn" style={{ animationDelay: '100ms' }}>
-                                <div className="flex items-center gap-3 mb-3">
-                                    <div className="p-2 rounded-lg bg-blue-500/20">
-                                        <FileCode className="w-5 h-5 text-blue-400" />
-                                    </div>
-                                    <h4 className="font-semibold text-white text-lg">SQL Query Executed</h4>
-                                </div>
-                                <div className="code-block whitespace-pre-wrap">
-                                    {result.evidence.sql_query}
-                                </div>
+                    <div className="section">
+                        <div className="table-container">
+                            <div className="table-header" style={{ background: 'linear-gradient(to right, #dbeafe, white)' }}>
+                                <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    🔍 Glass Box Evidence
+                                </h2>
+                                <p>Complete transparency into the analysis</p>
                             </div>
 
-                            {/* Data Retrieved */}
-                            <div className="animate-slideIn" style={{ animationDelay: '200ms' }}>
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div className="p-2 rounded-lg bg-amber-500/20">
-                                        <Database className="w-5 h-5 text-amber-400" />
-                                    </div>
-                                    <h4 className="font-semibold text-white text-lg">Data Retrieved</h4>
-                                </div>
-                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                                    <div className="stat-card">
-                                        <p className="text-slate-400 text-sm font-medium">Total Claims</p>
-                                        <p className="text-3xl font-bold text-white mt-1">{result.claims_summary.claim_count}</p>
-                                    </div>
-                                    <div className="stat-card">
-                                        <p className="text-slate-400 text-sm font-medium">Total Amount</p>
-                                        <p className="text-3xl font-bold text-white mt-1">
-                                            ${result.claims_summary.total_amount.toLocaleString()}
-                                        </p>
-                                    </div>
-                                    <div className="stat-card">
-                                        <p className="text-slate-400 text-sm font-medium">Avg Claim</p>
-                                        <p className="text-3xl font-bold text-white mt-1">
-                                            ${result.claims_summary.avg_amount.toLocaleString()}
-                                        </p>
-                                    </div>
-                                    <div className="stat-card">
-                                        <p className="text-slate-400 text-sm font-medium">Max Claim</p>
-                                        <p className="text-3xl font-bold text-white mt-1">
-                                            ${result.claims_summary.max_claim.toLocaleString()}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Guideline Citation */}
-                            {result.evidence.guideline_citation && (
-                                <div className="animate-slideIn" style={{ animationDelay: '300ms' }}>
-                                    <div className="flex items-center gap-3 mb-3">
-                                        <div className="p-2 rounded-lg bg-purple-500/20">
-                                            <BookOpen className="w-5 h-5 text-purple-400" />
+                            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                                {/* SQL Query */}
+                                <div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                                        <div className="stat-icon blue" style={{ width: '2.5rem', height: '2.5rem' }}>
+                                            <FileCode style={{ width: '1.25rem', height: '1.25rem' }} />
                                         </div>
-                                        <h4 className="font-semibold text-white text-lg">Guideline Citation</h4>
+                                        <h3 style={{ fontSize: '1rem', fontWeight: 600 }}>SQL Query Executed</h3>
                                     </div>
-                                    <div className="glass-box p-5 border-purple-500/30 bg-purple-500/5">
-                                        <p className="text-purple-300 font-bold text-lg mb-2">
-                                            {result.evidence.guideline_section}
-                                        </p>
-                                        <p className="text-slate-300 text-lg italic leading-relaxed">
-                                            "{result.evidence.guideline_citation}"
-                                        </p>
+                                    <div className="code-block" style={{ whiteSpace: 'pre-wrap' }}>
+                                        {result.evidence.sql_query}
                                     </div>
                                 </div>
-                            )}
+
+                                {/* Data Retrieved */}
+                                <div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                                        <div className="stat-icon amber" style={{ width: '2.5rem', height: '2.5rem' }}>
+                                            <Database style={{ width: '1.25rem', height: '1.25rem' }} />
+                                        </div>
+                                        <h3 style={{ fontSize: '1rem', fontWeight: 600 }}>Data Retrieved</h3>
+                                    </div>
+                                    <div className="stats-grid">
+                                        <div className="stat-card">
+                                            <div className="stat-content">
+                                                <div className="stat-label">Total Claims</div>
+                                                <div className="stat-value">{result.claims_summary.claim_count}</div>
+                                            </div>
+                                        </div>
+                                        <div className="stat-card">
+                                            <div className="stat-content">
+                                                <div className="stat-label">Total Amount</div>
+                                                <div className="stat-value">${result.claims_summary.total_amount.toLocaleString()}</div>
+                                            </div>
+                                        </div>
+                                        <div className="stat-card">
+                                            <div className="stat-content">
+                                                <div className="stat-label">Avg Claim</div>
+                                                <div className="stat-value">${result.claims_summary.avg_amount.toLocaleString()}</div>
+                                            </div>
+                                        </div>
+                                        <div className="stat-card">
+                                            <div className="stat-content">
+                                                <div className="stat-label">Max Claim</div>
+                                                <div className="stat-value">${result.claims_summary.max_claim.toLocaleString()}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Guideline Citation */}
+                                {result.evidence.guideline_citation && (
+                                    <div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                                            <div className="stat-icon purple" style={{ width: '2.5rem', height: '2.5rem' }}>
+                                                <BookOpen style={{ width: '1.25rem', height: '1.25rem' }} />
+                                            </div>
+                                            <h3 style={{ fontSize: '1rem', fontWeight: 600 }}>Guideline Citation</h3>
+                                        </div>
+                                        <div style={{
+                                            background: 'var(--purple-light)',
+                                            border: '1px solid #c4b5fd',
+                                            borderRadius: '0.75rem',
+                                            padding: '1.25rem'
+                                        }}>
+                                            <p style={{ color: 'var(--purple)', fontWeight: 600, fontSize: '1rem', marginBottom: '0.5rem' }}>
+                                                {result.evidence.guideline_section}
+                                            </p>
+                                            <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', fontStyle: 'italic', lineHeight: 1.6 }}>
+                                                "{result.evidence.guideline_citation}"
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
-                </div>
+                </>
             )}
         </div>
     )
