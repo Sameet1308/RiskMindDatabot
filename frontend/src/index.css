@@ -1,11 +1,9 @@
 @import "tailwindcss";
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
 :root {
-  --primary: #2563eb;
-  --primary-dark: #1d4ed8;
-  --primary-light: #3b82f6;
+  --primary: #FF5A5F;
+  --primary-dark: #E5484D;
+  --primary-light: #FF7A7E;
   --success: #059669;
   --success-light: #d1fae5;
   --warning: #d97706;
@@ -80,8 +78,10 @@ body {
 
 /* ==================== HEADER ==================== */
 .app-header {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.6);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -114,12 +114,13 @@ body {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 1rem;
-  transition: all 0.2s ease;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .card:hover {
   border-color: var(--border-dark);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
 }
 
 .card-header {
@@ -157,8 +158,8 @@ body {
 }
 
 .stat-card:hover {
-  border-color: var(--primary-light);
-  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.08);
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
   transform: translateY(-2px);
 }
 
@@ -173,8 +174,8 @@ body {
 }
 
 .stat-icon.blue {
-  background: #dbeafe;
-  color: #2563eb;
+  background: #e0f2fe;
+  color: #0284c7;
 }
 
 .stat-icon.green {
@@ -336,7 +337,7 @@ body {
 .btn-primary:hover {
   background: var(--primary-dark);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+  box-shadow: 0 4px 12px rgba(255, 90, 95, 0.3);
 }
 
 .btn-primary:disabled {
@@ -363,7 +364,7 @@ body {
 }
 
 .btn-ghost:hover {
-  background: rgba(37, 99, 235, 0.05);
+  background: rgba(255, 90, 95, 0.06);
 }
 
 /* ==================== FORM INPUTS ==================== */
@@ -393,7 +394,7 @@ body {
 .input-field:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  box-shadow: 0 0 0 3px rgba(255, 90, 95, 0.15);
 }
 
 .input-field::placeholder {
@@ -540,7 +541,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #FF5A5F 0%, #E5484D 60%, #C2363A 100%);
   padding: 2rem;
 }
 
@@ -564,7 +565,7 @@ body {
 .login-logo-icon {
   width: 3rem;
   height: 3rem;
-  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  background: linear-gradient(135deg, #FF5A5F, #E5484D);
   border-radius: 0.75rem;
   display: flex;
   align-items: center;
@@ -649,4 +650,55 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-light);
+}
+
+/* ==================== ANIMATIONS ==================== */
+.animate-fadeIn {
+  animation: fadeIn 0.35s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 90, 95, 0.4);
+  }
+
+  50% {
+    box-shadow: 0 0 0 8px rgba(255, 90, 95, 0);
+  }
 }

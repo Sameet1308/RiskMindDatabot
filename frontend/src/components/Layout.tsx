@@ -1,13 +1,17 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
-import { Home, Search, BookOpen, Shield, MessageSquare, LogOut } from 'lucide-react'
+import { Home, Search, BookOpen, Shield, LogOut, AlertTriangle, Briefcase, Bot, Map } from 'lucide-react'
+import ChatWidget from './ChatWidget'
 
 export default function Layout() {
     const location = useLocation()
 
     const navItems = [
-        { path: '/', icon: Home, label: 'Dashboard' },
-        { path: '/analyze', icon: Search, label: 'Analyze' },
-        { path: '/chat', icon: MessageSquare, label: 'Chat' },
+        { path: '/', icon: Home, label: 'Overview' },
+        { path: '/workbench', icon: Briefcase, label: 'My Desk' },
+        { path: '/analyze', icon: Search, label: 'Deep Search' },
+        { path: '/map', icon: Map, label: 'Geo Risk' },
+        { path: '/chat', icon: Bot, label: 'Co-Pilot' },
+        { path: '/alerts', icon: AlertTriangle, label: 'Alerts' },
         { path: '/guidelines', icon: BookOpen, label: 'Guidelines' },
     ]
 
@@ -20,7 +24,7 @@ export default function Layout() {
                         <div style={{
                             width: '2.5rem',
                             height: '2.5rem',
-                            background: 'linear-gradient(135deg, #2563eb, #7c3aed)',
+                            background: 'linear-gradient(135deg, #FF5A5F, #E5484D)',
                             borderRadius: '0.625rem',
                             display: 'flex',
                             alignItems: 'center',
@@ -29,8 +33,8 @@ export default function Layout() {
                             <Shield style={{ width: '1.25rem', height: '1.25rem', color: 'white' }} />
                         </div>
                         <div>
-                            <h1 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--text)', lineHeight: 1.2 }}>RiskMind</h1>
-                            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '-2px' }}>Underwriting Co-Pilot</p>
+                            <h1 style={{ fontSize: '1.125rem', fontWeight: 700, color: '#FF5A5F', lineHeight: 1.2 }}>RiskMind</h1>
+                            <p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginTop: '-2px', letterSpacing: '0.03em' }}>Underwriting Co-Pilot</p>
                         </div>
                     </Link>
 
@@ -100,6 +104,9 @@ export default function Layout() {
             <main className="main-content">
                 <Outlet />
             </main>
+
+            {/* Floating Chat Widget */}
+            <ChatWidget />
         </div>
     )
 }

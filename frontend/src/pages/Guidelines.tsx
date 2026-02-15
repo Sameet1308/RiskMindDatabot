@@ -143,7 +143,7 @@ export default function Guidelines() {
                                     <div style={{ display: 'flex', alignItems: 'stretch' }}>
                                         <div style={{
                                             width: '4px',
-                                            background: color === 'blue' ? '#2563eb' :
+                                            background: color === 'blue' ? '#FF5A5F' :
                                                 color === 'green' ? '#059669' :
                                                     color === 'amber' ? '#d97706' :
                                                         color === 'red' ? '#dc2626' : '#7c3aed'
@@ -160,7 +160,7 @@ export default function Guidelines() {
                                                             fontSize: '0.8125rem',
                                                             fontWeight: 600,
                                                             color: 'var(--primary)',
-                                                            background: '#dbeafe',
+                                                            background: '#FFF1F1',
                                                             padding: '0.25rem 0.625rem',
                                                             borderRadius: '0.375rem'
                                                         }}>

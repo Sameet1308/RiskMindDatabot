@@ -38,3 +38,7 @@ node_modules/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Internal Team Tracker (DO NOT PUSH)
+docs/tasks/
+docs/Team-Task-Assignments.md

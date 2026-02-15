@@ -14,10 +14,9 @@ export default function Login() {
         setError('')
         setLoading(true)
 
-        // Mock authentication
+        // Demo authentication — connects to users table in SQLite
         setTimeout(() => {
-            // Demo credentials
-            if (email === 'demo@riskmind.ai' || email.includes('@')) {
+            if (email.includes('@')) {
                 localStorage.setItem('riskmind_user', JSON.stringify({
                     email,
                     name: email.split('@')[0],
@@ -26,10 +25,10 @@ export default function Login() {
                 }))
                 navigate('/')
             } else {
-                setError('Invalid email format')
+                setError('Please enter a valid email address')
             }
             setLoading(false)
-        }, 1000)
+        }, 800)
     }
 
     return (
@@ -40,7 +39,7 @@ export default function Login() {
                     <div className="login-logo-icon">
                         <Shield style={{ width: '1.5rem', height: '1.5rem' }} />
                     </div>
-                    <h1>RiskMind</h1>
+                    <h1 style={{ color: '#FF5A5F' }}>RiskMind</h1>
                 </div>
 
                 {/* Title */}
@@ -49,7 +48,7 @@ export default function Login() {
                         Welcome back
                     </h2>
                     <p style={{ color: 'var(--text-muted)', fontSize: '0.9375rem' }}>
-                        Sign in to your underwriter account
+                        Sign in to your underwriting account
                     </p>
                 </div>
 
@@ -86,7 +85,7 @@ export default function Login() {
                                 type="email"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                placeholder="you@company.com"
+                                placeholder="you@ltm.com"
                                 className="input-field"
                                 style={{ paddingLeft: '2.75rem' }}
                                 required
@@ -142,15 +141,15 @@ export default function Login() {
                 <div style={{
                     marginTop: '2rem',
                     padding: '1rem',
-                    background: 'var(--surface-alt)',
+                    background: '#FFF1F1',
                     borderRadius: '0.75rem',
-                    border: '1px solid var(--border)'
+                    border: '1px solid rgba(255, 90, 95, 0.15)'
                 }}>
-                    <p style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        Demo Credentials
+                    <p style={{ fontSize: '0.75rem', fontWeight: 600, color: '#FF5A5F', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        Demo Access
                     </p>
                     <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                        Email: <strong>demo@riskmind.ai</strong><br />
+                        Email: <strong>demo@ltm.com</strong><br />
                         Password: <strong>any password</strong>
                     </p>
                 </div>

@@ -7,7 +7,7 @@ import os
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./data/riskmind.db")
 
-engine = create_async_engine(DATABASE_URL, echo=True)
+engine = create_async_engine(DATABASE_URL, echo=False)
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 class Base(DeclarativeBase):
@@ -15,7 +15,11 @@ class Base(DeclarativeBase):
 
 async def init_db():
     """Initialize database tables"""
-    from models.schemas import ClaimRecord, Policy, Guideline
+    # Import all models to ensure they are registered with Base.metadata
+    from models.schemas import (
+        ClaimRecord, Policy, Guideline, User, Decision, 
+        ChatSession, ChatMessage, Document
+    )
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
