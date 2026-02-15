@@ -47,11 +47,22 @@ const lowRiskIcon = new L.Icon({
     shadowSize: [41, 41]
 });
 
-export default function RiskMap() {
-    const [policies, setPolicies] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+type RiskMapProps = {
+    policies?: any[];
+    height?: string;
+};
+
+export default function RiskMap({ policies: providedPolicies, height = '60vh' }: RiskMapProps) {
+    const [policies, setPolicies] = useState<any[]>(providedPolicies || []);
+    const [loading, setLoading] = useState(!providedPolicies);
 
     useEffect(() => {
+        if (providedPolicies) {
+            setPolicies(providedPolicies);
+            setLoading(false);
+            return;
+        }
+
         const fetchPolicies = async () => {
             try {
                 const data = await apiService.getPolicies();
@@ -66,7 +77,7 @@ export default function RiskMap() {
         };
 
         fetchPolicies();
-    }, []);
+    }, [providedPolicies]);
 
     if (loading) {
         return (
@@ -77,7 +88,7 @@ export default function RiskMap() {
     }
 
     return (
-        <div className="w-full relative" style={{ height: '85vh' }}>
+        <div className="w-full relative" style={{ height }}>
             <div className="absolute top-4 right-4 z-[1000] bg-white/90 backdrop-blur p-4 rounded-xl shadow-lg border border-gray-200 w-64">
                 <h3 className="font-bold text-gray-900 mb-2 flex items-center gap-2">
                     <Shield className="h-4 w-4 text-emerald-600" /> Geospatial Intelligence

@@ -1,17 +1,20 @@
 
-import { BarChart3 } from 'lucide-react'
+type ChartPoint = {
+    month: string
+    value: number
+    label: string
+}
 
-export default function ClaimsChart() {
-    const data = [
-        { month: 'Aug', value: 45, label: '$45k' },
-        { month: 'Sep', value: 62, label: '$62k' },
-        { month: 'Oct', value: 38, label: '$38k' },
-        { month: 'Nov', value: 85, label: '$85k' },
-        { month: 'Dec', value: 55, label: '$55k' },
-        { month: 'Jan', value: 72, label: '$72k' },
-    ]
+export default function ClaimsChart({ data }: { data: ChartPoint[] }) {
+    if (!data.length) {
+        return (
+            <div className="h-64 flex items-center justify-center text-sm text-slate-400">
+                No claim history available yet.
+            </div>
+        )
+    }
 
-    const max = Math.max(...data.map(d => d.value))
+    const max = Math.max(...data.map(d => d.value), 1)
 
     return (
         <div className="h-64 flex items-end justify-between gap-4">

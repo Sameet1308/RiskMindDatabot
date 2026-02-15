@@ -53,6 +53,7 @@ class Guideline(Base):
     title = Column(String(200))
     content = Column(Text)
     category = Column(String(100))
+    policy_number = Column(String(50), nullable=True, index=True)
     threshold_type = Column(String(50))
     threshold_value = Column(Float, nullable=True)
     action = Column(String(100))

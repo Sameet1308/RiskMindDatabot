@@ -189,6 +189,9 @@ export default function ClaimDetail() {
                                         <div className="p-3 bg-white">
                                             <p className="text-sm font-medium text-slate-800">{item.description}</p>
                                             <p className="text-xs text-slate-500 mt-1">Uploaded by Claimant • {new Date(claim.claim_date).toLocaleDateString()}</p>
+                                            {item.local_path && (
+                                                <p className="text-[11px] text-slate-400 mt-1">Local path: {item.local_path}</p>
+                                            )}
                                         </div>
                                     </div>
                                 ))}

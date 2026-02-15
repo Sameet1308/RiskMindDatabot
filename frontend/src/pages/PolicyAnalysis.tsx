@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Search, Loader2, AlertTriangle, CheckCircle, Shield, FileCode, BookOpen, Database, ThumbsUp, ThumbsDown, FileText, X } from 'lucide-react'
-import apiService, { AnalysisResponse, MemoResponse, DecisionItem } from '../services/api'
+import { Search, Loader2, AlertTriangle, CheckCircle, Shield, FileCode, BookOpen, Database, ThumbsUp, ThumbsDown, FileText, X, Bot } from 'lucide-react'
+import apiService, { AnalysisResponse, MemoResponse, DecisionItem, Claim } from '../services/api'
 
 export default function PolicyAnalysis() {
     const [searchParams] = useSearchParams()
@@ -9,6 +9,13 @@ export default function PolicyAnalysis() {
     const [loading, setLoading] = useState(false)
     const [result, setResult] = useState<AnalysisResponse | null>(null)
     const [error, setError] = useState<string | null>(null)
+    const [policyClaims, setPolicyClaims] = useState<Claim[]>([])
+    const [evidenceState, setEvidenceState] = useState<Record<string, { loading: boolean; analysis?: string; localUrl?: string; error?: string }>>({})
+    const [selectedClaimId, setSelectedClaimId] = useState<number | ''>('')
+    const [evidenceDescription, setEvidenceDescription] = useState('')
+    const [uploadingEvidence, setUploadingEvidence] = useState(false)
+    const [uploadError, setUploadError] = useState<string | null>(null)
+    const fileInputRef = useRef<HTMLInputElement>(null)
 
     // Decision state
     const [decisionLoading, setDecisionLoading] = useState(false)
@@ -44,12 +51,14 @@ export default function PolicyAnalysis() {
         setDecisionNote('')
 
         try {
-            const [data, history] = await Promise.all([
+            const [data, history, claims] = await Promise.all([
                 apiService.analyzePolicy(policyToAnalyze),
-                apiService.getDecisions(policyToAnalyze).catch(() => [])
+                apiService.getDecisions(policyToAnalyze).catch(() => []),
+                apiService.getClaimsByPolicy(policyToAnalyze).catch(() => [])
             ])
             setResult(data)
             setDecisions(history)
+            setPolicyClaims(claims)
         } catch (err: any) {
             setError(err.response?.data?.detail || 'Failed to analyze policy. Is the backend running?')
         } finally {
@@ -114,6 +123,140 @@ export default function PolicyAnalysis() {
             case 'high': return 'badge-danger'
             case 'refer': return 'badge-purple'
             default: return 'badge-success'
+        }
+    }
+
+    const evidenceItems = useMemo(() => {
+        const items: Array<{ type: string; url: string; local_path?: string; description?: string; claim_number: string; claim_date: string }> = []
+        policyClaims.forEach((claim) => {
+            if (!claim.evidence_files) return
+            try {
+                const parsed = JSON.parse(claim.evidence_files) as Array<{ type: string; url: string; local_path?: string; description?: string }>
+                parsed.forEach((ev) => {
+                    if (!ev?.url) return
+                    items.push({
+                        type: ev.type || 'image',
+                        url: ev.url,
+                        local_path: ev.local_path,
+                        description: ev.description,
+                        claim_number: claim.claim_number,
+                        claim_date: claim.claim_date
+                    })
+                })
+            } catch {
+                // ignore invalid evidence JSON
+            }
+        })
+        return items
+    }, [policyClaims])
+
+    const sortedClaims = useMemo(() => (
+        [...policyClaims].sort((a, b) => new Date(b.claim_date).getTime() - new Date(a.claim_date).getTime())
+    ), [policyClaims])
+
+    useEffect(() => {
+        if (!selectedClaimId && sortedClaims.length > 0) {
+            setSelectedClaimId(sortedClaims[0].id)
+        }
+    }, [selectedClaimId, sortedClaims])
+
+    const aiActions = useMemo(() => {
+        if (!result) return [] as string[]
+        const actions: string[] = []
+        const summary = result.claims_summary
+
+        if (result.risk_level === 'high' || result.risk_level === 'refer') {
+            actions.push('Escalate to senior underwriter and schedule a loss control review.')
+        }
+
+        if (summary.claim_count >= 5) {
+            actions.push('Initiate a frequency review and consider pricing or deductible adjustments.')
+        }
+
+        if (summary.max_claim >= 100000) {
+            actions.push('Notify claims leadership and validate reserve adequacy for high severity loss.')
+        }
+
+        if (!actions.length) {
+            actions.push('Maintain current terms and monitor for adverse loss ratio shifts.')
+        }
+
+        actions.push('Review evidence package and confirm loss drivers with the insured.')
+
+        return actions
+    }, [result])
+
+    const analyzeEvidence = async (url: string, prompt?: string) => {
+        setEvidenceState(prev => ({
+            ...prev,
+            [url]: { ...(prev[url] || {}), loading: true, error: undefined }
+        }))
+
+        try {
+            const response = await apiService.analyzeEvidenceUrl(url, prompt)
+            setEvidenceState(prev => ({
+                ...prev,
+                [url]: { loading: false, analysis: response.analysis || 'Analysis complete.', localUrl: response.file_url }
+            }))
+        } catch (err: any) {
+            setEvidenceState(prev => ({
+                ...prev,
+                [url]: { loading: false, error: err.response?.data?.detail || 'Failed to analyze evidence.' }
+            }))
+        }
+    }
+
+    const handleEvidenceUpload = async () => {
+        if (!selectedClaimId || uploadingEvidence) return
+        const file = fileInputRef.current?.files?.[0]
+        if (!file) {
+            setUploadError('Select a file to upload.')
+            return
+        }
+
+        setUploadingEvidence(true)
+        setUploadError(null)
+
+        try {
+            const response = await apiService.uploadClaimEvidence(
+                Number(selectedClaimId),
+                file,
+                evidenceDescription
+            )
+
+            setPolicyClaims(prev => prev.map(claim => {
+                if (claim.id !== Number(selectedClaimId)) return claim
+                let existing: Array<{ type: string; url: string; local_path?: string; description?: string }> = []
+                try {
+                    existing = claim.evidence_files ? JSON.parse(claim.evidence_files) : []
+                    if (!Array.isArray(existing)) existing = []
+                } catch {
+                    existing = []
+                }
+                existing.push({
+                    type: response.file_type,
+                    url: response.file_url,
+                    local_path: response.local_path,
+                    description: evidenceDescription || file.name
+                })
+                return { ...claim, evidence_files: JSON.stringify(existing) }
+            }))
+
+            setEvidenceState(prev => ({
+                ...prev,
+                [response.file_url]: {
+                    loading: false,
+                    analysis: response.analysis || 'Analysis complete.',
+                    localUrl: response.file_url
+                }
+            }))
+
+            setEvidenceDescription('')
+            if (fileInputRef.current) fileInputRef.current.value = ''
+        } catch (err: any) {
+            setUploadError(err.response?.data?.detail || 'Failed to upload evidence.')
+        } finally {
+            setUploadingEvidence(false)
         }
     }
 
@@ -246,6 +389,203 @@ export default function PolicyAnalysis() {
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Evidence-Backed AI Blend */}
+                    <div className="section">
+                        <div className="card">
+                            <div className="card-body">
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', marginBottom: '1.5rem' }}>
+                                    <div>
+                                        <h3 style={{ fontSize: '1.125rem', fontWeight: 700 }}>Co-Pilot Evidence Blend</h3>
+                                        <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+                                            Structured metrics + unstructured evidence + LLM reasoning
+                                        </p>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                        <span className="badge badge-secondary">{policyClaims.length} claims</span>
+                                        <span className="badge badge-secondary">{evidenceItems.length} evidence items</span>
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem' }}>
+                                    {/* Structured */}
+                                    <div style={{ border: '1px solid var(--border)', borderRadius: '0.75rem', padding: '1rem', background: 'var(--surface-alt)' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, marginBottom: '0.75rem' }}>
+                                            <Database style={{ width: '1rem', height: '1rem' }} /> Structured Data
+                                        </div>
+                                        <div style={{ display: 'grid', gap: '0.5rem', fontSize: '0.875rem' }}>
+                                            <div>Claims: <strong>{result.claims_summary.claim_count}</strong></div>
+                                            <div>Total Incurred: <strong>${result.claims_summary.total_amount.toLocaleString()}</strong></div>
+                                            <div>Avg Claim: <strong>${result.claims_summary.avg_amount.toLocaleString()}</strong></div>
+                                            <div>Max Claim: <strong>${result.claims_summary.max_claim.toLocaleString()}</strong></div>
+                                        </div>
+                                        <div style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                            Evidence query: SQL-backed glass box
+                                        </div>
+                                    </div>
+
+                                    {/* Unstructured */}
+                                    <div style={{ border: '1px solid var(--border)', borderRadius: '0.75rem', padding: '1rem', background: 'var(--surface-alt)' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, marginBottom: '0.75rem' }}>
+                                            <FileText style={{ width: '1rem', height: '1rem' }} /> Unstructured Evidence
+                                        </div>
+                                        {evidenceItems.length === 0 ? (
+                                            <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>No evidence media linked to claims.</div>
+                                        ) : (
+                                            <div style={{ display: 'grid', gap: '0.5rem' }}>
+                                                {evidenceItems.slice(0, 3).map((ev, idx) => (
+                                                    <div key={`${ev.url}-${idx}`} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8125rem' }}>
+                                                        <span style={{ color: 'var(--text-secondary)' }}>{ev.description || ev.type}</span>
+                                                        <span style={{ color: 'var(--text-muted)' }}>{ev.claim_number}</span>
+                                                    </div>
+                                                ))}
+                                                {evidenceItems.length > 3 && (
+                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                                        +{evidenceItems.length - 3} more items
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* AI Insight */}
+                                    <div style={{ border: '1px solid var(--border)', borderRadius: '0.75rem', padding: '1rem', background: 'var(--surface-alt)' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, marginBottom: '0.75rem' }}>
+                                            <Bot style={{ width: '1rem', height: '1rem' }} /> LLM Actionable Insight
+                                        </div>
+                                        <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                                            {result.reason}
+                                        </div>
+                                        <div style={{ marginTop: '0.75rem', display: 'grid', gap: '0.5rem', fontSize: '0.8125rem' }}>
+                                            {aiActions.map((a, i) => (
+                                                <div key={`${a}-${i}`} style={{ display: 'flex', gap: '0.5rem' }}>
+                                                    <span>•</span>
+                                                    <span>{a}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div style={{ marginTop: '1.5rem' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', marginBottom: '0.75rem' }}>
+                                        <h4 style={{ fontSize: '0.95rem', fontWeight: 600 }}>Upload Evidence</h4>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                            Attach to a specific claim
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
+                                        <div>
+                                            <label className="input-label">Claim</label>
+                                            <select
+                                                value={selectedClaimId}
+                                                onChange={(e) => setSelectedClaimId(e.target.value ? Number(e.target.value) : '')}
+                                                className="input-field"
+                                            >
+                                                {sortedClaims.length === 0 && (
+                                                    <option value="">No claims available</option>
+                                                )}
+                                                {sortedClaims.map((claim) => (
+                                                    <option key={claim.id} value={claim.id}>
+                                                        {claim.claim_number} · {new Date(claim.claim_date).toLocaleDateString()}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="input-label">Description</label>
+                                            <input
+                                                type="text"
+                                                value={evidenceDescription}
+                                                onChange={(e) => setEvidenceDescription(e.target.value)}
+                                                placeholder="Optional evidence note"
+                                                className="input-field"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="input-label">File</label>
+                                            <input ref={fileInputRef} type="file" className="input-field" />
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                                            <button
+                                                onClick={handleEvidenceUpload}
+                                                disabled={uploadingEvidence || !selectedClaimId}
+                                                className="btn btn-primary"
+                                                style={{ width: '100%' }}
+                                            >
+                                                {uploadingEvidence ? 'Uploading...' : 'Upload & Analyze'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                    {uploadError && (
+                                        <div style={{ marginTop: '0.5rem', color: 'var(--danger)', fontSize: '0.75rem' }}>
+                                            {uploadError}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {evidenceItems.length > 0 && (
+                                    <div style={{ marginTop: '1.5rem' }}>
+                                        <h4 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: '0.75rem' }}>Evidence Gallery</h4>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+                                            {evidenceItems.map((ev, idx) => {
+                                                const state = evidenceState[ev.url]
+                                                const mediaUrl = state?.localUrl || ev.url
+
+                                                return (
+                                                    <div key={`${ev.url}-${idx}`} style={{ border: '1px solid var(--border)', borderRadius: '0.75rem', overflow: 'hidden', background: 'white' }}>
+                                                        {ev.type === 'video' ? (
+                                                            <div style={{ background: '#000' }}>
+                                                                <video src={mediaUrl} controls style={{ width: '100%', height: '180px', objectFit: 'cover' }} />
+                                                            </div>
+                                                        ) : (
+                                                            <img src={mediaUrl} alt={ev.description || 'Evidence'} style={{ width: '100%', height: '180px', objectFit: 'cover' }} />
+                                                        )}
+                                                        <div style={{ padding: '0.75rem', display: 'grid', gap: '0.5rem' }}>
+                                                            <div>
+                                                                <div style={{ fontSize: '0.875rem', fontWeight: 600 }}>{ev.description || 'Evidence item'}</div>
+                                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{ev.claim_number} · {new Date(ev.claim_date).toLocaleDateString()}</div>
+                                                                {ev.local_path && (
+                                                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-light)' }}>Local path: {ev.local_path}</div>
+                                                                )}
+                                                            </div>
+                                                            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                                                <button
+                                                                    onClick={() => analyzeEvidence(ev.url)}
+                                                                    disabled={state?.loading}
+                                                                    className="btn btn-secondary"
+                                                                    style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem' }}
+                                                                >
+                                                                    {state?.loading ? 'Analyzing...' : 'Analyze with RiskMind'}
+                                                                </button>
+                                                                <a
+                                                                    href={ev.url}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    className="btn btn-secondary"
+                                                                    style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem' }}
+                                                                >
+                                                                    Open Source
+                                                                </a>
+                                                            </div>
+                                                            {state?.analysis && (
+                                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', background: 'var(--surface-alt)', borderRadius: '0.5rem', padding: '0.5rem' }}>
+                                                                    {state.analysis}
+                                                                </div>
+                                                            )}
+                                                            {state?.error && (
+                                                                <div style={{ fontSize: '0.75rem', color: 'var(--danger)' }}>{state.error}</div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

@@ -21,6 +21,7 @@ async def seed():
         await db.execute(text("DELETE FROM claims"))
         await db.execute(text("DELETE FROM policies"))
         await db.execute(text("DELETE FROM guidelines"))
+        await db.execute(text("DELETE FROM documents"))
         await db.commit()
 
         # ===== POLICIES (20) =====
@@ -207,6 +208,31 @@ async def seed():
             """), {"sc": g[0], "title": g[1], "content": g[2], "cat": g[3], "tt": g[4], "tv": g[5], "action": g[6]})
         await db.commit()
 
+        # ===== DOCUMENTS (Local sample PDFs) =====
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        documents = [
+            (
+                "general-guidelines.pdf",
+                os.path.join(base_dir, "data", "uploads", "guidelines", "general-guidelines.pdf"),
+                "pdf",
+                "Baseline underwriting guidance (general).",
+            ),
+            (
+                "COMM-2024-002.pdf",
+                os.path.join(base_dir, "data", "policies", "COMM-2024-002.pdf"),
+                "pdf",
+                "Policy document for COMM-2024-002.",
+            ),
+        ]
+
+        for filename, file_path, file_type, summary in documents:
+            file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+            await db.execute(text("""
+                INSERT INTO documents (filename, file_path, file_type, file_size, uploaded_by, analysis_summary)
+                VALUES (:fn, :fp, :ft, :fs, :ub, :summary)
+            """), {"fn": filename, "fp": file_path, "ft": file_type, "fs": file_size, "ub": "seed", "summary": summary})
+        await db.commit()
+
         # Print summary
         result = await db.execute(text("SELECT COUNT(*) FROM policies"))
         p_count = result.scalar()
@@ -214,11 +240,14 @@ async def seed():
         c_count = result.scalar()
         result = await db.execute(text("SELECT COUNT(*) FROM guidelines"))
         g_count = result.scalar()
+        result = await db.execute(text("SELECT COUNT(*) FROM documents"))
+        d_count = result.scalar()
 
         print(f"\n✅ Database seeded successfully!")
         print(f"   📋 {p_count} policies")
         print(f"   📊 {c_count} claims")
         print(f"   📖 {g_count} guidelines")
+        print(f"   📄 {d_count} documents")
         print(f"\n   High-risk policies (for testing alerts):")
         print(f"   - COMM-2024-002: XYZ Restaurant — 6 claims (HIGH FREQUENCY)")
         print(f"   - COMM-2024-003: SafeBuild Construction — $175K claim (HIGH SEVERITY)")

@@ -3,9 +3,9 @@ AI Service - Mock and real LLM integration
 Supports: mock, openai, bedrock
 """
 import os
-from typing import Dict, Any
+from typing import Dict, Any, List
 
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "mock")
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "mock").lower()
 
 
 async def get_ai_analysis(claims_summary: Dict[str, Any], policy_number: str) -> Dict[str, Any]:
@@ -15,6 +15,8 @@ async def get_ai_analysis(claims_summary: Dict[str, Any], policy_number: str) ->
     """
     if LLM_PROVIDER == "openai":
         return await _openai_analysis(claims_summary, policy_number)
+    elif LLM_PROVIDER == "gemini":
+        return await _gemini_analysis(claims_summary, policy_number)
     elif LLM_PROVIDER == "bedrock":
         return await _bedrock_analysis(claims_summary, policy_number)
     else:
@@ -115,6 +117,69 @@ Provide your response in this exact JSON format:
         
     except Exception as e:
         print(f"OpenAI error: {e}")
+        return await _mock_analysis(claims_summary, policy_number)
+
+
+async def _gemini_analysis(claims_summary: Dict[str, Any], policy_number: str) -> Dict[str, Any]:
+    """
+    Gemini-powered analysis (free tier with API key)
+    """
+    api_key = os.getenv("GOOGLE_API_KEY", "")
+    if not api_key or api_key == "your-google-api-key-here":
+        return await _mock_analysis(claims_summary, policy_number)
+
+    try:
+        import json
+        import google.generativeai as genai
+
+        genai.configure(api_key=api_key)
+        model_name = os.getenv("GEMINI_MODEL", "").strip()
+        model_candidates: List[str] = [
+            model_name,
+            "gemini-1.5-flash-latest",
+            "gemini-1.5-flash",
+            "gemini-flash-latest",
+        ]
+        model_candidates = [m for m in model_candidates if m]
+
+        prompt = f"""You are an insurance underwriting assistant. Analyze the following claims data and provide a risk assessment.
+
+Claims Summary for Policy {policy_number}:
+- Total Claims: {claims_summary.get('claim_count', 0)}
+- Total Amount: ${claims_summary.get('total_amount', 0):,.2f}
+- Average Claim: ${claims_summary.get('avg_amount', 0):,.2f}
+- Largest Claim: ${claims_summary.get('max_claim', 0):,.2f}
+
+Provide your response in this exact JSON format:
+{{
+    "recommendation": "APPROVE/REVIEW REQUIRED/REFER TO SENIOR UNDERWRITER",
+    "risk_level": "low/medium/high/refer",
+    "reason": "Brief explanation",
+    "guideline_section": "Section X.X.X",
+    "guideline_text": "Relevant underwriting guideline"
+}}"""
+
+        last_error: Exception | None = None
+        for candidate in model_candidates:
+            try:
+                model = genai.GenerativeModel(candidate)
+                response = model.generate_content(
+                    prompt,
+                    generation_config={
+                        "temperature": 0.2,
+                        "response_mime_type": "application/json",
+                    },
+                )
+
+                text = response.text or ""
+                return json.loads(text)
+            except Exception as e:
+                last_error = e
+
+        if last_error:
+            raise last_error
+    except Exception as e:
+        print(f"Gemini error: {e}")
         return await _mock_analysis(claims_summary, policy_number)
 
 

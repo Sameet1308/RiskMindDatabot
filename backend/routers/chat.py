@@ -18,6 +18,7 @@ import time
 
 from database.connection import get_db
 from models.schemas import ChatSession, ChatMessage, Document
+from services.intent_engine import run_intent_pipeline
 from services.vector_store import search_similar
 
 router = APIRouter()
@@ -55,6 +56,10 @@ class ChatResponse(BaseModel):
     sources: List[dict] = []
     provider: str = "mock"
     session_id: int = 0
+    analysis_object: Optional[dict] = None
+    recommended_modes: Optional[List[str]] = None
+    default_mode: Optional[str] = None
+    provenance: Optional[dict] = None
 
 class SessionOut(BaseModel):
     id: int
@@ -433,9 +438,26 @@ async def _analyze_video(file_path: str, prompt: str) -> str:
             raise ValueError("Video processing failed.")
 
         # 3. Generate content
-        model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=SYSTEM_PROMPT)
-        response = model.generate_content([prompt, video_file])
-        return response.text
+        model_name = os.getenv("GEMINI_MODEL", "").strip()
+        model_candidates = [
+            model_name,
+            "gemini-1.5-flash-latest",
+            "gemini-1.5-flash",
+            "gemini-flash-latest",
+        ]
+        model_candidates = [m for m in model_candidates if m]
+
+        last_error: Exception | None = None
+        for candidate in model_candidates:
+            try:
+                model = genai.GenerativeModel(candidate, system_instruction=SYSTEM_PROMPT)
+                response = model.generate_content([prompt, video_file])
+                return response.text
+            except Exception as e:
+                last_error = e
+
+        if last_error:
+            raise last_error
 
     except Exception as e:
         print(f"Video analysis error: {e}")
@@ -539,13 +561,42 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
     db_msgs = result.scalars().all()
     history = [{"role": m.role, "content": m.content} for m in db_msgs[:-1]]
 
-    # Get LLM response
-    response_text, sources, provider = await _llm_response(request.message, history, db)
+    # Intent-driven pipeline (context-aware SQL + analysis object)
+    response_text = None
+    sources = []
+    provider = "intent-engine"
+    analysis_object = None
+    recommended_modes = None
+    default_mode = None
+    provenance = None
+
+    try:
+        pipeline = await run_intent_pipeline(request.message, db)
+        response_text = pipeline.get("analysis_text")
+        analysis_object = pipeline.get("analysis_object")
+        recommended_modes = pipeline.get("recommended_modes")
+        default_mode = pipeline.get("default_mode")
+        provenance = pipeline.get("provenance")
+    except Exception as e:
+        print(f"Intent pipeline error: {e}")
+
+    if not response_text:
+        # Fallback to LLM response
+        response_text, sources, provider = await _llm_response(request.message, history, db)
 
     await _save_message(sid, "assistant", response_text, db,
                          sources_json=json.dumps(sources) if sources else None)
 
-    return ChatResponse(response=response_text, sources=sources, provider=provider, session_id=sid)
+    return ChatResponse(
+        response=response_text,
+        sources=sources,
+        provider=provider,
+        session_id=sid,
+        analysis_object=analysis_object,
+        recommended_modes=recommended_modes,
+        default_mode=default_mode,
+        provenance=provenance
+    )
 
 
 @router.post("/vision", response_model=ChatResponse)

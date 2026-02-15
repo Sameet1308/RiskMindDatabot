@@ -49,6 +49,10 @@ export interface ChatResponse {
     sources: { section: string; title: string }[]
     provider: string
     session_id: number
+    analysis_object?: Record<string, any>
+    recommended_modes?: string[]
+    default_mode?: string
+    provenance?: Record<string, any>
 }
 
 export interface ChatSession {
@@ -127,6 +131,18 @@ export interface Guideline {
     title: string
     content: string
     category: string
+    policy_number?: string | null
+}
+
+export interface GuidelineCreate {
+    section_code: string
+    title: string
+    content: string
+    category?: string
+    policy_number?: string
+    threshold_type?: string
+    threshold_value?: number
+    action?: string
 }
 
 export interface DecisionItem {
@@ -144,6 +160,21 @@ export interface UploadResponse {
     filename: string
     file_type: string
     analysis: string | null
+}
+
+export interface EvidenceAnalyzeResponse {
+    file_url: string
+    file_type: string
+    analysis: string | null
+}
+
+export interface EvidenceUploadResponse {
+    file_url: string
+    file_type: string
+    analysis: string | null
+    claim_id: number
+    claim_number: string
+    local_path: string
 }
 
 // ──── API Service ────
@@ -171,15 +202,43 @@ export const apiService = {
         return response.data
     },
 
-    // Guidelines
-    async getGuidelines(category?: string) {
-        const params = category ? { category } : {}
-        const response = await api.get('/guidelines/', { params })
+    async getClaimsByPolicy(policyNumber: string): Promise<Claim[]> {
+        const response = await api.get(`/claims/policy/${policyNumber}`)
         return response.data
+    },
+
+    async analyzeEvidenceUrl(url: string, prompt?: string): Promise<EvidenceAnalyzeResponse> {
+        const response = await api.post('/claims/evidence/analyze', { url, prompt })
+        return response.data
+    },
+
+    async uploadClaimEvidence(claimId: number, file: File, description?: string, prompt?: string): Promise<EvidenceUploadResponse> {
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('description', description || '')
+        formData.append('user_prompt', prompt || '')
+        const response = await api.post(`/claims/${claimId}/evidence/upload`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        })
+        return response.data
+    },
+
+    // Guidelines
+    async getGuidelines(category?: string, policyNumber?: string) {
+        const params: any = {}
+        if (category) params.category = category
+        if (policyNumber) params.policy_number = policyNumber
+        const response = await api.get('/guidelines/', { params })
+        return response.data?.guidelines ?? []
     },
 
     async searchGuidelines(query: string) {
         const response = await api.get('/guidelines/search', { params: { query } })
+        return response.data
+    },
+
+    async createGuideline(payload: GuidelineCreate) {
+        const response = await api.post('/guidelines/', payload)
         return response.data
     },
 

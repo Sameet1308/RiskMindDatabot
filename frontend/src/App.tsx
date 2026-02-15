@@ -1,27 +1,22 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
-import Overview from './components/Overview'
-import Workbench from './components/Workbench'
-import Guidelines from './pages/Guidelines'
-import Chat from './pages/Chat'
+import RiskMind from './pages/RiskMind'
+import Workbench from './pages/Workbench'
+import SavedIntelligence from './pages/SavedIntelligence'
 import ClaimDetail from './components/ClaimDetail'
-import PolicyAnalysis from './pages/PolicyAnalysis'
-import RiskMap from './components/RiskMap'
-import Alerts from './pages/Alerts'
+import Login from './pages/Login'
 
 function App() {
     return (
         <Routes>
+            <Route path="/login" element={<Login />} />
             <Route path="/" element={<Layout />}>
-                <Route index element={<Overview />} />
+                <Route index element={<RiskMind />} />
                 <Route path="workbench" element={<Workbench />} />
+                <Route path="saved" element={<SavedIntelligence />} />
                 <Route path="claims/:id" element={<ClaimDetail />} />
-                <Route path="analyze" element={<PolicyAnalysis />} />
-                <Route path="map" element={<RiskMap />} />
-                <Route path="guidelines" element={<Guidelines />} />
-                <Route path="chat" element={<Chat />} />
-                <Route path="alerts" element={<Alerts />} />
             </Route>
+            <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
     )
 }

@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
-import { Briefcase, TrendingUp, AlertTriangle, CheckCircle, Search, FileText } from 'lucide-react'
+import { Briefcase, AlertTriangle, CheckCircle, Search, FileText, ShieldCheck } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import apiService, { PolicyItem } from '../services/api'
+import apiService, { PolicyItem, DecisionItem } from '../services/api'
 
 export default function Workbench() {
     const [policies, setPolicies] = useState<PolicyItem[]>([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState('')
+    const [decisionMap, setDecisionMap] = useState<Record<string, DecisionItem[]>>({})
     const navigate = useNavigate()
 
     useEffect(() => {
@@ -17,6 +18,14 @@ export default function Workbench() {
         try {
             const data = await apiService.getPolicies()
             setPolicies(data)
+            const decisions = await Promise.all(
+                data.map((policy) => apiService.getDecisions(policy.policy_number).catch(() => []))
+            )
+            const map: Record<string, DecisionItem[]> = {}
+            data.forEach((policy, index) => {
+                map[policy.policy_number] = decisions[index] || []
+            })
+            setDecisionMap(map)
         } catch (err) {
             console.error('Failed to load policies:', err)
         } finally {
@@ -30,10 +39,9 @@ export default function Workbench() {
         p.industry_type.toLowerCase().includes(search.toLowerCase())
     )
 
-    const totalPremium = policies.reduce((sum, p) => sum + p.premium, 0)
-    const totalClaims = policies.reduce((sum, p) => sum + p.total_claims, 0)
-    const highRiskCount = policies.filter(p => p.risk_level === 'high').length
-    const lowRiskCount = policies.filter(p => p.risk_level === 'low').length
+    const pendingDecisions = policies.filter(p => (decisionMap[p.policy_number] || []).length === 0).length
+    const needsReview = policies.filter(p => p.risk_level === 'high' || p.risk_level === 'refer').length
+    const evidenceMissing = policies.filter(p => !(p.claims || []).some(c => c.evidence_files)).length
 
     const riskBadge = (level: string) => {
         const styles: Record<string, { bg: string; color: string }> = {
@@ -57,43 +65,48 @@ export default function Workbench() {
         )
     }
 
+    const evidenceStatus = (policy: PolicyItem) => {
+        const hasEvidence = (policy.claims || []).some(c => c.evidence_files)
+        return hasEvidence ? 'Complete' : 'Missing'
+    }
+
     return (
         <div className="animate-fadeIn">
             <div className="page-header">
                 <div>
                     <h1 className="page-title">Underwriting Workbench</h1>
-                    <p className="page-subtitle">Portfolio overview — {policies.length} active policies</p>
+                    <p className="page-subtitle">Track decisions, AI review status, and evidence completeness</p>
                 </div>
             </div>
 
-            {/* Stats */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
+            {/* Status */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
                 <div className="stat-card">
                     <div className="stat-icon"><Briefcase /></div>
                     <div>
-                        <div className="stat-label">Total Policies</div>
+                        <div className="stat-label">Active Items</div>
                         <div className="stat-value">{policies.length}</div>
-                    </div>
-                </div>
-                <div className="stat-card">
-                    <div className="stat-icon"><TrendingUp /></div>
-                    <div>
-                        <div className="stat-label">Total Premium</div>
-                        <div className="stat-value">${(totalPremium / 1000).toFixed(0)}K</div>
                     </div>
                 </div>
                 <div className="stat-card">
                     <div className="stat-icon" style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' }}><AlertTriangle /></div>
                     <div>
-                        <div className="stat-label">High Risk</div>
-                        <div className="stat-value" style={{ color: '#ef4444' }}>{highRiskCount}</div>
+                        <div className="stat-label">Needs Review</div>
+                        <div className="stat-value" style={{ color: '#ef4444' }}>{needsReview}</div>
                     </div>
                 </div>
                 <div className="stat-card">
                     <div className="stat-icon" style={{ background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e' }}><CheckCircle /></div>
                     <div>
-                        <div className="stat-label">Low Risk</div>
-                        <div className="stat-value" style={{ color: '#22c55e' }}>{lowRiskCount}</div>
+                        <div className="stat-label">Decisions Pending</div>
+                        <div className="stat-value" style={{ color: '#22c55e' }}>{pendingDecisions}</div>
+                    </div>
+                </div>
+                <div className="stat-card">
+                    <div className="stat-icon" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' }}><ShieldCheck /></div>
+                    <div>
+                        <div className="stat-label">Evidence Missing</div>
+                        <div className="stat-value" style={{ color: '#f59e0b' }}>{evidenceMissing}</div>
                     </div>
                 </div>
             </div>
@@ -134,10 +147,11 @@ export default function Workbench() {
                                 <th style={thStyle}>Industry</th>
                                 <th style={{ ...thStyle, textAlign: 'right' }}>Premium</th>
                                 <th style={{ ...thStyle, textAlign: 'center' }}>Claims</th>
-                                <th style={{ ...thStyle, textAlign: 'right' }}>Claims $</th>
                                 <th style={{ ...thStyle, textAlign: 'right' }}>Loss Ratio</th>
-                                <th style={{ ...thStyle, textAlign: 'center' }}>Risk</th>
-                                <th style={{ ...thStyle, textAlign: 'center' }}>Actions</th>
+                                <th style={{ ...thStyle, textAlign: 'center' }}>AI Status</th>
+                                <th style={{ ...thStyle, textAlign: 'center' }}>Evidence</th>
+                                <th style={{ ...thStyle, textAlign: 'center' }}>Decision</th>
+                                <th style={{ ...thStyle, textAlign: 'center' }}>Action</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -167,17 +181,20 @@ export default function Workbench() {
                                     </td>
                                     <td style={{ ...tdStyle, textAlign: 'right' }}>${p.premium.toLocaleString()}</td>
                                     <td style={{ ...tdStyle, textAlign: 'center' }}>{p.claim_count}</td>
-                                    <td style={{ ...tdStyle, textAlign: 'right' }}>${p.total_claims.toLocaleString()}</td>
                                     <td style={{ ...tdStyle, textAlign: 'right' }}>{p.loss_ratio.toFixed(1)}%</td>
                                     <td style={{ ...tdStyle, textAlign: 'center' }}>{riskBadge(p.risk_level)}</td>
+                                    <td style={{ ...tdStyle, textAlign: 'center' }}>{evidenceStatus(p)}</td>
+                                    <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                        {(decisionMap[p.policy_number] || [])[0]?.decision?.toUpperCase() || 'PENDING'}
+                                    </td>
                                     <td style={{ ...tdStyle, textAlign: 'center' }}>
                                         <button
-                                            onClick={() => navigate(`/analyze?policy=${p.policy_number}`)}
+                                            onClick={() => navigate(`/?policy=${p.policy_number}&mode=decision`)}
                                             className="btn btn-secondary"
                                             style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
                                         >
                                             <FileText style={{ width: '0.75rem', height: '0.75rem' }} />
-                                            Analyze
+                                            Open in RiskMind
                                         </button>
                                     </td>
                                 </tr>

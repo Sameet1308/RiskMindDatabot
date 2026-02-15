@@ -79,7 +79,7 @@ async def index_guidelines(db_session):
     return len(ids)
 
 
-def search_similar(query: str, k: int = 5) -> List[dict]:
+def search_similar(query: str, k: int = 5, policy_number: Optional[str] = None) -> List[dict]:
     """Search ChromaDB for guidelines similar to the query."""
     collection = get_collection()
     if collection.count() == 0:
@@ -92,11 +92,28 @@ def search_similar(query: str, k: int = 5) -> List[dict]:
         for i, doc in enumerate(results["documents"][0]):
             meta = results["metadatas"][0][i] if results["metadatas"] else {}
             dist = results["distances"][0][i] if results["distances"] else 0
+            if policy_number and meta.get("policy_number") not in {policy_number, None, ""}:
+                continue
             matches.append({
                 "section": meta.get("section_code", ""),
                 "title": meta.get("title", ""),
                 "content": doc,
-                "score": 1 - dist  # Convert distance to similarity
+                "score": 1 - dist,  # Convert distance to similarity
+                "policy_number": meta.get("policy_number")
             })
 
     return matches
+
+
+async def upsert_guideline(guideline) -> None:
+    """Add or update a single guideline in ChromaDB."""
+    collection = get_collection()
+    doc_id = f"guideline_{guideline.id}"
+    document = f"Section {guideline.section_code} — {guideline.title}: {guideline.content}"
+    metadata = {
+        "section_code": guideline.section_code,
+        "title": guideline.title,
+        "category": guideline.category or "",
+        "policy_number": guideline.policy_number or ""
+    }
+    collection.upsert(ids=[doc_id], documents=[document], metadatas=[metadata])

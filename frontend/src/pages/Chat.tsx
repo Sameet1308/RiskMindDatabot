@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Send, Loader2, Bot, User, BookOpen, Plus, Trash2, Paperclip, MessageSquare, Mic, MicOff, Camera, Volume2, VolumeOff } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
 import apiService, { ChatSession, ChatMessageOut } from '../services/api'
 
 interface Message {
@@ -12,6 +13,7 @@ interface Message {
 }
 
 export default function Chat() {
+    const [searchParams] = useSearchParams()
     const [sessions, setSessions] = useState<ChatSession[]>([])
     const [activeSessionId, setActiveSessionId] = useState<number | undefined>(undefined)
     const [messages, setMessages] = useState<Message[]>([])
@@ -28,6 +30,11 @@ export default function Chat() {
     const streamRef = useRef<MediaStream | null>(null)
 
     useEffect(() => { loadSessions(); loadProvider() }, [])
+    useEffect(() => {
+        const q = searchParams.get('q')
+        if (!q || input.trim()) return
+        setInput(q)
+    }, [searchParams, input])
     useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
     const loadProvider = async () => {

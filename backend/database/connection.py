@@ -2,6 +2,7 @@
 Database connection and initialization
 """
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy import text
 from sqlalchemy.orm import DeclarativeBase
 import os
 
@@ -22,6 +23,13 @@ async def init_db():
     )
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Ensure guidelines.policy_number exists for policy-linked guidelines
+        result = await conn.execute(
+            text("SELECT name FROM pragma_table_info('guidelines') WHERE name='policy_number'")
+        )
+        if result.fetchone() is None:
+            await conn.execute(text("ALTER TABLE guidelines ADD COLUMN policy_number VARCHAR(50)"))
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_guidelines_policy_number ON guidelines (policy_number)"))
 
 async def get_db():
     """Dependency for getting database session"""

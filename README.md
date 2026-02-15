@@ -26,6 +26,10 @@ Start here:
 
 ## 🚀 Quick Start
 
+For a full walkthrough, use:
+
+- [docs/01-technical-onboarding.md](docs/01-technical-onboarding.md)
+
 ```bash
 # Clone
 git clone https://github.com/YOUR_ORG/riskmind.git
@@ -42,6 +46,19 @@ uvicorn main:app --reload --port 8000
 cd frontend
 npm install
 npm run dev
+```
+
+### Scripts (Windows)
+
+```powershell
+# Precheck environment
+powershell -ExecutionPolicy Bypass -File scripts\precheck.ps1
+
+# Run all services
+powershell -ExecutionPolicy Bypass -File scripts\run-all.ps1
+
+# Shortcut (same as run-all)
+powershell -ExecutionPolicy Bypass -File run.ps1
 ```
 
 - Backend: http://localhost:8000
