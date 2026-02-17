@@ -52,7 +52,26 @@ export interface ChatResponse {
     analysis_object?: Record<string, any>
     recommended_modes?: string[]
     default_mode?: string
-    provenance?: Record<string, any>
+    provenance?: Provenance
+    inferred_intent?: string
+    output_type?: string
+    suggested_outputs?: string[]
+    suggested_prompts?: string[]
+    artifact?: {
+        type: string
+        data: Record<string, any>
+    }
+}
+
+export interface Provenance {
+    tables_used?: string[]
+    join_paths?: string[]
+    query_ids?: string[]
+    sql_plan?: Array<{ id: string; sql: string; params?: Record<string, any> }>
+    citations?: Array<{ type: string; title: string; ref?: string; snippet?: string; url?: string; policy_number?: string }>
+    confidence?: number
+    confidence_reason_codes?: string[]
+    generated_at?: string
 }
 
 export interface ChatSession {
@@ -175,6 +194,17 @@ export interface EvidenceUploadResponse {
     claim_id: number
     claim_number: string
     local_path: string
+}
+
+export interface DashboardData {
+    policies: any[]
+    claims: any[]
+    guidelines: any[]
+    decisions: any[]
+    documents: any[]
+    chat_sessions: any[]
+    chat_messages: any[]
+    snapshot: string
 }
 
 // ──── API Service ────
@@ -345,6 +375,12 @@ export const apiService = {
     // Provider status
     async getProviderInfo() {
         const response = await api.get('/chat/provider')
+        return response.data
+    },
+
+    // Dashboard
+    async getDashboardData(): Promise<DashboardData> {
+        const response = await api.get('/dashboard/data')
         return response.data
     },
 }

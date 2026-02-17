@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Send, Loader2, Bot, MessageSquare, X, BookOpen, Paperclip, Mic, MicOff, Camera, Volume2, VolumeOff } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import apiService from '../services/api'
 
 interface Message {
@@ -7,6 +9,7 @@ interface Message {
     role: 'user' | 'assistant'
     content: string
     sources?: { section: string; title: string }[]
+    suggestedPrompts?: string[]
     timestamp: Date
 }
 
@@ -47,7 +50,7 @@ export default function ChatWidget() {
             if (!sessionId) setSessionId(response.session_id)
             const assistantMsg: Message = {
                 id: Date.now() + 1, role: 'assistant', content: response.response,
-                sources: response.sources, timestamp: new Date()
+                sources: response.sources, suggestedPrompts: response.suggested_prompts || [], timestamp: new Date()
             }
             setMessages(prev => [...prev, assistantMsg])
             speakResponse(response.response)
@@ -247,14 +250,18 @@ export default function ChatWidget() {
                     <div style={{ flex: 1, overflowY: 'auto', padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                         {messages.map((m) => (
                             <div key={m.id} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                                <div style={{
+                                <div className="chat-widget-content" style={{
                                     maxWidth: '85%', padding: '0.5rem 0.75rem',
                                     borderRadius: m.role === 'user' ? '0.875rem 0.875rem 0.25rem 0.875rem' : '0.875rem 0.875rem 0.875rem 0.25rem',
                                     background: m.role === 'user' ? 'linear-gradient(135deg, #FF5A5F, #E5484D)' : '#f1f5f9',
                                     color: m.role === 'user' ? 'white' : 'var(--text)',
                                     fontSize: '0.8125rem', lineHeight: 1.5, whiteSpace: 'pre-wrap'
                                 }}>
-                                    {m.content}
+                                            {m.role === 'assistant' ? (
+                                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
+                                            ) : (
+                                                m.content
+                                            )}
                                     {m.sources && m.sources.length > 0 && (
                                         <div style={{
                                             marginTop: '0.375rem', padding: '0.25rem 0.5rem',
@@ -264,6 +271,41 @@ export default function ChatWidget() {
                                                 <BookOpen style={{ width: '0.5rem', height: '0.5rem' }} /> Sources
                                             </div>
                                             {m.sources.map((s, i) => <div key={i}>§{s.section} — {s.title}</div>)}
+                                        </div>
+                                    )}
+                                    {m.role === 'assistant' && m.suggestedPrompts && m.suggestedPrompts.length > 0 && (
+                                        <div style={{ marginTop: '0.5rem' }}>
+                                            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Did you mean:</div>
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+                                                {m.suggestedPrompts.map((prompt, idx) => (
+                                                    <button
+                                                        key={idx}
+                                                        onClick={() => {
+                                                            setInput(prompt)
+                                                            handleSend()
+                                                        }}
+                                                        style={{
+                                                            background: 'white',
+                                                            border: '1px solid var(--border)',
+                                                            borderRadius: '0.75rem',
+                                                            padding: '0.35rem 0.65rem',
+                                                            fontSize: '0.7rem',
+                                                            cursor: 'pointer',
+                                                            transition: 'all 0.2s',
+                                                        }}
+                                                        onMouseEnter={(e) => {
+                                                            e.currentTarget.style.background = 'rgba(255,90,95,0.08)'
+                                                            e.currentTarget.style.borderColor = 'rgba(255,90,95,0.3)'
+                                                        }}
+                                                        onMouseLeave={(e) => {
+                                                            e.currentTarget.style.background = 'white'
+                                                            e.currentTarget.style.borderColor = 'var(--border)'
+                                                        }}
+                                                    >
+                                                        {prompt}
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
                                     )}
                                 </div>

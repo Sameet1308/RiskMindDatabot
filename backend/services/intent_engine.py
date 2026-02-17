@@ -5,6 +5,7 @@ analysis object creation, and renderer output.
 import re
 import os
 import json
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,8 +16,15 @@ from services.vector_store import search_similar
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 UPLOAD_DIR = os.path.join(BASE_DIR, "data", "uploads")
 
-POLICY_REGEX = re.compile(r"(COMM-\d{4}-\d{3})", re.IGNORECASE)
+POLICY_REGEX = re.compile(r"(COMM-\d{4}-\d{3}|P-\d{4})", re.IGNORECASE)
 CLAIM_REGEX = re.compile(r"(CLM-\d{4}-\d{3})", re.IGNORECASE)
+
+CANONICAL_INTENTS = {
+    "understand": "Understand",
+    "analyze": "Analyze",
+    "decide": "Decide",
+    "document": "Document",
+}
 
 
 def _route_intent(message: str) -> Dict[str, Any]:
@@ -36,37 +44,54 @@ def _route_intent(message: str) -> Dict[str, Any]:
     elif entity == "claim":
         intent = "claim_summary"
 
+    keep_portfolio = False
+    if entity == "portfolio":
+        if any(phrase in lower for phrase in [
+            "how many policies",
+            "total policies",
+            "number of policies",
+            "policy count",
+        ]):
+            intent = "portfolio_summary"
+            keep_portfolio = True
+
     if any(word in lower for word in ["evidence", "photo", "video", "image", "pdf", "document", "report"]):
-        intent = "evidence_blend"
+        intent = "policy_risk_summary" if policy_match else intent
 
-    if any(word in lower for word in ["geo", "map", "location", "region", "geospatial"]):
-        intent = "geo_risk"
-
-    if not policy_match and not claim_match and intent == "portfolio_summary":
+    if not policy_match and not claim_match and intent == "portfolio_summary" and not keep_portfolio:
         if any(word in lower for word in ["list", "show", "count", "average", "total", "top", "highest", "lowest", "group", "by", "trend", "compare", "how many", "max", "most"]):
             intent = "ad_hoc_query"
 
     required_metrics = ["claim_count", "total_amount", "avg_amount", "max_claim"]
-    evidence_needed = intent in {"evidence_blend", "claim_summary"}
+    evidence_needed = intent in {"claim_summary", "policy_risk_summary"}
 
-    recommended_modes = []
-    default_mode = "analysis"
+    canonical_intent = CANONICAL_INTENTS["understand"]
+    output_type = "analysis"
 
-    if intent == "portfolio_summary":
-        recommended_modes = ["dashboard", "insight_card"]
-        default_mode = "dashboard"
-    elif intent == "policy_risk_summary":
-        recommended_modes = ["insight_card", "memo", "decision_draft", "evidence_blend"]
-        default_mode = "analysis"
-    elif intent == "claim_summary" or intent == "evidence_blend":
-        recommended_modes = ["evidence_blend", "recommendation", "decision_draft"]
-        default_mode = "evidence_blend"
-    elif intent == "geo_risk":
-        recommended_modes = ["dashboard", "insight_card"]
-        default_mode = "geo_risk"
+    if any(word in lower for word in ["memo", "draft", "document", "write", "underwriting memo"]):
+        canonical_intent = CANONICAL_INTENTS["document"]
+        output_type = "memo"
+    elif any(word in lower for word in ["should we", "renew", "accept", "decline", "refer", "decision"]):
+        canonical_intent = CANONICAL_INTENTS["decide"]
+        output_type = "card" if "card" in lower else "decision"
+    elif any(word in lower for word in ["trend", "compare", "breakdown", "chart", "dashboard", "analysis", "analyze", "by "]):
+        canonical_intent = CANONICAL_INTENTS["analyze"]
+        output_type = "dashboard"
     elif intent == "ad_hoc_query":
-        recommended_modes = ["insight_card", "dashboard", "memo"]
-        default_mode = "analysis"
+        canonical_intent = CANONICAL_INTENTS["analyze"]
+        output_type = "dashboard"
+
+    recommended_modes: List[str] = []
+    default_mode = output_type
+
+    if canonical_intent == CANONICAL_INTENTS["understand"]:
+        recommended_modes = ["analysis", "card", "memo"]
+    elif canonical_intent == CANONICAL_INTENTS["analyze"]:
+        recommended_modes = ["dashboard", "analysis", "card"]
+    elif canonical_intent == CANONICAL_INTENTS["decide"]:
+        recommended_modes = ["card", "decision", "memo"]
+    elif canonical_intent == CANONICAL_INTENTS["document"]:
+        recommended_modes = ["memo", "analysis", "card"]
 
     return {
         "intent": intent,
@@ -79,6 +104,8 @@ def _route_intent(message: str) -> Dict[str, Any]:
         "evidence_needed": evidence_needed,
         "recommended_modes": recommended_modes,
         "default_mode": default_mode,
+        "canonical_intent": canonical_intent,
+        "output_type": output_type,
     }
 
 
@@ -284,7 +311,69 @@ async def _auto_analyze_evidence(evidence: List[Dict[str, Any]], max_items: int 
         analyzed += 1
 
 
+def _try_simple_query_pattern(message: str) -> Optional[str]:
+    """
+    Handle common simple queries with pre-built SQL patterns.
+    This provides fallback for when LLM is unavailable or fails.
+    """
+    lower = message.lower()
+    
+    # Simple list/show queries
+    if re.match(r'^(show|list|get|display|view|give\s+me|what\s+are).*claims?.*$', lower):
+        return "SELECT * FROM claims ORDER BY claim_date DESC LIMIT 50"
+    
+    if re.match(r'^(show|list|get|display|view|give\s+me|what\s+are).*polic(y|ies).*$', lower):
+        return "SELECT * FROM policies ORDER BY effective_date DESC LIMIT 50"
+    
+    if re.match(r'^(show|list|get|display|view|give\s+me|what\s+are).*guideline.*$', lower):
+        return "SELECT * FROM guidelines ORDER BY section_code LIMIT 50"
+    
+    if re.match(r'^(show|list|get|display|view|give\s+me|what\s+are).*decision.*$', lower):
+        return "SELECT * FROM decisions ORDER BY created_at DESC LIMIT 50"
+    
+    # Specific field queries
+    if any(pattern in lower for pattern in ['all claims', 'every claim', 'claims list']):
+        return "SELECT * FROM claims ORDER BY claim_date DESC LIMIT 50"
+    
+    if any(pattern in lower for pattern in ['all policies', 'every policy', 'policies list']):
+        return "SELECT * FROM policies ORDER BY effective_date DESC LIMIT 50"
+    
+    if 'high risk' in lower and 'polic' in lower:
+        return "SELECT * FROM policies WHERE risk_level = 'high' ORDER BY premium DESC LIMIT 50"
+    
+    # Count queries
+    if 'count' in lower and 'claim' in lower and 'by' in lower and ('policy' in lower or 'policyholder' in lower):
+        return "SELECT policy_number, COUNT(claims.id) as claim_count FROM claims LEFT JOIN policies ON claims.policy_id = policies.id GROUP BY policy_number ORDER BY claim_count DESC"
+    
+    if 'total' in lower and 'claim' in lower and ('amount' in lower or 'value' in lower):
+        return "SELECT SUM(claim_amount) as total_amount, COUNT(*) as claim_count FROM claims"
+    
+    if ('how many' in lower or 'count' in lower) and 'claim' in lower:
+        return "SELECT COUNT(*) as total_claims FROM claims"
+    
+    if ('how many' in lower or 'count' in lower) and 'polic' in lower:
+        return "SELECT COUNT(*) as total_policies FROM policies"
+    
+    return None
+
+
+# In-memory cache for SQL generation (reduces API calls)
+_sql_cache: Dict[str, str] = {}
+_cache_max_size = 100
+
 async def _generate_sql_llm(message: str) -> Optional[str]:
+    # First try simple pattern matching
+    simple_sql = _try_simple_query_pattern(message)
+    if simple_sql:
+        print(f"[intent_engine] Using pattern-matched SQL for: {message}")
+        return simple_sql
+    
+    # Check cache (similar queries won't hit API)
+    cache_key = message.lower().strip()
+    if cache_key in _sql_cache:
+        print(f"[intent_engine] Using cached SQL for: {message}")
+        return _sql_cache[cache_key]
+    
     api_key_g = os.getenv("GOOGLE_API_KEY", "")
     api_key_o = os.getenv("OPENAI_API_KEY", "")
     tables = ", ".join(sorted(JOIN_GRAPH.keys()))
@@ -299,16 +388,49 @@ User question: {message}
 """
 
     if api_key_g:
-        try:
-            import google.generativeai as genai
-            genai.configure(api_key=api_key_g)
-            model_name = os.getenv("GEMINI_MODEL", "gemini-1.5-flash-latest")
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(prompt)
-            return _clean_sql((response.text or "").strip())
-        except Exception as exc:
-            print(f"[intent_engine] Gemini SQL generation failed: {exc}")
-            return None
+        import google.generativeai as genai
+        import asyncio
+        
+        genai.configure(api_key=api_key_g)
+        model_name = os.getenv("GEMINI_MODEL", "gemini-1.5-flash-latest")
+        model = genai.GenerativeModel(model_name)
+        
+        # Retry logic with exponential backoff for rate limits
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = model.generate_content(prompt)
+                sql = _clean_sql((response.text or "").strip())
+                
+                # Cache the result (LRU: remove oldest if full)
+                if sql:
+                    if len(_sql_cache) >= _cache_max_size:
+                        # Remove first (oldest) item
+                        _sql_cache.pop(next(iter(_sql_cache)))
+                    _sql_cache[cache_key] = sql
+                    print(f"[intent_engine] Cached SQL for future use")
+                
+                return sql
+            except Exception as exc:
+                error_str = str(exc)
+                
+                # Check if it's a rate limit error (429)
+                if "429" in error_str or "quota" in error_str.lower() or "rate" in error_str.lower():
+                    if attempt < max_retries - 1:
+                        # Exponential backoff: 2s, 4s, 8s
+                        wait_time = 2 ** (attempt + 1)
+                        print(f"[intent_engine] Gemini rate limit hit, retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})")
+                        await asyncio.sleep(wait_time)
+                        continue
+                    else:
+                        print(f"[intent_engine] Gemini rate limit exhausted after {max_retries} retries")
+                        return None
+                else:
+                    # Non-rate-limit error, don't retry
+                    print(f"[intent_engine] Gemini SQL generation failed: {exc}")
+                    return None
+        
+        return None
 
     if api_key_o:
         try:
@@ -318,7 +440,16 @@ User question: {message}
                 model="gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}],
             )
-            return _clean_sql((response.choices[0].message.content or "").strip())
+            sql = _clean_sql((response.choices[0].message.content or "").strip())
+            
+            # Cache the result
+            if sql:
+                if len(_sql_cache) >= _cache_max_size:
+                    _sql_cache.pop(next(iter(_sql_cache)))
+                _sql_cache[cache_key] = sql
+                print(f"[intent_engine] Cached SQL for future use")
+            
+            return sql
         except Exception as exc:
             print(f"[intent_engine] OpenAI SQL generation failed: {exc}")
             return None
@@ -449,16 +580,87 @@ def _build_analysis_object(intent: str, entities: Dict[str, Any], sql_results: D
     }
 
 
-def _render_analysis_text(analysis_object: Dict[str, Any]) -> str:
+def _build_citations(evidence: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    citations: List[Dict[str, Any]] = []
+    for item in evidence:
+        item_type = (item.get("type") or "").lower()
+        if item_type == "guideline":
+            snippet = (item.get("content") or "")[:240]
+            citations.append({
+                "type": "guideline",
+                "title": item.get("title") or item.get("section") or "Guideline",
+                "ref": item.get("section"),
+                "snippet": snippet,
+                "policy_number": item.get("policy_number"),
+            })
+            continue
+        if item_type == "document":
+            snippet = (item.get("summary") or "")[:240]
+            citations.append({
+                "type": "document",
+                "title": item.get("filename") or "Document",
+                "ref": item.get("file_path"),
+                "snippet": snippet,
+            })
+            continue
+
+        if item.get("url"):
+            citations.append({
+                "type": item.get("type") or "evidence",
+                "title": item.get("description") or item.get("title") or item.get("filename") or "Evidence",
+                "ref": item.get("claim_number"),
+                "url": item.get("url"),
+            })
+
+    return citations
+
+
+def _estimate_confidence(intent: str, analysis_object: Dict[str, Any], message: str, entities: Dict[str, Any]) -> Tuple[int, List[str]]:
+    metrics = analysis_object.get("metrics", {})
+    evidence = analysis_object.get("evidence", [])
+    reason_codes: List[str] = []
+
+    confidence = 72
+    if metrics:
+        confidence += 6
+        reason_codes.append("metrics_present")
+    if evidence:
+        confidence += 6
+        reason_codes.append("evidence_present")
+    if intent == "ad_hoc_query":
+        confidence -= 6
+        reason_codes.append("ad_hoc_query")
+
+    if len(message.split()) <= 3:
+        confidence -= 14
+        reason_codes.append("short_prompt")
+    if not entities.get("policy_number") and not entities.get("claim_number"):
+        confidence -= 8
+        reason_codes.append("no_entity")
+
+    keyword_boost = any(word in message.lower() for word in ["summarize", "trend", "dashboard", "memo", "renew", "decision", "recommend"])
+    if keyword_boost:
+        confidence += 4
+        reason_codes.append("keyword_match")
+
+    return max(45, min(confidence, 95)), reason_codes
+
+
+def _render_analysis_text(analysis_object: Dict[str, Any], output_type: str = "analysis") -> str:
     context = analysis_object.get("context", {})
     metrics = analysis_object.get("metrics", {})
     dims = analysis_object.get("dimensions", {})
     intent = context.get("intent")
 
     if intent == "portfolio_summary":
+        if output_type == "dashboard":
+            return (
+                f"I've prepared your dashboard with cached data from {metrics.get('policy_count', 0)} policies. "
+                f"The intelligence canvas now shows your requested visualization."
+            )
         return (
-            f"Portfolio summary: {metrics.get('policy_count', 0)} policies, total premium "
-            f"${metrics.get('total_premium', 0):,.0f}, total claims "
+            f"You have {metrics.get('policy_count', 0)} policies in the portfolio. "
+            f"Total premium is ${metrics.get('total_premium', 0):,.0f}, and total claims are "
             f"${metrics.get('total_amount', 0):,.0f}."
         )
 
@@ -481,45 +683,126 @@ def _render_analysis_text(analysis_object: Dict[str, Any]) -> str:
 
     if intent == "ad_hoc_query":
         rows = analysis_object.get("dimensions", {}).get("rows", [])
-        return f"Returned {len(rows)} row(s) from the requested query."
+        columns = analysis_object.get("dimensions", {}).get("columns", [])
+        
+        # Dashboard mode: provide a visualization-friendly message
+        if output_type == "dashboard" and len(rows) > 0:
+            return (
+                f"I've created your visualization with {len(rows)} data point(s). "
+                f"The intelligence canvas now shows your requested chart."
+            )
+        
+        if len(rows) == 1 and columns:
+            row = rows[0]
+            if len(columns) == 1:
+                value = row.get(columns[0])
+                if isinstance(value, (int, float)):
+                    return f"The result is {value:,}."
+                return f"The result is {value}."
+            if "policy_count" in row:
+                return f"You have {int(row.get('policy_count', 0)):,} policies in total."
+            if "claim_count" in row:
+                return f"You have {int(row.get('claim_count', 0)):,} total claims."
+        
+        # Multi-row results: return conversational message with Markdown table
+        if len(rows) > 1 and columns:
+            intro = f"Here are the {len(rows)} results:\n\n"
+            header = "| " + " | ".join(str(col) for col in columns) + " |"
+            separator = "| " + " | ".join("---" for _ in columns) + " |"
+            table_rows = []
+            for row in rows:
+                values = [str(row.get(col, "")) for col in columns]
+                table_rows.append("| " + " | ".join(values) + " |")
+            table = "\n".join([header, separator] + table_rows)
+            return intro + table
+        
+        return f"I found {len(rows)} result(s) from your query."
 
     return "RiskMind analyzed your request using available portfolio data."
 
 
-async def run_intent_pipeline(message: str, db: AsyncSession) -> Dict[str, Any]:
-    intent_payload = _route_intent(message)
+async def run_intent_pipeline(message: str, db: AsyncSession, history: List[Dict[str, str]] = None) -> Dict[str, Any]:
+    """Run intent-based analysis pipeline with conversation history for context."""
+    if history is None:
+        history = []
+    
+    # Extract context from recent history (last 5 messages)
+    context_message = message
+    if history:
+        recent_history = history[-5:]
+        # Look for policy/claim references in recent messages
+        for msg in reversed(recent_history):
+            if msg["role"] == "user":
+                policy_match = POLICY_REGEX.search(msg["content"])
+                claim_match = CLAIM_REGEX.search(msg["content"])
+                if policy_match or claim_match:
+                    # Append previous context to current message for intent routing
+                    context_message = f"{msg['content']} {message}"
+                    break
+    
+    intent_payload = _route_intent(context_message)
+    output_type = intent_payload["output_type"]
+    canonical_intent = intent_payload["canonical_intent"]
 
     if intent_payload["intent"] == "ad_hoc_query":
         sql = await _generate_sql_llm(message)
         if not sql:
+            empty_provenance = {"tables_used": [], "join_paths": [], "query_ids": []}
+            analysis_object = {
+                "context": {"intent": "ad_hoc_query"},
+                "metrics": {},
+                "dimensions": {},
+                "evidence": [],
+                "provenance": empty_provenance,
+            }
+            provenance_detail = {
+                **empty_provenance,
+                "sql_plan": [],
+                "citations": [],
+                "confidence": 52,
+                "confidence_reason_codes": ["no_sql", "no_provider"],
+                "generated_at": datetime.utcnow().isoformat(),
+            }
             return {
-                "analysis_object": {
-                    "context": {"intent": "ad_hoc_query"},
-                    "metrics": {},
-                    "dimensions": {},
-                    "evidence": [],
-                    "provenance": {"tables_used": [], "join_paths": [], "query_ids": []}
-                },
+                "analysis_object": analysis_object,
                 "analysis_text": "Unable to generate SQL without an AI provider. Configure an API key to enable ad-hoc queries.",
                 "recommended_modes": intent_payload["recommended_modes"],
                 "default_mode": intent_payload["default_mode"],
-                "provenance": {"tables_used": [], "join_paths": [], "query_ids": []}
+                "provenance": provenance_detail,
+                "inferred_intent": canonical_intent,
+                "output_type": output_type,
+                "suggested_outputs": intent_payload["recommended_modes"],
+                "artifact": {"type": "analysis_object", "data": analysis_object},
             }
 
         is_valid, error, tables = _validate_sql(sql)
         if not is_valid:
+            base_provenance = {"tables_used": tables, "join_paths": [], "query_ids": ["ad_hoc_query"]}
+            analysis_object = {
+                "context": {"intent": "ad_hoc_query"},
+                "metrics": {},
+                "dimensions": {},
+                "evidence": [],
+                "provenance": base_provenance,
+            }
+            provenance_detail = {
+                **base_provenance,
+                "sql_plan": [],
+                "citations": [],
+                "confidence": 56,
+                "confidence_reason_codes": ["sql_rejected"],
+                "generated_at": datetime.utcnow().isoformat(),
+            }
             return {
-                "analysis_object": {
-                    "context": {"intent": "ad_hoc_query"},
-                    "metrics": {},
-                    "dimensions": {},
-                    "evidence": [],
-                    "provenance": {"tables_used": tables, "join_paths": [], "query_ids": ["ad_hoc_query"]}
-                },
+                "analysis_object": analysis_object,
                 "analysis_text": f"SQL rejected: {error}",
                 "recommended_modes": intent_payload["recommended_modes"],
                 "default_mode": intent_payload["default_mode"],
-                "provenance": {"tables_used": tables, "join_paths": [], "query_ids": ["ad_hoc_query"]}
+                "provenance": provenance_detail,
+                "inferred_intent": canonical_intent,
+                "output_type": output_type,
+                "suggested_outputs": intent_payload["recommended_modes"],
+                "artifact": {"type": "analysis_object", "data": analysis_object},
             }
 
         plan = {
@@ -567,10 +850,69 @@ async def run_intent_pipeline(message: str, db: AsyncSession) -> Dict[str, Any]:
     if _should_analyze_evidence(message, analysis_object["evidence"]):
         await _auto_analyze_evidence(analysis_object["evidence"], max_items=2)
 
+    confidence, reason_codes = _estimate_confidence(intent_payload["intent"], analysis_object, message, intent_payload["entities"])
+    
+    # Don't override dashboard mode for chart/visualization requests even if confidence is low
+    explicit_dashboard_request = any(word in message.lower() for word in ["chart", "dashboard", "plot", "graph", "visualization", "widget"])
+    
+    if confidence < 60:
+        reason_codes.append("low_confidence")
+        if not explicit_dashboard_request:
+            canonical_intent = CANONICAL_INTENTS["understand"]
+            output_type = "analysis"
+
+    recommended_modes = intent_payload["recommended_modes"]
+    if confidence < 60:
+        recommended_modes = recommended_modes[:2]
+
+    # Generate clarifying suggestions when confidence is low
+    suggested_prompts = []
+    if confidence < 60:
+        lower = message.lower()
+        if "claim" in lower and not intent_payload["entities"]["claim_number"]:
+            suggested_prompts = [
+                "Show me claims for COMM-2024-016",
+                "List all claims with high severity",
+                "What's the total claim amount?"
+            ]
+        elif "policy" in lower and not intent_payload["entities"]["policy_number"]:
+            suggested_prompts = [
+                "Show me policy COMM-2024-016",
+                "List policies by industry type",
+                "What's the total premium?"
+            ]
+        elif "chart" in lower or "dashboard" in lower:
+            suggested_prompts = [
+                "Bar chart of claim count by policy number",
+                "Pie chart of policies by industry type",
+                "Line chart showing claim trends"
+            ]
+        else:
+            suggested_prompts = [
+                "Show me the portfolio overview",
+                "Analyze policy COMM-2024-016",
+                "Create a dashboard with key metrics"
+            ]
+
+    provenance_detail = {
+        **plan["provenance"],
+        "sql_plan": plan.get("sql_plan", []),
+        "citations": _build_citations(analysis_object.get("evidence", [])),
+        "confidence": confidence,
+        "confidence_reason_codes": reason_codes,
+        "generated_at": datetime.utcnow().isoformat(),
+    }
+    analysis_object["provenance"] = provenance_detail
+
     return {
         "analysis_object": analysis_object,
-        "analysis_text": _render_analysis_text(analysis_object),
-        "recommended_modes": intent_payload["recommended_modes"],
-        "default_mode": intent_payload["default_mode"],
-        "provenance": plan["provenance"],
+        "analysis_text": _render_analysis_text(analysis_object, output_type),
+        "recommended_modes": recommended_modes,
+        "default_mode": output_type,
+        "provenance": provenance_detail,
+        "inferred_intent": canonical_intent,
+        "output_type": output_type,
+        "suggested_outputs": recommended_modes,
+        "suggested_prompts": suggested_prompts,
+        "artifact": {"type": "analysis_object", "data": analysis_object},
     }

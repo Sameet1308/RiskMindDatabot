@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Briefcase, AlertTriangle, CheckCircle, Search, FileText, ShieldCheck } from 'lucide-react'
+import { Briefcase, AlertTriangle, CheckCircle, Search, FileText, ShieldCheck, Sparkles } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import apiService, { PolicyItem, DecisionItem } from '../services/api'
 
@@ -188,14 +188,24 @@ export default function Workbench() {
                                         {(decisionMap[p.policy_number] || [])[0]?.decision?.toUpperCase() || 'PENDING'}
                                     </td>
                                     <td style={{ ...tdStyle, textAlign: 'center' }}>
-                                        <button
-                                            onClick={() => navigate(`/?policy=${p.policy_number}&mode=decision`)}
-                                            className="btn btn-secondary"
-                                            style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
-                                        >
-                                            <FileText style={{ width: '0.75rem', height: '0.75rem' }} />
-                                            Open in RiskMind
-                                        </button>
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', justifyContent: 'center' }}>
+                                            <button
+                                                onClick={() => navigate(`/?policy=${p.policy_number}&output=analysis`)}
+                                                className="btn btn-secondary"
+                                                style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                                            >
+                                                <FileText style={{ width: '0.75rem', height: '0.75rem' }} />
+                                                Analyze
+                                            </button>
+                                            <button
+                                                onClick={() => navigate(`/?policy=${p.policy_number}&output=card`)}
+                                                className="btn btn-secondary"
+                                                style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                                            >
+                                                <Sparkles style={{ width: '0.75rem', height: '0.75rem' }} />
+                                                Hyperintelligence
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}

@@ -1,5 +1,5 @@
 import { Outlet, Link, NavLink } from 'react-router-dom'
-import { Shield, LogOut, Briefcase, Bot, Bookmark } from 'lucide-react'
+import { Shield, Briefcase, Bot, Bookmark } from 'lucide-react'
 
 export default function Layout() {
     const navItems = [
@@ -36,12 +36,6 @@ export default function Layout() {
                             </NavLink>
                         ))}
 
-                        <div className="nav-divider" />
-
-                        <Link to="/login" className="nav-link">
-                            <LogOut className="nav-icon" />
-                            <span className="hidden sm:inline">Logout</span>
-                        </Link>
                     </nav>
                 </div>
             </header>

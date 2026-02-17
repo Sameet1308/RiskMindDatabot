@@ -60,6 +60,10 @@ class ChatResponse(BaseModel):
     recommended_modes: Optional[List[str]] = None
     default_mode: Optional[str] = None
     provenance: Optional[dict] = None
+    inferred_intent: Optional[str] = None
+    output_type: Optional[str] = None
+    suggested_outputs: Optional[List[str]] = None
+    artifact: Optional[dict] = None
 
 class SessionOut(BaseModel):
     id: int
@@ -118,7 +122,7 @@ async def _nl_to_sql_query(message: str, db: AsyncSession) -> str:
     context_parts = []
 
     # Policy-specific queries
-    policy_match = re.search(r'(COMM-\d{4}-\d{3})', message, re.IGNORECASE)
+    policy_match = re.search(r'(COMM-\d{4}-\d{3}|P-\d{4})', message, re.IGNORECASE)
     if policy_match:
         policy_num = policy_match.group(1).upper()
         result = await db.execute(text(f"""
@@ -569,14 +573,23 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
     recommended_modes = None
     default_mode = None
     provenance = None
+    inferred_intent = None
+    output_type = None
+    suggested_outputs = None
+    artifact = None
 
     try:
-        pipeline = await run_intent_pipeline(request.message, db)
+        # Pass history for context-aware follow-up questions
+        pipeline = await run_intent_pipeline(request.message, db, history)
         response_text = pipeline.get("analysis_text")
         analysis_object = pipeline.get("analysis_object")
         recommended_modes = pipeline.get("recommended_modes")
         default_mode = pipeline.get("default_mode")
         provenance = pipeline.get("provenance")
+        inferred_intent = pipeline.get("inferred_intent")
+        output_type = pipeline.get("output_type")
+        suggested_outputs = pipeline.get("suggested_outputs")
+        artifact = pipeline.get("artifact")
     except Exception as e:
         print(f"Intent pipeline error: {e}")
 
@@ -595,7 +608,11 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
         analysis_object=analysis_object,
         recommended_modes=recommended_modes,
         default_mode=default_mode,
-        provenance=provenance
+        provenance=provenance,
+        inferred_intent=inferred_intent,
+        output_type=output_type,
+        suggested_outputs=suggested_outputs,
+        artifact=artifact
     )
 
 
@@ -615,8 +632,8 @@ async def vision_chat(request: VisionRequest, db: AsyncSession = Depends(get_db)
 
 @router.get("/sessions", response_model=List[SessionOut])
 async def list_sessions(user_email: str = "demo@ltm.com", db: AsyncSession = Depends(get_db)):
-    """List chat sessions (last 7 days)."""
-    cutoff = datetime.utcnow() - timedelta(days=7)
+    """List chat sessions (last 2 days)."""
+    cutoff = datetime.utcnow() - timedelta(days=2)
     result = await db.execute(
         select(ChatSession)
         .where(ChatSession.user_email == user_email)

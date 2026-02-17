@@ -27,6 +27,7 @@ async def seed():
         # ===== POLICIES (20) =====
         policies = [
             ("COMM-2024-001", "ABC Manufacturing Inc", "Manufacturing", 50000, "2024-01-15", "2025-01-15"),
+            ("P-1023", "Northwind Logistics", "Transportation", 52000, "2024-01-01", "2025-01-01"),
             ("COMM-2024-002", "XYZ Restaurant Group", "Restaurant", 35000, "2024-02-01", "2025-02-01"),
             ("COMM-2024-003", "SafeBuild Construction", "Construction", 75000, "2024-03-10", "2025-03-10"),
             ("COMM-2024-004", "MedCare Health Services", "Healthcare", 60000, "2024-04-01", "2025-04-01"),
@@ -81,6 +82,11 @@ async def seed():
 
         # ===== CLAIMS (58 total) =====
         claims = [
+            # P-1023: Northwind Logistics — trend-ready claims
+            (policy_map["P-1023"], "CLM-2025-100", "2024-01-12", 12000, "auto_accident", "closed", "Rear-end collision on highway"),
+            (policy_map["P-1023"], "CLM-2025-101", "2024-03-18", 18000, "auto_accident", "closed", "Multi-vehicle incident"),
+            (policy_map["P-1023"], "CLM-2025-102", "2024-06-09", 9000, "property_damage", "closed", "Cargo handling damage"),
+            (policy_map["P-1023"], "CLM-2025-103", "2024-10-22", 24000, "auto_accident", "open", "Intersection collision with injuries"),
             # COMM-2024-001: ABC Manufacturing — 2 claims (LOW risk)
             (policy_map["COMM-2024-001"], "CLM-2024-001", "2024-03-15", 8500, "property_damage", "closed", "Minor equipment damage in warehouse"),
             (policy_map["COMM-2024-001"], "CLM-2024-002", "2024-07-22", 15000, "property_damage", "closed", "Water damage from pipe burst"),

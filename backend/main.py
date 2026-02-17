@@ -16,6 +16,7 @@ from routers.alerts import router as alerts_router
 from routers.memo import router as memo_router
 from routers.policies import router as policies_router
 from routers.decisions import router as decisions_router
+from routers.dashboard import router as dashboard_router
 from database.connection import init_db, get_db, async_session
 
 @asynccontextmanager
@@ -59,7 +60,7 @@ app = FastAPI(
 # CORS for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:5174", "http://localhost:5175", "http://localhost:5176", "http://localhost:5177"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -77,6 +78,7 @@ app.include_router(alerts_router, prefix="/api/alerts", tags=["Alerts"])
 app.include_router(memo_router, prefix="/api/memo", tags=["Memo"])
 app.include_router(policies_router, prefix="/api/policies", tags=["Policies"])
 app.include_router(decisions_router, prefix="/api/decisions", tags=["Decisions"])
+app.include_router(dashboard_router, prefix="/api/dashboard", tags=["Dashboard"])
 
 @app.get("/")
 async def root():
