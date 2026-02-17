@@ -25,12 +25,15 @@ async def lifespan(app: FastAPI):
     await init_db()
     print("[OK] Database initialized")
 
-    # Index guidelines into ChromaDB
+    # Index guidelines + claims + decisions into ChromaDB
     try:
-        from services.vector_store import index_guidelines
+        from services.vector_store import index_guidelines, index_claims_and_decisions
         async with async_session() as session:
             count = await index_guidelines(session)
             print(f"[OK] ChromaDB: {count} guidelines indexed")
+        async with async_session() as session:
+            n_claims, n_decisions = await index_claims_and_decisions(session)
+            print(f"[OK] ChromaDB: {n_claims} claims + {n_decisions} decisions indexed")
     except Exception as e:
         print(f"[WARN] ChromaDB indexing skipped: {e}")
 

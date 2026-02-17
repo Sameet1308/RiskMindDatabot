@@ -19,7 +19,7 @@ import time
 from database.connection import get_db
 from models.schemas import ChatSession, ChatMessage, Document
 from services.intent_engine import run_intent_pipeline
-from services.vector_store import search_similar
+from services.vector_store import search_similar, search_knowledge
 
 router = APIRouter()
 
@@ -119,14 +119,13 @@ If asked about specific data, provide numbers, tables, and calculations."""
 # ──── NL→SQL: Query any structured data ────
 
 async def _nl_to_sql_query(message: str, db: AsyncSession) -> str:
-    """Generate and execute SQL from natural language question.
-    Uses the LLM to generate SQL, then runs it against SQLite.
-    Falls back to keyword-based queries if no LLM available."""
+    """Fetch relevant structured data context based on the user's message.
+    Covers policies, claims, decisions, industry, risk, loss ratios, and more."""
 
     msg_lower = message.lower()
     context_parts = []
 
-    # Policy-specific queries
+    # ── Specific policy lookup (COMM-YYYY-NNN) ────────────────────────────────
     policy_match = re.search(r'(COMM-\d{4}-\d{3}|P-\d{4})', message, re.IGNORECASE)
     if policy_match:
         policy_num = policy_match.group(1).upper()
@@ -144,39 +143,75 @@ async def _nl_to_sql_query(message: str, db: AsyncSession) -> str:
         """))
         row = result.fetchone()
         if row:
-            pn, name, ind, prem, eff, exp, cnt, tot, avg, mx = row
+            pn, name, ind, prem, eff, exp, cnt, tot, avg_c, mx = row
             lr = (tot / prem * 100) if prem > 0 else 0
+            risk = "HIGH" if (cnt >= 5 or tot >= 100000) else "MEDIUM" if (cnt >= 3 or tot >= 50000) else "LOW"
             context_parts.append(f"""
 POLICY {pn}:
 - Policyholder: {name}
 - Industry: {ind}
 - Premium: ${prem:,.2f}
 - Effective: {eff} → Expiration: {exp}
-- Claims: {cnt} | Total: ${tot:,.2f} | Avg: ${avg:,.2f} | Max: ${mx:,.2f}
+- Claims: {cnt} | Total: ${tot:,.2f} | Avg: ${avg_c:,.2f} | Max: ${mx:,.2f}
 - Loss Ratio: {lr:.1f}%
+- Risk Level: {risk}
 """)
+        # Also fetch claim details for this policy
+        result2 = await db.execute(text(f"""
+            SELECT claim_number, claim_type, claim_amount, status, claim_date, description
+            FROM claims c
+            JOIN policies p ON c.policy_id = p.id
+            WHERE p.policy_number = '{policy_num}'
+            ORDER BY claim_date DESC LIMIT 10
+        """))
+        claim_rows = result2.fetchall()
+        if claim_rows:
+            lines = f"CLAIMS FOR {policy_num}:\n"
+            for r in claim_rows:
+                desc_short = (r[5] or "")[:80]
+                lines += f"- {r[0]} | {r[1]} | ${r[2]:,.2f} | {r[3]} | {r[4]} | {desc_short}\n"
+            context_parts.append(lines)
+        # Past decisions for this policy
+        result3 = await db.execute(text(f"""
+            SELECT decision, risk_level, reason, decided_by, created_at
+            FROM decisions WHERE policy_number = '{policy_num}'
+            ORDER BY created_at DESC LIMIT 3
+        """))
+        dec_rows = result3.fetchall()
+        if dec_rows:
+            lines = f"DECISIONS FOR {policy_num}:\n"
+            for r in dec_rows:
+                lines += f"- {r[0].upper()} (Risk: {r[1]}) by {r[3]} on {r[4]}: {(r[2] or '')[:120]}\n"
+            context_parts.append(lines)
 
-    # Claims queries
-    if any(w in msg_lower for w in ["claim", "loss", "incident", "severity", "frequency"]):
-        result = await db.execute(text("""
-            SELECT COUNT(*), COALESCE(SUM(claim_amount), 0),
-                   COALESCE(AVG(claim_amount), 0), COALESCE(MAX(claim_amount), 0)
-            FROM claims
+    # ── Specific claim lookup (CLM-YYYY-NNN) ─────────────────────────────────
+    claim_match = re.search(r'(CLM-\d{4}-\d{3})', message, re.IGNORECASE)
+    if claim_match:
+        claim_num = claim_match.group(1).upper()
+        result = await db.execute(text(f"""
+            SELECT c.claim_number, c.claim_type, c.claim_amount, c.status,
+                   c.claim_date, c.description, p.policy_number, p.policyholder_name
+            FROM claims c JOIN policies p ON c.policy_id = p.id
+            WHERE c.claim_number = '{claim_num}'
         """))
         row = result.fetchone()
         if row:
             context_parts.append(f"""
-CLAIMS OVERVIEW:
-- Total Claims: {row[0]}
-- Total Amount: ${row[1]:,.2f}
-- Average: ${row[2]:,.2f}
-- Largest: ${row[3]:,.2f}
+CLAIM {row[0]}:
+- Type: {row[1]} | Amount: ${row[2]:,.2f} | Status: {row[3]}
+- Date: {row[4]}
+- Policy: {row[6]} ({row[7]})
+- Description: {row[5]}
 """)
 
-    # Policy portfolio
-    if any(w in msg_lower for w in ["portfolio", "all policies", "total policies", "how many", "list"]):
+    # ── Portfolio overview ────────────────────────────────────────────────────
+    if any(w in msg_lower for w in ["portfolio", "overview", "all policies", "total policies",
+                                     "how many", "summary", "snapshot"]):
         result = await db.execute(text("""
-            SELECT COUNT(*), COALESCE(SUM(premium), 0), COALESCE(AVG(premium), 0)
+            SELECT COUNT(*) as total, COALESCE(SUM(premium), 0) as total_premium,
+                   COALESCE(AVG(premium), 0) as avg_premium,
+                   SUM(CASE WHEN expiration_date < date('now') THEN 1 ELSE 0 END) as expired,
+                   SUM(CASE WHEN expiration_date BETWEEN date('now') AND date('now','+30 days') THEN 1 ELSE 0 END) as expiring_soon
             FROM policies
         """))
         row = result.fetchone()
@@ -184,51 +219,159 @@ CLAIMS OVERVIEW:
             context_parts.append(f"""
 PORTFOLIO SUMMARY:
 - Total Policies: {row[0]}
-- Total Premium: ${row[1]:,.2f}
-- Average Premium: ${row[2]:,.2f}
+- Total Premium: ${row[1]:,.2f}  |  Average Premium: ${row[2]:,.2f}
+- Expired: {row[3]}  |  Expiring in 30 days: {row[4]}
 """)
 
-    # Industry breakdown
-    if any(w in msg_lower for w in ["industry", "sector", "type", "breakdown"]):
+    # ── Claims overview ───────────────────────────────────────────────────────
+    if any(w in msg_lower for w in ["claim", "loss", "incident", "severity", "frequency", "damage"]):
         result = await db.execute(text("""
-            SELECT industry_type, COUNT(*) as cnt, SUM(premium) as total_prem
-            FROM policies GROUP BY industry_type ORDER BY cnt DESC
+            SELECT COUNT(*) as total, COALESCE(SUM(claim_amount), 0) as total_amount,
+                   COALESCE(AVG(claim_amount), 0) as avg_amount,
+                   COALESCE(MAX(claim_amount), 0) as max_amount,
+                   SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) as open_claims,
+                   SUM(CASE WHEN status = 'closed' THEN 1 ELSE 0 END) as closed_claims
+            FROM claims
+        """))
+        row = result.fetchone()
+        if row:
+            context_parts.append(f"""
+CLAIMS OVERVIEW:
+- Total: {row[0]} (Open: {row[4]}, Closed: {row[5]})
+- Total Amount: ${row[1]:,.2f}  |  Average: ${row[2]:,.2f}  |  Largest: ${row[3]:,.2f}
+""")
+        # Claims by type
+        result2 = await db.execute(text("""
+            SELECT claim_type, COUNT(*) as cnt, COALESCE(SUM(claim_amount), 0) as total
+            FROM claims GROUP BY claim_type ORDER BY total DESC
+        """))
+        type_rows = result2.fetchall()
+        if type_rows:
+            lines = "CLAIMS BY TYPE:\n"
+            for r in type_rows:
+                lines += f"- {r[0]}: {r[1]} claims, ${r[2]:,.2f}\n"
+            context_parts.append(lines)
+
+    # ── Industry breakdown ────────────────────────────────────────────────────
+    if any(w in msg_lower for w in ["industry", "sector", "construction", "restaurant",
+                                     "retail", "manufacturing", "healthcare", "technology"]):
+        result = await db.execute(text("""
+            SELECT p.industry_type, COUNT(DISTINCT p.id) as policies,
+                   COALESCE(SUM(p.premium), 0) as total_premium,
+                   COUNT(c.id) as claim_count,
+                   COALESCE(SUM(c.claim_amount), 0) as total_claims,
+                   CASE WHEN SUM(p.premium) > 0
+                        THEN ROUND(SUM(c.claim_amount) * 100.0 / SUM(p.premium), 1)
+                        ELSE 0 END as loss_ratio
+            FROM policies p
+            LEFT JOIN claims c ON p.id = c.policy_id
+            GROUP BY p.industry_type ORDER BY total_claims DESC
         """))
         rows = result.fetchall()
         if rows:
             lines = "INDUSTRY BREAKDOWN:\n"
             for r in rows:
-                lines += f"- {r[0]}: {r[1]} policies, ${r[2]:,.2f} premium\n"
+                lines += f"- {r[0]}: {r[1]} policies, ${r[2]:,.2f} premium, {r[3]} claims, loss ratio {r[5]}%\n"
             context_parts.append(lines)
 
-    # Decisions
-    if any(w in msg_lower for w in ["decision", "accept", "decline", "refer"]):
+    # ── Loss ratio analysis ───────────────────────────────────────────────────
+    if any(w in msg_lower for w in ["loss ratio", "profitability", "profitable", "underperform"]):
         result = await db.execute(text("""
-            SELECT decision, COUNT(*) FROM decisions GROUP BY decision
+            SELECT p.policy_number, p.policyholder_name, p.industry_type,
+                   p.premium, COALESCE(SUM(c.claim_amount), 0) as total_claims,
+                   ROUND(COALESCE(SUM(c.claim_amount), 0) * 100.0 / p.premium, 1) as loss_ratio
+            FROM policies p
+            LEFT JOIN claims c ON p.id = c.policy_id
+            GROUP BY p.id
+            HAVING loss_ratio > 60
+            ORDER BY loss_ratio DESC LIMIT 10
         """))
         rows = result.fetchall()
         if rows:
-            lines = "DECISION HISTORY:\n"
+            lines = "HIGH LOSS RATIO POLICIES (>60%):\n"
             for r in rows:
-                lines += f"- {r[0].title()}: {r[1]}\n"
+                lines += f"- {r[0]} ({r[1]}, {r[2]}): premium ${r[3]:,.2f}, claims ${r[4]:,.2f}, LR {r[5]}%\n"
             context_parts.append(lines)
 
-    # High risk
-    if any(w in msg_lower for w in ["high risk", "risky", "worst", "danger", "review"]):
+    # ── High risk policies ────────────────────────────────────────────────────
+    if any(w in msg_lower for w in ["high risk", "risky", "worst", "danger", "most claims",
+                                     "problematic", "concern", "worry"]):
         result = await db.execute(text("""
-            SELECT p.policy_number, p.policyholder_name,
-                   COUNT(c.id) as claims, COALESCE(SUM(c.claim_amount), 0) as total
+            SELECT p.policy_number, p.policyholder_name, p.industry_type,
+                   COUNT(c.id) as claims, COALESCE(SUM(c.claim_amount), 0) as total,
+                   p.premium,
+                   ROUND(COALESCE(SUM(c.claim_amount), 0) * 100.0 / NULLIF(p.premium, 0), 1) as lr
             FROM policies p
             LEFT JOIN claims c ON p.id = c.policy_id
             GROUP BY p.id
             HAVING claims >= 3 OR total >= 50000
-            ORDER BY total DESC LIMIT 5
+            ORDER BY total DESC LIMIT 8
         """))
         rows = result.fetchall()
         if rows:
             lines = "HIGH RISK POLICIES:\n"
             for r in rows:
-                lines += f"- {r[0]} ({r[1]}): {r[2]} claims, ${r[3]:,.2f}\n"
+                lines += f"- {r[0]} ({r[1]}, {r[2]}): {r[3]} claims, ${r[4]:,.2f} total, LR {r[6]}%\n"
+            context_parts.append(lines)
+
+    # ── Decision history ──────────────────────────────────────────────────────
+    if any(w in msg_lower for w in ["decision", "accept", "decline", "refer", "approved",
+                                     "rejected", "underwriting decision", "past decision"]):
+        result = await db.execute(text("""
+            SELECT decision, COUNT(*) as cnt FROM decisions GROUP BY decision
+        """))
+        rows = result.fetchall()
+        if rows:
+            lines = "DECISION SUMMARY:\n"
+            for r in rows:
+                lines += f"- {r[0].title()}: {r[1]}\n"
+            context_parts.append(lines)
+        # Recent decisions
+        result2 = await db.execute(text("""
+            SELECT policy_number, decision, risk_level, reason, decided_by, created_at
+            FROM decisions ORDER BY created_at DESC LIMIT 5
+        """))
+        recent = result2.fetchall()
+        if recent:
+            lines = "RECENT DECISIONS:\n"
+            for r in recent:
+                lines += f"- {r[0]}: {r[1].upper()} (Risk: {r[2]}) — {(r[3] or '')[:100]}\n"
+            context_parts.append(lines)
+
+    # ── Policyholder name search ──────────────────────────────────────────────
+    name_keywords = [w for w in msg_lower.split() if len(w) > 4
+                     and w not in {"about", "policy", "claim", "show", "tell", "what", "which",
+                                   "their", "there", "where", "those", "these", "industry"}]
+    if name_keywords and not policy_match and not claim_match:
+        like_clause = " OR ".join([f"LOWER(p.policyholder_name) LIKE '%{w}%'" for w in name_keywords[:3]])
+        result = await db.execute(text(f"""
+            SELECT p.policy_number, p.policyholder_name, p.industry_type, p.premium,
+                   COUNT(c.id) as claims, COALESCE(SUM(c.claim_amount), 0) as total_claims
+            FROM policies p
+            LEFT JOIN claims c ON p.id = c.policy_id
+            WHERE {like_clause}
+            GROUP BY p.id LIMIT 5
+        """))
+        rows = result.fetchall()
+        if rows:
+            lines = "MATCHING POLICIES BY NAME:\n"
+            for r in rows:
+                lines += f"- {r[0]}: {r[1]} ({r[2]}) | Premium: ${r[3]:,.2f} | {r[4]} claims, ${r[5]:,.2f}\n"
+            context_parts.append(lines)
+
+    # ── Expiring policies ─────────────────────────────────────────────────────
+    if any(w in msg_lower for w in ["expir", "renew", "upcoming", "soon"]):
+        result = await db.execute(text("""
+            SELECT policy_number, policyholder_name, industry_type, premium, expiration_date
+            FROM policies
+            WHERE expiration_date BETWEEN date('now') AND date('now', '+60 days')
+            ORDER BY expiration_date ASC LIMIT 10
+        """))
+        rows = result.fetchall()
+        if rows:
+            lines = "POLICIES EXPIRING IN 60 DAYS:\n"
+            for r in rows:
+                lines += f"- {r[0]} ({r[1]}, {r[2]}): ${r[3]:,.2f} premium, expires {r[4]}\n"
             context_parts.append(lines)
 
     return "\n".join(context_parts)
@@ -328,44 +471,61 @@ async def _openai_response(message: str, history: list, context: str, guideline_
 
 
 async def _llm_response(message: str, history: list, db: AsyncSession) -> tuple:
-    """Unified LLM call: Gemini → OpenAI → Smart Mock."""
+    """Unified LLM call with 3-source context: SQL data + guidelines RAG + knowledge RAG."""
 
-    # 1. RAG: Search ChromaDB for guidelines
+    # 1. Guidelines RAG (underwriting rules and thresholds)
     rag_results = search_similar(message, k=5)
     sources = [{"section": r["section"], "title": r["title"]} for r in rag_results] if rag_results else []
     guideline_context = "\n".join([f"- [{r['section']}] {r['content']}" for r in rag_results]) if rag_results else ""
 
-    # 2. NL→SQL: Get structured data context
+    # 2. Structured data: exact SQL queries
     data_context = await _nl_to_sql_query(message, db)
 
-    # 3. Try LLMs in order: Claude → Gemini → OpenAI → Mock
-    provider = "mock"
+    # 3. Knowledge RAG: similar past claims and decisions (semantic search)
+    knowledge_results = search_knowledge(message, k=4)
+    knowledge_context = ""
+    if knowledge_results:
+        claims_ctx = [r for r in knowledge_results if r.get("type") == "claim"]
+        decisions_ctx = [r for r in knowledge_results if r.get("type") == "decision"]
+        parts = []
+        if claims_ctx:
+            parts.append("SIMILAR PAST CLAIMS:\n" + "\n".join(f"- {r['content']}" for r in claims_ctx))
+        if decisions_ctx:
+            parts.append("SIMILAR PAST DECISIONS:\n" + "\n".join(f"- {r['content']}" for r in decisions_ctx))
+        knowledge_context = "\n\n".join(parts)
+        # Add knowledge sources to sources list
+        for r in decisions_ctx:
+            pnum = r.get("policy_number", "")
+            if pnum:
+                sources.append({"section": pnum, "title": f"{r.get('decision','').upper()} decision"})
+
+    # Combine all context
+    full_data_context = "\n\n".join(filter(None, [data_context, knowledge_context]))
+
+    # 4. Try LLMs in order: Claude → Gemini → OpenAI → Mock
     if _has_claude():
         try:
-            text_resp = await _claude_response(message, history, data_context, guideline_context)
-            provider = "claude"
-            return text_resp, sources, provider
+            text_resp = await _claude_response(message, history, full_data_context, guideline_context)
+            return text_resp, sources, "claude"
         except Exception as e:
             print(f"Claude error: {e}")
 
     if _has_gemini():
         try:
-            text_resp = await _gemini_response(message, history, data_context, guideline_context)
-            provider = "gemini"
-            return text_resp, sources, provider
+            text_resp = await _gemini_response(message, history, full_data_context, guideline_context)
+            return text_resp, sources, "gemini"
         except Exception as e:
             print(f"Gemini error: {e}")
 
     if _has_openai():
         try:
-            text_resp = await _openai_response(message, history, data_context, guideline_context)
-            provider = "openai"
-            return text_resp, sources, provider
+            text_resp = await _openai_response(message, history, full_data_context, guideline_context)
+            return text_resp, sources, "openai"
         except Exception as e:
             print(f"OpenAI error: {e}")
 
-    # 4. Smart mock fallback
-    text_resp = _build_mock_response(message, data_context, guideline_context, rag_results)
+    # 5. Smart mock fallback
+    text_resp = _build_mock_response(message, full_data_context, guideline_context, rag_results)
     return text_resp, sources, "mock"
 
 
