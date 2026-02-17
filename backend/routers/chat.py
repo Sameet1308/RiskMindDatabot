@@ -25,6 +25,7 @@ router = APIRouter()
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -235,6 +236,9 @@ PORTFOLIO SUMMARY:
 
 # ──── LLM Providers ────
 
+def _has_claude():
+    return bool(ANTHROPIC_API_KEY and ANTHROPIC_API_KEY != "your-anthropic-api-key-here")
+
 def _has_gemini():
     return bool(GOOGLE_API_KEY and GOOGLE_API_KEY != "your-google-api-key-here")
 
@@ -242,8 +246,34 @@ def _has_openai():
     return bool(OPENAI_API_KEY and OPENAI_API_KEY != "your-openai-api-key-here")
 
 
+async def _claude_response(message: str, history: list, context: str, guideline_context: str) -> str:
+    """Anthropic Claude response (claude-haiku-4-5 - fast and cost-effective)."""
+    import anthropic
+
+    client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
+
+    system = SYSTEM_PROMPT
+    if guideline_context:
+        system += f"\n\nRELEVANT GUIDELINES:\n{guideline_context}"
+    if context:
+        system += f"\n\nDATABASE CONTEXT (use this real data in your response):\n{context}"
+
+    messages = []
+    for msg in history[-20:]:
+        messages.append({"role": msg["role"], "content": msg["content"]})
+    messages.append({"role": "user", "content": message})
+
+    response = await client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=1024,
+        system=system,
+        messages=messages,
+    )
+    return response.content[0].text
+
+
 async def _gemini_response(message: str, history: list, context: str, guideline_context: str) -> str:
-    """Google Gemini 1.5 Flash response (FREE tier)."""
+    """Google Gemini 2.0 Flash response (FREE tier)."""
     import google.generativeai as genai
 
     genai.configure(api_key=GOOGLE_API_KEY)
@@ -263,7 +293,7 @@ async def _gemini_response(message: str, history: list, context: str, guideline_
     gemini_history.append({"role": "user", "parts": [message]})
 
     try:
-        model = genai.GenerativeModel("gemini-flash-latest", system_instruction=full_prompt)
+        model = genai.GenerativeModel("gemini-2.0-flash", system_instruction=full_prompt)
         response = model.generate_content(
             gemini_history,
             generation_config={"temperature": 0.7, "max_output_tokens": 1000}
@@ -307,8 +337,16 @@ async def _llm_response(message: str, history: list, db: AsyncSession) -> tuple:
     # 2. NL→SQL: Get structured data context
     data_context = await _nl_to_sql_query(message, db)
 
-    # 3. Try LLMs in order
+    # 3. Try LLMs in order: Claude → Gemini → OpenAI → Mock
     provider = "mock"
+    if _has_claude():
+        try:
+            text_resp = await _claude_response(message, history, data_context, guideline_context)
+            provider = "claude"
+            return text_resp, sources, provider
+        except Exception as e:
+            print(f"Claude error: {e}")
+
     if _has_gemini():
         try:
             text_resp = await _gemini_response(message, history, data_context, guideline_context)

@@ -1021,10 +1021,11 @@ async def run_intent_pipeline(message: str, db: AsyncSession, history: List[Dict
         if intent_payload["intent"] in {"policy_risk_summary", "claim_summary"} and has_metrics:
             show_canvas_summary = True
 
-        # For pure conversational queries (no canvas summary), let LLM generate response
-        # by NOT providing analysis_text (will trigger fallback in chat.py)
-        if not show_canvas_summary:
-            analysis_text = None  # Trigger LLM fallback for conversational response
+        # ALWAYS let LLM generate the conversational response for Understand intent.
+        # The analysis_object (with metrics) is still returned for the canvas.
+        # Setting analysis_text=None triggers the LLM fallback in chat.py which
+        # calls Gemini with the real data context → rich explanation in chat panel.
+        analysis_text = None
 
     # Detect if response is long and should suggest viewing intelligent canvas
     suggest_canvas_view = False
