@@ -273,11 +273,11 @@ async def _claude_response(message: str, history: list, context: str, guideline_
 
 
 async def _gemini_response(message: str, history: list, context: str, guideline_context: str) -> str:
-    """Google Gemini 2.0 Flash response (FREE tier)."""
+    """Google Gemini 1.5 Flash response (FREE tier — 1,500 req/day)."""
     import google.generativeai as genai
 
     genai.configure(api_key=GOOGLE_API_KEY)
-    
+
     full_prompt = SYSTEM_PROMPT
     if guideline_context:
         full_prompt += f"\n\nRELEVANT GUIDELINES:\n{guideline_context}"
@@ -289,11 +289,12 @@ async def _gemini_response(message: str, history: list, context: str, guideline_
     for msg in history[-20:]:
         role = "user" if msg["role"] == "user" else "model"
         gemini_history.append({"role": role, "parts": [msg["content"]]})
-    
+
     gemini_history.append({"role": "user", "parts": [message]})
 
     try:
-        model = genai.GenerativeModel("gemini-2.0-flash", system_instruction=full_prompt)
+        model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
+        model = genai.GenerativeModel(model_name, system_instruction=full_prompt)
         response = model.generate_content(
             gemini_history,
             generation_config={"temperature": 0.7, "max_output_tokens": 1000}
@@ -410,7 +411,7 @@ async def _analyze_image_gemini(image_base64: str, prompt: str) -> str:
     image = PIL.Image.open(io.BytesIO(image_bytes))
 
     try:
-        model = genai.GenerativeModel("gemini-flash-latest", system_instruction=SYSTEM_PROMPT)
+        model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite"), system_instruction=SYSTEM_PROMPT)
         response = model.generate_content([prompt, image])
         return response.text
     except Exception as e:
@@ -487,9 +488,9 @@ async def _analyze_video(file_path: str, prompt: str) -> str:
         model_name = os.getenv("GEMINI_MODEL", "").strip()
         model_candidates = [
             model_name,
-            "gemini-1.5-flash-latest",
-            "gemini-1.5-flash",
-            "gemini-flash-latest",
+            "gemini-2.5-flash-lite",
+            "gemini-2.5-flash",
+            "gemini-2.0-flash",
         ]
         model_candidates = [m for m in model_candidates if m]
 
@@ -527,7 +528,7 @@ async def _analyze_pdf(file_path: str) -> str:
         try:
             import google.generativeai as genai
             genai.configure(api_key=GOOGLE_API_KEY)
-            model = genai.GenerativeModel("gemini-flash-latest", system_instruction=SYSTEM_PROMPT)
+            model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite"), system_instruction=SYSTEM_PROMPT)
             response = model.generate_content(prompt)
             return response.text
         except Exception as e:

@@ -413,7 +413,7 @@ User question: {message}
         import asyncio
         
         genai.configure(api_key=api_key_g)
-        model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+        model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
         model = genai.GenerativeModel(model_name)
         
         # Retry logic with exponential backoff for rate limits
