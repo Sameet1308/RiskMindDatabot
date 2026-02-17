@@ -604,7 +604,9 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
         suggest_canvas_view = pipeline.get("suggest_canvas_view", False)
         show_canvas_summary = pipeline.get("show_canvas_summary", True)
     except Exception as e:
+        import traceback
         print(f"Intent pipeline error: {e}")
+        traceback.print_exc()
 
     # Handle clarification needed
     if clarification_needed and not response_text:
@@ -621,8 +623,8 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
         # Check if LLM-generated response is long and should suggest canvas view
         if response_text and len(response_text) > 500:
             suggest_canvas_view = True
-            # For UNDERSTAND intent with long response, show canvas summary
-            if inferred_intent == "Understand":
+            # For UNDERSTAND intent (or when pipeline failed) with long response, show canvas summary
+            if inferred_intent in ("Understand", None):
                 show_canvas_summary = True
 
                 # Use Query Library (Tier 1) to fetch contextual summary metrics.

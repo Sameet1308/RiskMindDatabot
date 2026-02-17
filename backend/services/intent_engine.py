@@ -1009,6 +1009,7 @@ async def run_intent_pipeline(message: str, db: AsyncSession, history: List[Dict
 
     if canonical_intent == "Understand":
         # Check if there's enough data to warrant a visual summary
+        metrics = analysis_object.get("metrics", {})
         has_metrics = len(metrics) > 2  # More than just basic counts
         has_evidence = len(analysis_object.get("evidence", [])) > 0
         has_multiple_claims = metrics.get("claim_count", 0) >= 3
@@ -1017,7 +1018,7 @@ async def run_intent_pipeline(message: str, db: AsyncSession, history: List[Dict
         show_canvas_summary = (has_metrics and has_multiple_claims) or has_evidence
 
         # Always show summary for policy/claim-specific queries with data
-        if intent in {"policy_risk_summary", "claim_summary"} and has_metrics:
+        if intent_payload["intent"] in {"policy_risk_summary", "claim_summary"} and has_metrics:
             show_canvas_summary = True
 
         # For pure conversational queries (no canvas summary), let LLM generate response
