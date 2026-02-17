@@ -1056,25 +1056,53 @@ export default function RiskMind() {
                 )
             }
 
-            // Full summary card with KPIs (when show_canvas_summary is true)
+            // Determine display mode: policy-specific vs portfolio-level
+            const isPolicyMode = !!(analysisDimensions.policy_number || activePolicy)
+            const isPortfolioMode = !isPolicyMode && !!(analysisMetrics.policy_count || analysisMetrics.total_premium)
+            const hasKpiData = isPolicyMode
+                ? (claimsCount > 0 || claimsTotal > 0 || !!analysisMetrics.loss_ratio)
+                : isPortfolioMode
+
+            // If no real KPI data, fall through to minimal conversational view
+            if (!hasKpiData) {
+                return (
+                    <div className="canvas-stack">
+                        <div className="canvas-card">
+                            <div className="canvas-card-header">
+                                <div><h3>Analysis</h3><p>Natural language insight</p></div>
+                            </div>
+                            <div className="canvas-card-body">
+                                <div className="conversation-view">
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                        {canvasNarrative || 'RiskMind is analyzing your request...'}
+                                    </ReactMarkdown>
+                                </div>
+                                {(analysisEvidence.length > 0 || provenance) && renderEvidencePanel()}
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+
+            // Build summary bullets from whatever metrics are available
             const summaryBullets = [
-                analysisMetrics.policy_count ? `Portfolio includes ${analysisMetrics.policy_count} policies.` : null,
-                analysisMetrics.total_premium ? `Total premium ${formatCurrency(analysisMetrics.total_premium)}.` : null,
-                analysisMetrics.total_amount ? `Total claims ${formatCurrency(analysisMetrics.total_amount)}.` : null,
-                analysisMetrics.loss_ratio ? `Loss ratio ${analysisMetrics.loss_ratio}% across ${claimsCount} claim(s).` : null,
-                analysisMetrics.avg_amount ? `Average claim ${formatCurrency(analysisMetrics.avg_amount)}.` : null,
-                analysisMetrics.max_claim ? `Largest claim ${formatCurrency(analysisMetrics.max_claim)}.` : null,
-                claimsTotal ? `Total loss ${formatCurrency(claimsTotal)}.` : null,
+                analysisMetrics.policy_count ? `Portfolio includes ${analysisMetrics.policy_count} active policies.` : null,
+                analysisMetrics.total_premium ? `Total written premium: ${formatCurrency(analysisMetrics.total_premium)}.` : null,
+                analysisMetrics.total_amount || claimsTotal ? `Total incurred losses: ${formatCurrency(analysisMetrics.total_amount ?? claimsTotal)}.` : null,
+                analysisMetrics.loss_ratio ? `Portfolio loss ratio: ${analysisMetrics.loss_ratio}%.` : null,
+                analysisMetrics.avg_amount ? `Average claim size: ${formatCurrency(analysisMetrics.avg_amount)}.` : null,
+                analysisMetrics.max_claim ? `Largest single claim: ${formatCurrency(analysisMetrics.max_claim)}.` : null,
                 topAlert?.message ? `Alert: ${topAlert.message}` : null,
-                analysisEvidence.length ? `${analysisEvidence.length} evidence item(s) linked.` : null,
+                analysisEvidence.length ? `${analysisEvidence.length} evidence item(s) attached.` : null,
             ].filter(Boolean) as string[]
+
             return (
                 <div className="canvas-stack">
                     <div className="canvas-card">
                         <div className="canvas-card-header">
                             <div>
                                 <h3>Summary</h3>
-                                <p>Decision intelligence in KPIs and drivers.</p>
+                                <p>{isPolicyMode ? 'Policy risk intelligence' : 'Portfolio overview'}</p>
                             </div>
                             <button className="btn btn-secondary" onClick={() => saveArtifact('summary', 'Summary insight', { metrics: analysisMetrics, dimensions: analysisDimensions, bullets: summaryBullets })}>
                                 Save
@@ -1082,27 +1110,56 @@ export default function RiskMind() {
                         </div>
                         <div className="canvas-card-body">
                             <div className="summary-kpis">
-                                <div>
-                                    <span>Policy</span>
-                                    <strong>{analysisDimensions.policy_number || activePolicy || 'Not available'}</strong>
-                                </div>
-                                <div>
-                                    <span>Claims</span>
-                                    <strong>{claimsCount}</strong>
-                                </div>
-                                <div>
-                                    <span>Total Loss</span>
-                                    <strong>{formatCurrency(claimsTotal)}</strong>
-                                </div>
-                                <div>
-                                    <span>Loss Ratio</span>
-                                    <strong>{analysisMetrics.loss_ratio ? `${analysisMetrics.loss_ratio}%` : 'Not available'}</strong>
-                                </div>
+                                {isPolicyMode ? (
+                                    <>
+                                        <div>
+                                            <span>Policy</span>
+                                            <strong>{analysisDimensions.policy_number || activePolicy}</strong>
+                                        </div>
+                                        <div>
+                                            <span>Claims</span>
+                                            <strong>{claimsCount}</strong>
+                                        </div>
+                                        <div>
+                                            <span>Total Loss</span>
+                                            <strong>{formatCurrency(claimsTotal)}</strong>
+                                        </div>
+                                        <div>
+                                            <span>Loss Ratio</span>
+                                            <strong>{analysisMetrics.loss_ratio ? `${analysisMetrics.loss_ratio}%` : '—'}</strong>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div>
+                                            <span>Policies</span>
+                                            <strong>{analysisMetrics.policy_count ?? '—'}</strong>
+                                        </div>
+                                        <div>
+                                            <span>Total Premium</span>
+                                            <strong>{formatCurrency(analysisMetrics.total_premium || 0)}</strong>
+                                        </div>
+                                        <div>
+                                            <span>Total Claims</span>
+                                            <strong>{formatCurrency(analysisMetrics.total_amount || claimsTotal || 0)}</strong>
+                                        </div>
+                                        <div>
+                                            <span>Loss Ratio</span>
+                                            <strong>{
+                                                analysisMetrics.loss_ratio
+                                                    ? `${analysisMetrics.loss_ratio}%`
+                                                    : (analysisMetrics.total_premium && analysisMetrics.total_amount)
+                                                        ? `${((analysisMetrics.total_amount / analysisMetrics.total_premium) * 100).toFixed(1)}%`
+                                                        : '—'
+                                            }</strong>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                             <div className="summary-drivers">
                                 <h4>Key drivers</h4>
                                 {summaryBullets.length === 0 ? (
-                                    <p className="canvas-muted">Not available</p>
+                                    <p className="canvas-muted">Ask a specific policy or portfolio question to see key drivers.</p>
                                 ) : (
                                     <ul>
                                         {summaryBullets.map((item) => (
@@ -1111,7 +1168,7 @@ export default function RiskMind() {
                                     </ul>
                                 )}
                             </div>
-                            {renderEvidencePanel()}
+                            {(analysisEvidence.length > 0 || (provenance && Object.keys(provenance).length > 0)) && renderEvidencePanel()}
                         </div>
                     </div>
                 </div>
