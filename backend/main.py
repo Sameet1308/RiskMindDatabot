@@ -23,28 +23,28 @@ from database.connection import init_db, get_db, async_session
 async def lifespan(app: FastAPI):
     # Startup: Initialize database
     await init_db()
-    print("✅ Database initialized")
+    print("[OK] Database initialized")
 
     # Index guidelines into ChromaDB
     try:
         from services.vector_store import index_guidelines
         async with async_session() as session:
             count = await index_guidelines(session)
-            print(f"🧠 ChromaDB: {count} guidelines indexed")
+            print(f"[OK] ChromaDB: {count} guidelines indexed")
     except Exception as e:
-        print(f"⚠️  ChromaDB indexing skipped: {e}")
+        print(f"[WARN] ChromaDB indexing skipped: {e}")
 
     api_key_g = os.getenv("GOOGLE_API_KEY", "")
     api_key_o = os.getenv("OPENAI_API_KEY", "")
     if api_key_g and api_key_g != "your-google-api-key-here":
-        print("🤖 LLM: Google Gemini 2.0 Flash (FREE)")
+        print("[LLM] Google Gemini 2.0 Flash (FREE)")
     elif api_key_o and api_key_o != "your-openai-api-key-here":
-        print("🤖 LLM: OpenAI GPT-4o-mini (paid)")
+        print("[LLM] OpenAI GPT-4o-mini (paid)")
     else:
-        print("🤖 LLM: Smart mock (no API key — set GOOGLE_API_KEY for free AI)")
+        print("[LLM] Smart mock (no API key - set GOOGLE_API_KEY for free AI)")
 
     yield
-    print("👋 Shutting down...")
+    print("[OK] Shutting down...")
 
 # Ensure upload directory exists
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "data", "uploads")

@@ -1015,6 +1015,123 @@ body {
   box-shadow: 0 6px 14px rgba(15, 23, 42, 0.04);
 }
 
+/* Selector Toolbar */
+.dashboard-selector-toolbar {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 0.85rem;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.selector-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: flex-end;
+}
+
+.selector-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 120px;
+  flex: 1;
+}
+
+.selector-group label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.selector-group select,
+.selector-group input {
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.4rem 0.55rem;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.75rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.selector-group select:focus,
+.selector-group input:focus {
+  border-color: var(--primary);
+}
+
+.filter-row {
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--border);
+}
+
+.btn-add-widget {
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s, transform 0.15s;
+  font-family: inherit;
+  align-self: flex-end;
+}
+
+.btn-add-widget:hover {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+}
+
+.btn-sm {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.btn-sm:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* Widget action buttons */
+.widget-actions {
+  display: flex;
+  gap: 0.3rem;
+  align-items: center;
+}
+
+.widget-actions button {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 0.4rem;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 0.2s, border-color 0.2s;
+}
+
+.widget-actions button:hover {
+  opacity: 1;
+  border-color: var(--border);
+}
+
 .dashboard-widget-header {
   display: flex;
   justify-content: space-between;
@@ -1367,6 +1484,176 @@ body {
 
 .suggestion-chip:active {
   transform: translateY(0);
+}
+
+/* Intent Suggestion Chips - Enhanced for Clarification */
+.intent-suggestions {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.intent-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.intent-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.05), rgba(255, 90, 95, 0.05));
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  border-radius: 12px;
+  transition: all 0.3s ease;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+}
+
+.intent-chip:hover {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(255, 90, 95, 0.12));
+  border-color: rgba(124, 58, 237, 0.4);
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.15);
+}
+
+.intent-chip:active {
+  transform: translateX(2px);
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.1);
+}
+
+.intent-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--purple);
+  margin-bottom: 4px;
+}
+
+.intent-example {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Conversation View & Focus Insight - Markdown Formatting */
+.conversation-view,
+.focus-insight-content {
+  line-height: 1.8;
+  color: var(--text);
+}
+
+.conversation-view h1,
+.conversation-view h2,
+.conversation-view h3,
+.focus-insight-content h3,
+.focus-insight-content h1,
+.focus-insight-content h2,
+.focus-insight-content h3 {
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.conversation-view h3,
+.focus-insight-content h3 {
+  font-size: 1.125rem;
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 0.5rem;
+}
+
+.conversation-view p,
+.focus-insight-content p {
+  margin-bottom: 1rem;
+}
+
+.conversation-view ul,
+.focus-insight-content ul,
+.conversation-view ol,
+.focus-insight-content ol {
+  margin-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.conversation-view li,
+.focus-insight-content li {
+  margin-bottom: 0.5rem;
+}
+
+.conversation-view strong,
+.focus-insight-content strong {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.conversation-view table,
+.focus-insight-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.9rem;
+}
+
+.conversation-view thead,
+.focus-insight-content thead {
+  background: var(--surface-alt);
+}
+
+.conversation-view th,
+.focus-insight-content th {
+  padding: 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  border-bottom: 2px solid var(--border-dark);
+  color: var(--text);
+}
+
+.conversation-view td,
+.focus-insight-content td {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.conversation-view tr,
+.focus-insight-content tr:hover {
+  background: var(--surface-alt);
+}
+
+.conversation-view hr,
+.focus-insight-content hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1.5rem 0;
+}
+
+.conversation-view code,
+.focus-insight-content code {
+  background: var(--surface-alt);
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9em;
+}
+
+.conversation-view pre,
+.focus-insight-content pre {
+  background: var(--surface-alt);
+  padding: 1rem;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+
+.conversation-view blockquote,
+.focus-insight-content blockquote {
+  border-left: 4px solid var(--purple);
+  padding-left: 1rem;
+  margin: 1rem 0;
+  color: var(--text-secondary);
+  font-style: italic;
 }
 
 .convert-strip {

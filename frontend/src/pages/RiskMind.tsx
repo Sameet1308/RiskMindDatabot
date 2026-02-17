@@ -1,7 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useSearchParams, Link } from 'react-router-dom'
+import { lazy } from 'react'
+import {
+    LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, ScatterChart, Scatter,
+    XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+} from 'recharts'
 import {
     Bot,
     Send,
@@ -35,6 +40,13 @@ type Message = {
     content: string
     sources?: { section: string; title: string }[]
     suggestedPrompts?: string[]
+    suggestedIntents?: {
+        label: string
+        intent: string
+        output_type: string
+        example: string
+        keywords: string[]
+    }[]
     timestamp: Date
 }
 
@@ -64,7 +76,7 @@ type SavedItem = {
 
 type DashboardWidget = {
     id: string
-    type: 'kpi' | 'table' | 'bar' | 'line' | 'pie' | 'scatter' | 'timeline'
+    type: 'kpi' | 'table' | 'bar' | 'line' | 'pie' | 'scatter' | 'timeline' | 'map'
     title: string
     dataset: keyof DashboardData | 'joined_claims' | 'joined_policies'
     field?: string
@@ -80,6 +92,8 @@ type DashboardCache = {
     metrics: Record<string, string[]>
     attributes: Record<string, string[]>
 }
+
+const LazyRiskMap = lazy(() => import('../components/RiskMap'))
 
 const suggestedPromptGroups = [
     {
@@ -117,7 +131,7 @@ const inferOutputType = (text: string): CanvasMode => {
     if (lower.includes('memo') || lower.includes('draft') || lower.includes('document')) return 'memo'
     if (lower.includes('decision') || lower.includes('renew') || lower.includes('accept') || lower.includes('decline') || lower.includes('refer')) return 'decision'
     if (lower.includes('card') || lower.includes('decision-ready')) return 'card'
-    if (lower.includes('dashboard') || lower.includes('trend') || lower.includes('chart') || lower.includes('compare') || lower.includes('by ')) return 'dashboard'
+    if (lower.includes('dashboard') || lower.includes('overview') || lower.includes('trend') || lower.includes('chart') || lower.includes('compare') || lower.includes('by ')) return 'dashboard'
     return 'analysis'
 }
 
@@ -139,6 +153,7 @@ export default function RiskMind() {
     const [canvasMode, setCanvasMode] = useState<CanvasMode>('empty')
     const [selectedOutputType, setSelectedOutputType] = useState<'auto' | CanvasMode>('auto')
     const [outputPinned, setOutputPinned] = useState(false)
+    const [showCanvasSummary, setShowCanvasSummary] = useState(true) // Controls if summary card should be displayed
     const [focusExpanded, setFocusExpanded] = useState(true)
     const [canvasNarrative, setCanvasNarrative] = useState('')
     const [activePolicy, setActivePolicy] = useState<string>('')
@@ -407,21 +422,18 @@ export default function RiskMind() {
             // Dashboard cache not ready yet, will retry when it becomes available
             return
         }
-        
+
         console.log('[Widget] Creating widget from prompt:', pendingWidgetPrompt)
-        // Cache is ready, apply the widget prompt
-        applyWidgetPrompt(pendingWidgetPrompt)
-        
-        // Auto-create widget for any chart/plot/trend request
-        if (/(chart|plot|bar|line|pie|trend|widget|graph|visualization|by )/i.test(pendingWidgetPrompt)) {
-            console.log('[Widget] Matched chart/trend pattern, calling addWidgetFromSelectors')
-            // Small delay to ensure state updates from applyWidgetPrompt have propagated
-            setTimeout(() => {
-                addWidgetFromSelectors()
-                console.log('[Widget] Widget created')
-            }, 50)
+        // Cache is ready, apply the widget prompt and get computed values directly
+        const config = applyWidgetPrompt(pendingWidgetPrompt)
+
+        // Auto-create widget for any chart/plot/trend request using direct config (no stale state)
+        if (config && /(chart|plot|bar|line|pie|trend|widget|graph|visualization|by )/i.test(pendingWidgetPrompt)) {
+            console.log('[Widget] Matched chart/trend pattern, creating widget directly with config:', config)
+            addWidgetDirect(config, pendingWidgetPrompt)
+            console.log('[Widget] Widget created directly')
         }
-        
+
         setPendingWidgetPrompt(null)
     }, [pendingWidgetPrompt, dashboardCache])
 
@@ -546,8 +558,8 @@ export default function RiskMind() {
         return `SELECT * FROM ${dataset}`
     }
 
-    const applyWidgetPrompt = (prompt: string) => {
-        if (!dashboardCache || !prompt.trim()) return
+    const applyWidgetPrompt = (prompt: string): { dataset: string; type: DashboardWidget['type']; agg: DashboardWidget['agg']; metric: string; groupBy: string } | null => {
+        if (!dashboardCache || !prompt.trim()) return null
         console.log('[applyWidgetPrompt] Processing prompt:', prompt)
         const lower = prompt.toLowerCase()
         const cleaned = lower.replace('add widget showing', '').replace('add widget', '').replace('create widget', '').replace('create a', '').replace('create', '').replace('show', '').replace('give me', '').replace('for me', '').trim()
@@ -557,12 +569,19 @@ export default function RiskMind() {
         const dataset = datasetMatch || (cleaned.includes('policy') ? 'joined_policies' : cleaned.includes('guideline') ? 'guidelines' : cleaned.includes('decision') ? 'decisions' : cleaned.includes('document') ? 'documents' : cleaned.includes('session') || cleaned.includes('chat') ? 'chat_sessions' : 'joined_claims')
 
         let type: DashboardWidget['type'] = 'bar'
+        // Phase 1: Implicit hints (low priority - easily overridden)
+        if (cleaned.includes('distribution') || cleaned.includes('correlation')) type = 'scatter'
+        if (cleaned.includes('breakdown')) type = 'pie'
+        if (cleaned.includes('trend') || cleaned.includes('time series') || cleaned.includes('over time')) type = 'line'
+        if (cleaned.includes('history') || cleaned.includes('chronolog')) type = 'timeline'
+        // Phase 2: Explicit chart type names (high priority - always win)
         if (cleaned.includes('table')) type = 'table'
-        if (cleaned.includes('pie')) type = 'pie'
-        if (cleaned.includes('line') || cleaned.includes('trend')) type = 'line'
+        if (cleaned.includes('pie') || cleaned.includes('donut')) type = 'pie'
         if (cleaned.includes('scatter')) type = 'scatter'
+        if (cleaned.includes('line chart') || cleaned.includes('line graph')) type = 'line'
+        if (cleaned.includes('bar chart') || cleaned.includes('bar graph')) type = 'bar'
         if (cleaned.includes('timeline')) type = 'timeline'
-        if (cleaned.includes('bar') || cleaned.includes('chart')) type = 'bar'
+        if (cleaned.includes('map') || cleaned.includes('geo') || cleaned.includes('geographic') || cleaned.includes('spatial') || cleaned.includes('esri')) type = 'map'
 
         let agg: DashboardWidget['agg'] = 'count'
         if (cleaned.includes('sum') || cleaned.includes('total')) agg = 'sum'
@@ -578,40 +597,42 @@ export default function RiskMind() {
         // Default to appropriate metric based on aggregation
         const defaultMetric = agg === 'count' ? 'id' : (dataset === 'joined_claims' ? 'claim_amount' : metricOptions[0] || '')
         const defaultGroupBy = dataset === 'joined_claims' ? 'policy_number' : dataset === 'joined_policies' ? 'industry_type' : attributeOptions[0] || ''
-        
-        console.log('[applyWidgetPrompt] Settings:', { dataset, type, agg, metric: metricMatch || defaultMetric, groupBy: groupByMatch || attributeMatch || defaultGroupBy })
+
+        const resolvedMetric = metricMatch || defaultMetric
+        const resolvedGroupBy = groupByMatch || attributeMatch || defaultGroupBy
+
+        console.log('[applyWidgetPrompt] Settings:', { dataset, type, agg, metric: resolvedMetric, groupBy: resolvedGroupBy })
         setWidgetDataset(dataset)
         setWidgetAgg(agg)
-        setWidgetMetric(metricMatch || defaultMetric)
-        setWidgetGroupBy(groupByMatch || attributeMatch || defaultGroupBy)
+        setWidgetMetric(resolvedMetric)
+        setWidgetGroupBy(resolvedGroupBy)
         if (widgetTypeOverride === 'auto') {
             setWidgetTypeOverride(type)
         }
+
+        // Return computed values so callers can use them immediately without waiting for state
+        return { dataset, type, agg, metric: resolvedMetric, groupBy: resolvedGroupBy }
     }
 
-    const addWidgetFromSelectors = () => {
+    // Direct widget creation that uses explicit config instead of reading from stale state
+    const addWidgetDirect = (config: { dataset: string; type: DashboardWidget['type']; agg: DashboardWidget['agg']; metric: string; groupBy: string }, promptTitle: string) => {
         if (!dashboardCache) {
-            console.log('[addWidgetFromSelectors] No dashboard cache available')
+            console.log('[addWidgetDirect] No dashboard cache available')
             return
         }
-        const rawDataset = widgetDataset || 'joined_claims'
-        const dataset: DashboardWidget['dataset'] = rawDataset as DashboardWidget['dataset']
-        const metric = widgetMetric || (dashboardCache.metrics[rawDataset]?.[0] || '')
-        const groupBy = widgetGroupBy || undefined
-        const agg = widgetAgg
-        const type = widgetTypeOverride === 'auto' ? (groupBy ? 'bar' : 'kpi') : widgetTypeOverride
-        const title = widgetPrompt.trim() || `${agg.toUpperCase()} ${metric}${groupBy ? ` by ${groupBy}` : ''}`
-        const sql = buildWidgetSql(rawDataset, metric, agg, groupBy)
+        const { dataset, type, agg, metric, groupBy } = config
+        const title = promptTitle.trim() || `${(agg || 'count').toUpperCase()} ${metric}${groupBy ? ` by ${groupBy}` : ''}`
+        const sql = buildWidgetSql(dataset, metric, agg, groupBy || undefined)
 
-        console.log('[addWidgetFromSelectors] Creating widget:', { type, title, dataset, metric, groupBy, agg })
+        console.log('[addWidgetDirect] Creating widget:', { type, title, dataset, metric, groupBy, agg })
 
         const widget: DashboardWidget = {
             id: replaceWidgetId || `${Date.now()}`,
             type,
             title,
-            dataset,
+            dataset: dataset as DashboardWidget['dataset'],
             field: metric || undefined,
-            groupBy,
+            groupBy: groupBy || undefined,
             agg,
             sql,
             description: title,
@@ -619,17 +640,31 @@ export default function RiskMind() {
 
         setDashboardWidgets(prev => {
             if (replaceWidgetId) {
-                console.log('[addWidgetFromSelectors] Replacing widget:', replaceWidgetId)
+                console.log('[addWidgetDirect] Replacing widget:', replaceWidgetId)
                 return prev.map(item => (item.id === replaceWidgetId ? widget : item))
             }
-            console.log('[addWidgetFromSelectors] Adding new widget, current count:', prev.length)
+            console.log('[addWidgetDirect] Adding new widget, current count:', prev.length)
             const newWidgets = [widget, ...prev]
-            console.log('[addWidgetFromSelectors] New widgets array:', newWidgets)
+            console.log('[addWidgetDirect] New widgets array:', newWidgets)
             return newWidgets
         })
         setWidgetPrompt('')
         setWidgetTypeOverride('auto')
         setReplaceWidgetId(null)
+    }
+
+    // Legacy function for manual widget creation from UI selectors (reads from state)
+    const addWidgetFromSelectors = () => {
+        if (!dashboardCache) {
+            console.log('[addWidgetFromSelectors] No dashboard cache available')
+            return
+        }
+        const rawDataset = widgetDataset || 'joined_claims'
+        const metric = widgetMetric || (dashboardCache.metrics[rawDataset]?.[0] || '')
+        const groupBy = widgetGroupBy || undefined
+        const agg = widgetAgg
+        const type = widgetTypeOverride === 'auto' ? (groupBy ? 'bar' : 'kpi') : widgetTypeOverride
+        addWidgetDirect({ dataset: rawDataset, type, agg, metric, groupBy: groupBy || '' }, widgetPrompt)
     }
 
     const buildDefaultWidgets = () => {
@@ -719,6 +754,11 @@ export default function RiskMind() {
             setSuggestedOutputs(confidence !== null && confidence < 60 ? suggestions.slice(0, 2) : suggestions)
             setProvenance(response.provenance || artifactData?.provenance || null)
             setInferredOutputType(responseOutput)
+
+            // NEW: Check if canvas summary should be shown for UNDERSTAND intent
+            const shouldShowSummary = response.show_canvas_summary !== false  // Default to true if not specified
+            setShowCanvasSummary(shouldShowSummary)
+
             if (response.analysis_object?.context?.policy_number) {
                 setActivePolicy(response.analysis_object.context.policy_number)
             }
@@ -728,37 +768,49 @@ export default function RiskMind() {
             if (response.analysis_object?.context?.submission_id) {
                 setActiveSubmission(response.analysis_object.context.submission_id)
             }
+
+            // Set canvas mode based on response
             if (!outputPinned && selectedOutputType === 'auto') {
                 setCanvasMode(responseOutput)
             }
-            
+
             // Auto-create dashboard widget for chart/trend requests
-            if (responseOutput === 'dashboard' && /(dashboard|widget|chart|plot|bar|line|pie|trend)/.test(userMessage.toLowerCase())) {
-                console.log('[Widget] Dashboard mode detected, setting pending widget prompt:', userMessage)
-                // Set pending widget even before dashboard loads
-                setPendingWidgetPrompt(userMessage)
-                setWidgetPrompt(userMessage)
-                
-                // If dashboard cache is already available, create widget immediately
-                if (dashboardCache) {
-                    console.log('[Widget] Dashboard cache available, creating widget immediately')
-                    setTimeout(() => {
-                        applyWidgetPrompt(userMessage)
-                        if (/(chart|plot|bar|line|pie|trend|widget|graph|visualization)/i.test(userMessage)) {
-                            addWidgetFromSelectors()
-                            console.log('[Widget] Immediate widget created')
+            // Auto-create dashboard widget for chart/trend requests
+            if (responseOutput === 'dashboard') {
+                const lowerMsg = userMessage.toLowerCase()
+
+                // Overview: Revert to default widgets if requested without specific charts
+                if (/(create|give|show).*(overview|summary|briefing)/.test(lowerMsg) && !/(chart|plot|bar|line|pie|trend|map|geo|scatter|location)/.test(lowerMsg)) {
+                    console.log('[Widget] Overview requested, setting default widgets')
+                    setDashboardWidgets(buildDefaultWidgets())
+                }
+                else if (/(dashboard|widget|chart|plot|bar|line|pie|trend|map|geo|scatter|location)/.test(lowerMsg)) {
+                    console.log('[Widget] Dashboard mode detected, setting pending widget prompt:', userMessage)
+                    setWidgetPrompt(userMessage)
+
+                    // If dashboard cache is already available, create widget immediately (skip pendingWidgetPrompt)
+                    if (dashboardCache) {
+                        console.log('[Widget] Dashboard cache available, creating widget immediately')
+                        const config = applyWidgetPrompt(userMessage)
+                        if (config && /(chart|plot|bar|line|pie|trend|widget|graph|visualization)/i.test(userMessage)) {
+                            addWidgetDirect(config, userMessage)
+                            console.log('[Widget] Immediate widget created with config:', config)
                         }
-                    }, 100)
+                    } else {
+                        // Cache not ready yet — set pending so the useEffect creates it when cache loads
+                        setPendingWidgetPrompt(userMessage)
+                    }
                 }
             }
-            
-            setMessages(prev => [...prev, { 
-                id: Date.now() + 1, 
-                role: 'assistant', 
-                content: response.response, 
-                sources: response.sources, 
+
+            setMessages(prev => [...prev, {
+                id: Date.now() + 1,
+                role: 'assistant',
+                content: response.response,
+                sources: response.sources,
                 suggestedPrompts: response.suggested_prompts || [],
-                timestamp: new Date() 
+                suggestedIntents: response.suggested_intents || [],
+                timestamp: new Date()
             }])
         } catch {
             setMessages(prev => [...prev, { id: Date.now() + 1, role: 'assistant', content: 'Connection error. Is the backend running?', timestamp: new Date() }])
@@ -767,6 +819,8 @@ export default function RiskMind() {
             setLoading(false)
         }
     }
+
+
 
     const handlePrompt = (prompt: string) => {
         setInput(prompt)
@@ -976,6 +1030,33 @@ export default function RiskMind() {
         }
 
         if (canvasMode === 'analysis') {
+            // For UNDERSTAND intent, check if we should show the full summary card
+            // If not, show a minimal conversational view
+            if (!showCanvasSummary) {
+                return (
+                    <div className="canvas-stack">
+                        <div className="canvas-card">
+                            <div className="canvas-card-header">
+                                <div>
+                                    <h3>Conversation</h3>
+                                    <p>Natural language analysis</p>
+                                </div>
+                            </div>
+                            <div className="canvas-card-body">
+                                <div className="conversation-view">
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                        {canvasNarrative || 'RiskMind is analyzing your request...'}
+                                    </ReactMarkdown>
+                                </div>
+                                {/* Show evidence panel if available */}
+                                {(analysisEvidence.length > 0 || provenance) && renderEvidencePanel()}
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+
+            // Full summary card with KPIs (when show_canvas_summary is true)
             const summaryBullets = [
                 analysisMetrics.policy_count ? `Portfolio includes ${analysisMetrics.policy_count} policies.` : null,
                 analysisMetrics.total_premium ? `Total premium ${formatCurrency(analysisMetrics.total_premium)}.` : null,
@@ -1126,21 +1207,21 @@ export default function RiskMind() {
                 const isStringField = widget.field && rows.length > 0 && typeof rows[0][widget.field] === 'string'
                 const groupField = widget.groupBy || (isStringField ? widget.field : undefined) || 'claim_type'
                 const grouped: Record<string, number> = {}
-                
+
                 // Aggregate based on widget configuration
                 rows.forEach((row) => {
                     const key = String(row[groupField] || 'Unknown')
                     let valueToAdd = 1
-                    
+
                     if (widget.agg === 'sum' && widget.field) {
                         valueToAdd = Number(row[widget.field as string] || 0)
                     } else if (widget.agg === 'count') {
                         valueToAdd = 1
                     }
-                    
+
                     grouped[key] = (grouped[key] || 0) + valueToAdd
                 })
-                
+
                 // For avg, we need to calculate the average after grouping
                 if (widget.agg === 'avg' && widget.field) {
                     const counts: Record<string, number> = {}
@@ -1153,44 +1234,61 @@ export default function RiskMind() {
                         grouped[key] = counts[key] > 0 ? Math.round(grouped[key] / counts[key]) : 0
                     })
                 }
-                
+
                 const chartData = Object.entries(grouped).slice(0, 6).map(([label, value]) => ({ label, value }))
 
+                const CHART_COLORS = ['#FF5A5F', '#60A5FA', '#34D399', '#FDBA74', '#A78BFA', '#FCA5A5', '#38BDF8', '#FB923C']
+
                 if (widget.type === 'bar') {
-                    const maxValue = Math.max(...chartData.map(d => d.value), 1)
                     return (
-                        <div className="widget-bars">
-                            {chartData.map((item) => (
-                                <div key={item.label}>
-                                    <span>{item.label}</span>
-                                    <div>
-                                        <div style={{ width: `${(item.value / maxValue) * 100}%` }} />
-                                    </div>
-                                    <strong>{item.value}</strong>
-                                </div>
-                            ))}
+                        <div style={{ width: '100%', height: 220 }}>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                                    <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                                    <YAxis tick={{ fontSize: 11 }} />
+                                    <Tooltip
+                                        contentStyle={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 12 }}
+                                        formatter={(val: any) => [Number(val || 0).toLocaleString(), widget.agg === 'sum' ? 'Amount' : 'Count']}
+                                    />
+                                    <Bar dataKey="value" fill="#FF5A5F" radius={[4, 4, 0, 0]} animationDuration={800}>
+                                        {chartData.map((_entry, idx) => (
+                                            <Cell key={idx} fill={CHART_COLORS[idx % CHART_COLORS.length]} />
+                                        ))}
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
                         </div>
                     )
                 }
 
                 if (widget.type === 'pie') {
-                    const pieColors = ['#FF5A5F', '#FCA5A5', '#FDBA74', '#60A5FA', '#34D399']
-                    const totalValue = chartData.reduce((sum, item) => sum + item.value, 0) || 1
-                    let offset = 0
-                    const segments = chartData.map((item) => {
-                        const start = (offset / totalValue) * 360
-                        offset += item.value
-                        const end = (offset / totalValue) * 360
-                        return `${item.label} ${start}deg ${end}deg`
-                    })
                     return (
-                        <div className="widget-pie">
-                            <div style={{ background: `conic-gradient(${segments.map((seg, idx) => `${pieColors[idx % pieColors.length]} ${seg.split(' ')[1]} ${seg.split(' ')[2]}`).join(', ')})` }} />
-                            <ul>
-                                {chartData.map((item) => (
-                                    <li key={item.label}>{item.label} · {item.value}</li>
-                                ))}
-                            </ul>
+                        <div style={{ width: '100%', height: 220 }}>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={chartData}
+                                        dataKey="value"
+                                        nameKey="label"
+                                        cx="50%" cy="50%"
+                                        outerRadius={70}
+                                        innerRadius={35}
+                                        paddingAngle={2}
+                                        animationDuration={800}
+                                        label={({ name, percent }: any) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
+                                    >
+                                        {chartData.map((_entry, idx) => (
+                                            <Cell key={idx} fill={CHART_COLORS[idx % CHART_COLORS.length]} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip
+                                        contentStyle={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 12 }}
+                                        formatter={(val: any) => [Number(val || 0).toLocaleString(), 'Value']}
+                                    />
+                                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                                </PieChart>
+                            </ResponsiveContainer>
                         </div>
                     )
                 }
@@ -1206,37 +1304,74 @@ export default function RiskMind() {
                         const value = widget.agg === 'sum' ? Number(row[widget.field || '']) || 0 : 1
                         timeBuckets[key] = (timeBuckets[key] || 0) + value
                     })
-                    const series = Object.entries(timeBuckets).slice(0, 6).map(([label, value]) => ({ label, value }))
-                    const points = series.map((item, idx) => ({ x: idx, y: item.value }))
-                    const maxY = Math.max(...points.map(p => p.y), 1)
-                    const width = 240
-                    const height = 80
-                    const polyline = points.map(p => `${(p.x / Math.max(points.length - 1, 1)) * width},${height - (p.y / maxY) * height}`).join(' ')
+                    // Sort time buckets chronologically
+                    const series = Object.entries(timeBuckets)
+                        .sort(([a], [b]) => a.localeCompare(b))
+                        .map(([month, value]) => ({ month, value }))
                     return (
-                        <div className="widget-line">
-                            <svg viewBox={`0 0 ${width} ${height}`}>
-                                <polyline points={polyline} />
-                            </svg>
-                            <div className="widget-line-labels">
-                                {series.slice(0, 4).map((item) => (
-                                    <span key={item.label}>{item.label}</span>
-                                ))}
-                            </div>
+                        <div style={{ width: '100%', height: 220 }}>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={series} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                                    <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                                    <YAxis tick={{ fontSize: 11 }} />
+                                    <Tooltip
+                                        contentStyle={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 12 }}
+                                        formatter={(val: any) => [widget.agg === 'sum' ? `$${Number(val || 0).toLocaleString()}` : Number(val || 0).toLocaleString(), widget.agg === 'sum' ? 'Amount' : 'Count']}
+                                        labelFormatter={(label) => `Month: ${label}`}
+                                    />
+                                    <Line
+                                        type="monotone"
+                                        dataKey="value"
+                                        stroke="#FF5A5F"
+                                        strokeWidth={2}
+                                        dot={{ r: 4, fill: '#FF5A5F' }}
+                                        activeDot={{ r: 6, stroke: '#FF5A5F', strokeWidth: 2, fill: '#fff' }}
+                                        animationDuration={800}
+                                    />
+                                </LineChart>
+                            </ResponsiveContainer>
                         </div>
                     )
                 }
 
                 if (widget.type === 'scatter') {
-                    const maxValue = Math.max(...values, 1)
-                    const scatterPoints = values.slice(0, 20).map((value, idx) => ({
-                        x: (idx / Math.max(values.length - 1, 1)) * 100,
-                        y: 100 - (value / maxValue) * 100,
+                    const scatterData = rows.slice(0, 30).map((row, idx) => ({
+                        x: idx,
+                        y: widget.field ? Number(row[widget.field] || 0) : 0,
+                        name: row.claim_number || row.policy_number || `#${idx + 1}`,
                     }))
                     return (
-                        <div className="widget-scatter">
-                            {scatterPoints.map((point, idx) => (
-                                <span key={idx} style={{ left: `${point.x}%`, top: `${point.y}%` }} />
-                            ))}
+                        <div style={{ width: '100%', height: 220 }}>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <ScatterChart margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                                    <XAxis dataKey="x" name="Index" tick={{ fontSize: 11 }} />
+                                    <YAxis dataKey="y" name="Value" tick={{ fontSize: 11 }} />
+                                    <Tooltip
+                                        contentStyle={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 12 }}
+                                        formatter={(val: any) => [`$${Number(val || 0).toLocaleString()}`, 'Value']}
+                                    />
+                                    <Scatter data={scatterData} fill="#FF5A5F" animationDuration={800} />
+                                </ScatterChart>
+                            </ResponsiveContainer>
+                        </div>
+                    )
+                }
+
+                // Map widget rendering
+                if (widget.type === 'map') {
+                    const policies = (dashboardCache?.datasets?.['joined_policies'] || []) as any[]
+                    const validPolicies = policies.filter((p: any) => p.latitude && p.longitude)
+                    console.log(`[Widget:Map] Rendering map for widget ${widget.id}. Total policies: ${policies.length}, Valid geo policies: ${validPolicies.length}`)
+                    if (validPolicies.length === 0) {
+                        return <p className="canvas-muted">No geolocation data available for map view. (Policies loaded: {policies.length})</p>
+                    }
+                    return (
+                        <div style={{ width: '100%', height: 320, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)' }}>
+                            <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>Loading map...</div>}>
+                                <LazyRiskMap policies={validPolicies} height="320px" />
+                            </Suspense>
                         </div>
                     )
                 }
@@ -1244,17 +1379,113 @@ export default function RiskMind() {
                 return <p className="canvas-muted">Not available</p>
             }
 
+
+
             return (
                 <div className="canvas-stack">
                     <div className="canvas-card">
                         <div className="canvas-card-header">
                             <div>
                                 <h3>Dashboard</h3>
-                                <p>Only requested widgets are shown.</p>
+                                <p>Interactive analytics dashboard — use selectors or NLP to add widgets.</p>
+                            </div>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                                <button className="btn-sm" onClick={exportDashboard}>Export</button>
+                                <button className="btn-sm" onClick={() => setDashboardWidgets([])}>Clear All</button>
                             </div>
                         </div>
                         <div className="canvas-card-body">
-                            <p className="canvas-narrative">{canvasNarrative || 'Widgets generated from cached tables and NL instructions.'}</p>
+                            {/* Selector Toolbar */}
+                            {dashboardCache && (
+                                <div className="dashboard-selector-toolbar">
+                                    <div className="selector-row">
+                                        <div className="selector-group">
+                                            <label>Dataset</label>
+                                            <select value={widgetDataset} onChange={e => setWidgetDataset(e.target.value)}>
+                                                {Object.keys(dashboardCache.datasets).map(ds => (
+                                                    <option key={ds} value={ds}>{ds.replace(/_/g, ' ')}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="selector-group">
+                                            <label>Metric</label>
+                                            <select value={widgetMetric} onChange={e => setWidgetMetric(e.target.value)}>
+                                                <option value="">— select —</option>
+                                                {(dashboardCache.metrics[widgetDataset] || []).map((m: string) => (
+                                                    <option key={m} value={m}>{m.replace(/_/g, ' ')}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="selector-group">
+                                            <label>Group By</label>
+                                            <select value={widgetGroupBy} onChange={e => setWidgetGroupBy(e.target.value)}>
+                                                <option value="">— none —</option>
+                                                {(dashboardCache.attributes[widgetDataset] || []).map((a: string) => (
+                                                    <option key={a} value={a}>{a.replace(/_/g, ' ')}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="selector-group">
+                                            <label>Chart Type</label>
+                                            <select value={widgetTypeOverride} onChange={e => setWidgetTypeOverride(e.target.value as any)}>
+                                                <option value="auto">Auto</option>
+                                                <option value="bar">Bar Chart</option>
+                                                <option value="line">Line / Time Series</option>
+                                                <option value="pie">Pie Chart</option>
+                                                <option value="scatter">Scatter Plot</option>
+                                                <option value="kpi">KPI Card</option>
+                                                <option value="table">Table</option>
+                                                <option value="timeline">Timeline</option>
+                                                <option value="map">Map / Geo</option>
+                                            </select>
+                                        </div>
+                                        <div className="selector-group">
+                                            <label>Aggregation</label>
+                                            <select value={widgetAgg} onChange={e => setWidgetAgg(e.target.value as any)}>
+                                                <option value="count">Count</option>
+                                                <option value="sum">Sum</option>
+                                                <option value="avg">Average</option>
+                                            </select>
+                                        </div>
+                                        <button className="btn-add-widget" onClick={addWidgetFromSelectors}>+ Add Widget</button>
+                                    </div>
+                                    {/* Filter Row */}
+                                    <div className="selector-row filter-row">
+                                        <div className="selector-group">
+                                            <label>Filter by Policy</label>
+                                            <input
+                                                type="text"
+                                                placeholder="e.g. COMM-2024-016"
+                                                value={dashboardFilters.policy}
+                                                onChange={e => setDashboardFilters(prev => ({ ...prev, policy: e.target.value }))}
+                                            />
+                                        </div>
+                                        <div className="selector-group">
+                                            <label>Filter by Status</label>
+                                            <input
+                                                type="text"
+                                                placeholder="e.g. approved"
+                                                value={dashboardFilters.status}
+                                                onChange={e => setDashboardFilters(prev => ({ ...prev, status: e.target.value }))}
+                                            />
+                                        </div>
+                                        <div className="selector-group">
+                                            <label>Date Range</label>
+                                            <select
+                                                value={dashboardFilters.dateRange || ''}
+                                                onChange={e => setDashboardFilters(prev => ({ ...prev, dateRange: e.target.value }))}
+                                            >
+                                                <option value="">All Time</option>
+                                                <option value="30d">Last 30 Days</option>
+                                                <option value="90d">Last 90 Days</option>
+                                                <option value="12m">Last 12 Months</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            <p className="canvas-narrative">{canvasNarrative || 'Use the selectors above or NLP prompts to create interactive widgets.'}</p>
                             {dashboardLoading && (
                                 <div className="dashboard-loading">
                                     <Loader2 className="spin" /> Loading dashboard data...
@@ -1272,7 +1503,7 @@ export default function RiskMind() {
                             {dashboardData && (
                                 <div className="dashboard-widgets">
                                     {dashboardWidgets.length === 0 ? (
-                                        <p className="canvas-muted">No chart requested yet.</p>
+                                        <p className="canvas-muted">No widgets yet — use the selectors above or type a prompt like "Show claims by type as a bar chart".</p>
                                     ) : (
                                         <>
                                             {console.log('[Render] Rendering', dashboardWidgets.length, 'widgets')}
@@ -1282,6 +1513,10 @@ export default function RiskMind() {
                                                         <div>
                                                             <strong>{widget.title}</strong>
                                                             {widget.description && <span>{widget.description}</span>}
+                                                        </div>
+                                                        <div className="widget-actions">
+                                                            <button title="Edit" onClick={() => handleReplaceWidget(widget)}>✏️</button>
+                                                            <button title="Remove" onClick={() => handleRemoveWidget(widget.id)}>✕</button>
                                                         </div>
                                                     </div>
                                                     {renderWidgetBody(widget)}
@@ -1691,6 +1926,34 @@ export default function RiskMind() {
                                         </div>
                                     </div>
                                 )}
+
+                                {/* Intent Suggestions - Clickable Intent Options */}
+                                {m.role === 'assistant' && m.suggestedIntents && m.suggestedIntents.length > 0 && (
+                                    <div className="bubble-suggestions intent-suggestions">
+                                        <span className="suggestions-label">Choose what you'd like to do:</span>
+                                        <div className="suggestion-chips intent-chips">
+                                            {m.suggestedIntents.map((intentOption, idx) => (
+                                                <button
+                                                    key={idx}
+                                                    className="suggestion-chip intent-chip"
+                                                    onClick={() => {
+                                                        // Set the input to the example
+                                                        setInput(intentOption.example)
+                                                        // Optionally pin the output type
+                                                        setSelectedOutputType(intentOption.output_type as any)
+                                                        setOutputPinned(true)
+                                                        // Send the message
+                                                        handleSend()
+                                                    }}
+                                                    title={`Keywords: ${intentOption.keywords.join(', ')}`}
+                                                >
+                                                    <span className="intent-label">{intentOption.label}</span>
+                                                    <span className="intent-example">{intentOption.example}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         ))}
                         <div ref={messagesEndRef} />
@@ -1784,7 +2047,9 @@ export default function RiskMind() {
                     <div className="focus-drawer">
                         <div>
                             <h4>Focus Insight</h4>
-                            <p>{focusInsight}</p>
+                            <div className="focus-insight-content">
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{focusInsight}</ReactMarkdown>
+                            </div>
                         </div>
                         <button
                             className="btn btn-secondary"

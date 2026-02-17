@@ -62,6 +62,10 @@ def _route_intent(message: str) -> Dict[str, Any]:
         if any(word in lower for word in ["list", "show", "count", "average", "total", "top", "highest", "lowest", "group", "by", "trend", "compare", "how many", "max", "most"]):
             intent = "ad_hoc_query"
 
+    # Override: If specific visualization/trend keywords are used, force ad_hoc_query even for specific entities
+    if any(word in lower for word in ["trend", "chart", "plot", "graph", "timeline", "over time", "by month", "by year", "scatter", "map", "geo"]):
+        intent = "ad_hoc_query"
+
     required_metrics = ["claim_count", "total_amount", "avg_amount", "max_claim"]
     evidence_needed = intent in {"claim_summary", "policy_risk_summary"}
 
@@ -362,12 +366,29 @@ _sql_cache: Dict[str, str] = {}
 _cache_max_size = 100
 
 async def _generate_sql_llm(message: str) -> Optional[str]:
-    # First try simple pattern matching
+    # Tier 0: Dashboard / Analytic deterministic patterns (LLM Bypass)
+    dashboard_sql = _try_dashboard_query_pattern(message)
+    if dashboard_sql:
+        print(f"[intent_engine] TIER-0 deterministic dashboard SQL: {message[:60]}")
+        return dashboard_sql
+
+    # Tier 0b: Simple pattern matching
     simple_sql = _try_simple_query_pattern(message)
     if simple_sql:
-        print(f"[intent_engine] Using pattern-matched SQL for: {message}")
+        print(f"[intent_engine] TIER-0b pattern-matched SQL: {message[:60]}")
         return simple_sql
-    
+
+    # Tier 1: Query Library — 100 golden pre-built queries (ZERO LLM cost)
+    try:
+        from services.query_library import get_library_sql
+        library_result = get_library_sql(message)
+        if library_result:
+            qid, lib_sql, chart_type = library_result
+            print(f"[intent_engine] TIER-1 query library match [{qid}]: {message[:60]}")
+            return lib_sql.strip()
+    except Exception as lib_err:
+        print(f"[intent_engine] Query library lookup failed: {lib_err}")
+
     # Check cache (similar queries won't hit API)
     cache_key = message.lower().strip()
     if cache_key in _sql_cache:
@@ -392,7 +413,7 @@ User question: {message}
         import asyncio
         
         genai.configure(api_key=api_key_g)
-        model_name = os.getenv("GEMINI_MODEL", "gemini-1.5-flash-latest")
+        model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
         model = genai.GenerativeModel(model_name)
         
         # Retry logic with exponential backoff for rate limits
@@ -647,36 +668,55 @@ def _estimate_confidence(intent: str, analysis_object: Dict[str, Any], message: 
 
 
 def _render_analysis_text(analysis_object: Dict[str, Any], output_type: str = "analysis") -> str:
+    """
+    Render analysis text for chat response.
+    For 'understand' intent, this will be conversational (use LLM).
+    For other intents, use templates.
+    """
     context = analysis_object.get("context", {})
     metrics = analysis_object.get("metrics", {})
     dims = analysis_object.get("dimensions", {})
     intent = context.get("intent")
+    canonical_intent = context.get("canonical_intent", "Understand")
 
-    if intent == "portfolio_summary":
-        if output_type == "dashboard":
+    # For dashboard/visualization intents, keep it brief
+    if output_type == "dashboard":
+        if intent == "portfolio_summary":
             return (
                 f"I've prepared your dashboard with cached data from {metrics.get('policy_count', 0)} policies. "
                 f"The intelligence canvas now shows your requested visualization."
             )
-        return (
-            f"You have {metrics.get('policy_count', 0)} policies in the portfolio. "
-            f"Total premium is ${metrics.get('total_premium', 0):,.0f}, and total claims are "
-            f"${metrics.get('total_amount', 0):,.0f}."
-        )
+        if intent == "ad_hoc_query":
+            rows = analysis_object.get("dimensions", {}).get("rows", [])
+            return (
+                f"I've created your visualization with {len(rows)} data point(s). "
+                f"The intelligence canvas now shows your requested chart."
+            )
 
-    if intent in {"policy_risk_summary", "evidence_blend"}:
-        return (
-            f"Policy {dims.get('policy_number', 'N/A')} for {dims.get('policyholder_name', 'N/A')} has "
-            f"{metrics.get('claim_count', 0)} claims totaling ${metrics.get('total_amount', 0):,.0f}. "
-            f"Loss ratio is {metrics.get('loss_ratio', 0)}%."
-        )
-
-    if intent == "claim_summary":
-        return (
-            f"Claim {dims.get('claim_number', 'N/A')} on policy {dims.get('policy_number', 'N/A')} "
-            f"reported ${metrics.get('claim_amount', 0):,.0f} in {metrics.get('claim_type', 'unknown')} "
-            f"status {metrics.get('status', 'unknown')}."
-        )
+    # For UNDERSTAND intent, return conversational placeholder (LLM will generate actual response)
+    if canonical_intent == "Understand":
+        # This is a placeholder - the actual conversational response will come from LLM
+        # We'll implement LLM chat in the next step
+        if intent == "portfolio_summary":
+            return (
+                f"You have {metrics.get('policy_count', 0)} policies in the portfolio. "
+                f"Total premium is ${metrics.get('total_premium', 0):,.0f}, and total claims are "
+                f"${metrics.get('total_amount', 0):,.0f}."
+            )
+        if intent in {"policy_risk_summary", "evidence_blend"}:
+            return (
+                f"Policy {dims.get('policy_number', 'N/A')} for {dims.get('policyholder_name', 'N/A')} has "
+                f"{metrics.get('claim_count', 0)} claims totaling ${metrics.get('total_amount', 0):,.0f}. "
+                f"Loss ratio is {metrics.get('loss_ratio', 0)}%."
+            )
+        if intent == "claim_summary":
+            return (
+                f"Claim {dims.get('claim_number', 'N/A')} on policy {dims.get('policy_number', 'N/A')} "
+                f"reported ${metrics.get('claim_amount', 0):,.0f} in {metrics.get('claim_type', 'unknown')} "
+                f"status {metrics.get('status', 'unknown')}."
+            )
+        # Generic fallback for conversational queries
+        return "Let me analyze that for you..."
 
     if intent == "geo_risk":
         return "Geo risk summary generated from policies with mapped locations."
@@ -745,6 +785,23 @@ async def run_intent_pipeline(message: str, db: AsyncSession, history: List[Dict
     canonical_intent = intent_payload["canonical_intent"]
 
     if intent_payload["intent"] == "ad_hoc_query":
+        # 1. Try Cached Data Cube (Pandas) - Implementation of "Query Once" architecture
+        from services.data_cube import DataCube
+        cube_result = DataCube.try_query(message)
+        if cube_result:
+             # Map cube result to full response format
+             return {
+                "analysis_object": cube_result["analysis_object"],
+                "analysis_text": cube_result["analysis_text"],
+                "recommended_modes": ["dashboard", "analysis"],
+                "default_mode": "dashboard",
+                "provenance": cube_result["analysis_object"]["provenance"],
+                "inferred_intent": canonical_intent,
+                "output_type": "dashboard",
+                "suggested_outputs": ["dashboard"],
+                "artifact": {"type": "analysis_object", "data": cube_result["analysis_object"]},
+            }
+
         sql = await _generate_sql_llm(message)
         if not sql:
             empty_provenance = {"tables_used": [], "join_paths": [], "query_ids": []}
@@ -851,15 +908,56 @@ async def run_intent_pipeline(message: str, db: AsyncSession, history: List[Dict
         await _auto_analyze_evidence(analysis_object["evidence"], max_items=2)
 
     confidence, reason_codes = _estimate_confidence(intent_payload["intent"], analysis_object, message, intent_payload["entities"])
-    
+
     # Don't override dashboard mode for chart/visualization requests even if confidence is low
-    explicit_dashboard_request = any(word in message.lower() for word in ["chart", "dashboard", "plot", "graph", "visualization", "widget"])
-    
+    # Include all keywords that trigger dashboard mode (from line 81-83)
+    explicit_dashboard_request = any(word in message.lower() for word in [
+        "chart", "dashboard", "plot", "graph", "visualization", "widget",
+        "trend", "compare", "breakdown", "analysis", "analyze", " by "
+    ])
+
+    # Confusion detection: When confidence is very low, ask for clarification
+    clarification_needed = confidence < 50
+    suggested_intents = []
+
     if confidence < 60:
         reason_codes.append("low_confidence")
         if not explicit_dashboard_request:
             canonical_intent = CANONICAL_INTENTS["understand"]
             output_type = "analysis"
+
+        # Generate clickable intent suggestions when confused
+        if clarification_needed:
+            suggested_intents = [
+                {
+                    "label": "📊 Analyze with Dashboard",
+                    "intent": "Analyze",
+                    "output_type": "dashboard",
+                    "example": "Show me trends and visualizations",
+                    "keywords": ["chart", "trend", "compare", "breakdown"]
+                },
+                {
+                    "label": "📝 Understand Details",
+                    "intent": "Understand",
+                    "output_type": "analysis",
+                    "example": "Explain this policy or claim",
+                    "keywords": ["why", "what", "explain", "tell me"]
+                },
+                {
+                    "label": "✅ Make a Decision",
+                    "intent": "Decide",
+                    "output_type": "decision",
+                    "example": "Should we accept or decline?",
+                    "keywords": ["should we", "decision", "recommend"]
+                },
+                {
+                    "label": "📄 Generate Memo",
+                    "intent": "Document",
+                    "output_type": "memo",
+                    "example": "Create underwriting memo",
+                    "keywords": ["memo", "document", "draft"]
+                }
+            ]
 
     recommended_modes = intent_payload["recommended_modes"]
     if confidence < 60:
@@ -904,9 +1002,44 @@ async def run_intent_pipeline(message: str, db: AsyncSession, history: List[Dict
     }
     analysis_object["provenance"] = provenance_detail
 
+    # Determine if canvas summary should be shown
+    # For UNDERSTAND intent, only show canvas summary if there's rich data to display
+    show_canvas_summary = True
+    analysis_text = _render_analysis_text(analysis_object, output_type)
+
+    if canonical_intent == "Understand":
+        # Check if there's enough data to warrant a visual summary
+        has_metrics = len(metrics) > 2  # More than just basic counts
+        has_evidence = len(analysis_object.get("evidence", [])) > 0
+        has_multiple_claims = metrics.get("claim_count", 0) >= 3
+
+        # Only show canvas summary if there's rich structured data
+        show_canvas_summary = (has_metrics and has_multiple_claims) or has_evidence
+
+        # Always show summary for policy/claim-specific queries with data
+        if intent in {"policy_risk_summary", "claim_summary"} and has_metrics:
+            show_canvas_summary = True
+
+        # For pure conversational queries (no canvas summary), let LLM generate response
+        # by NOT providing analysis_text (will trigger fallback in chat.py)
+        if not show_canvas_summary:
+            analysis_text = None  # Trigger LLM fallback for conversational response
+
+    # Detect if response is long and should suggest viewing intelligent canvas
+    suggest_canvas_view = False
+    if analysis_text and len(analysis_text) > 500:  # Response is verbose
+        suggest_canvas_view = True
+        # For long responses, always show canvas summary
+        if canonical_intent == "Understand":
+            show_canvas_summary = True
+
+    # If clarification needed and no explicit prompt given, suggest checking canvas
+    if clarification_needed and not analysis_text:
+        suggest_canvas_view = False  # Don't suggest canvas when we need clarification first
+
     return {
         "analysis_object": analysis_object,
-        "analysis_text": _render_analysis_text(analysis_object, output_type),
+        "analysis_text": analysis_text,  # None for conversational UNDERSTAND intent
         "recommended_modes": recommended_modes,
         "default_mode": output_type,
         "provenance": provenance_detail,
@@ -915,4 +1048,53 @@ async def run_intent_pipeline(message: str, db: AsyncSession, history: List[Dict
         "suggested_outputs": recommended_modes,
         "suggested_prompts": suggested_prompts,
         "artifact": {"type": "analysis_object", "data": analysis_object},
+        "show_canvas_summary": show_canvas_summary,  # Flag to control canvas display
+        "clarification_needed": clarification_needed,  # NEW: Indicates confusion, needs user clarification
+        "suggested_intents": suggested_intents,  # NEW: Clickable intent options when confused
+        "suggest_canvas_view": suggest_canvas_view,  # NEW: Prompt user to check intelligent canvas for long responses
     }
+
+
+def _try_dashboard_query_pattern(message: str) -> Optional[str]:
+    """
+    Deterministic SQL generation for common dashboard widgets.
+    Bypasses LLM for standard trends, distributions, and top-lists.
+    """
+    import re
+    lower = message.lower()
+    
+    # 1. Claim Trend over time (monthly) - GLOBAL ONLY
+    # Ensure we don't capture "Trend for Policy X" by checking for specific entity markers
+    if any(x in lower for x in ['trend', 'over time', 'timeline', 'history']) and 'claim' in lower:
+        # If user specifies a filter (e.g. "for policy", "where", or specific ID like "2024-"), skip deterministic
+        if ' for ' in lower or 'where' in lower or re.search(r'\d', lower):
+             return None
+        return "SELECT strftime('%Y-%m', claim_date) as month, SUM(claim_amount) as total_amount, COUNT(*) as claim_count FROM claims GROUP BY month ORDER BY month"
+
+    # 2. Claims by Type (Distribution) - GLOBAL ONLY
+    if 'claim' in lower and ('by type' in lower or 'breakdown' in lower or 'distribution' in lower):
+        if ' for ' in lower or 'where' in lower or re.search(r'\d', lower):
+             return None
+        return "SELECT claim_type, COUNT(*) as claim_count, SUM(claim_amount) as total_amount FROM claims GROUP BY claim_type ORDER BY total_amount DESC"
+
+    # 3. Policies by Industry - GLOBAL ONLY
+    if 'polic' in lower and 'industry' in lower:
+        if ' for ' in lower or 'where' in lower or re.search(r'\d', lower):
+             return None
+        return "SELECT industry_type, COUNT(*) as policy_count, SUM(premium) as total_premium FROM policies GROUP BY industry_type ORDER BY total_premium DESC"
+
+    # 4. Policies by Risk Level - GLOBAL ONLY
+    if 'polic' in lower and ('risk' in lower or 'level' in lower) and ('by' in lower or 'distribution' in lower):
+        if ' for ' in lower or 'where' in lower or re.search(r'\d', lower):
+             return None
+        return "SELECT risk_level, COUNT(*) as policy_count, AVG(premium) as avg_premium FROM policies GROUP BY risk_level ORDER BY policy_count DESC"
+
+    # 5. Top Claims by Amount
+    if 'top' in lower and 'claim' in lower:
+        try:
+            limit = int(re.search(r'\d+', lower).group())
+        except:
+            limit = 5
+        return f"SELECT * FROM claims ORDER BY claim_amount DESC LIMIT {limit}"
+
+    return None

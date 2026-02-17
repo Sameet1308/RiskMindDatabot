@@ -64,6 +64,10 @@ class ChatResponse(BaseModel):
     output_type: Optional[str] = None
     suggested_outputs: Optional[List[str]] = None
     artifact: Optional[dict] = None
+    clarification_needed: Optional[bool] = False
+    suggested_intents: Optional[List[dict]] = []
+    suggest_canvas_view: Optional[bool] = False
+    show_canvas_summary: Optional[bool] = True
 
 class SessionOut(BaseModel):
     id: int
@@ -578,6 +582,11 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
     suggested_outputs = None
     artifact = None
 
+    clarification_needed = False
+    suggested_intents = []
+    suggest_canvas_view = False
+    show_canvas_summary = True
+
     try:
         # Pass history for context-aware follow-up questions
         pipeline = await run_intent_pipeline(request.message, db, history)
@@ -590,12 +599,98 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
         output_type = pipeline.get("output_type")
         suggested_outputs = pipeline.get("suggested_outputs")
         artifact = pipeline.get("artifact")
+        clarification_needed = pipeline.get("clarification_needed", False)
+        suggested_intents = pipeline.get("suggested_intents", [])
+        suggest_canvas_view = pipeline.get("suggest_canvas_view", False)
+        show_canvas_summary = pipeline.get("show_canvas_summary", True)
     except Exception as e:
         print(f"Intent pipeline error: {e}")
+
+    # Handle clarification needed
+    if clarification_needed and not response_text:
+        response_text = (
+            "I'm not entirely sure what you're looking for. Could you help me understand better?\n\n"
+            "You can click one of the options below, or rephrase your question with more details."
+        )
+        provider = "intent-engine"
 
     if not response_text:
         # Fallback to LLM response
         response_text, sources, provider = await _llm_response(request.message, history, db)
+
+        # Check if LLM-generated response is long and should suggest canvas view
+        if response_text and len(response_text) > 500:
+            suggest_canvas_view = True
+            # For UNDERSTAND intent with long response, show canvas summary
+            if inferred_intent == "Understand":
+                show_canvas_summary = True
+
+                # Use Query Library (Tier 1) to fetch contextual summary metrics.
+                # The library's PF-006 "portfolio overview" query covers the common
+                # case. For more specific questions, it matches the right golden query.
+                # This is NOT hardcoded SQL — it routes through the same golden query
+                # library used across the entire intent engine pipeline.
+                try:
+                    from services.query_library import get_query_by_id, match_query
+                    from sqlalchemy import text as sql_text
+
+                    # Find best matching library query for this message
+                    match = match_query(request.message)
+                    if match is None:
+                        # Fallback to portfolio overview (PF-006) for general portfolio queries
+                        lower_msg = request.message.lower()
+                        if any(w in lower_msg for w in ["portfolio", "policies", "claims", "overview", "high risk", "risk"]):
+                            match = ("PF-006", get_query_by_id("PF-006"))
+
+                    if match:
+                        qid, entry = match
+                        # Only run aggregate queries (single-row summaries) for the metrics card
+                        if entry and entry.get("is_aggregate") and not entry.get("params"):
+                            result = await db.execute(sql_text(entry["sql"]))
+                            row = result.fetchone()
+                            columns = result.keys() if hasattr(result, 'keys') else []
+
+                            if row:
+                                if not analysis_object:
+                                    analysis_object = {}
+                                if "metrics" not in analysis_object:
+                                    analysis_object["metrics"] = {}
+
+                                # Map returned columns to metrics dict dynamically
+                                row_dict = dict(zip(columns, row)) if columns else {}
+                                # Normalize common column name variants
+                                col_map = {
+                                    "policy_count": "policy_count",
+                                    "total_policies": "policy_count",
+                                    "total_premium": "total_premium",
+                                    "total_premium_ever": "total_premium",
+                                    "claim_count": "claim_count",
+                                    "total_claims": "total_amount",
+                                    "total_paid": "total_amount",
+                                    "avg_claim": "avg_amount",
+                                    "avg_claim_amount": "avg_amount",
+                                    "max_claim": "max_claim",
+                                    "loss_ratio_pct": "loss_ratio",
+                                }
+                                for src_col, dest_key in col_map.items():
+                                    if src_col in row_dict and row_dict[src_col] is not None:
+                                        analysis_object["metrics"][dest_key] = row_dict[src_col]
+
+                                # Compute loss_ratio if not directly returned
+                                if "loss_ratio" not in analysis_object["metrics"]:
+                                    prem = analysis_object["metrics"].get("total_premium", 0)
+                                    paid = analysis_object["metrics"].get("total_amount", 0)
+                                    if prem and prem > 0:
+                                        analysis_object["metrics"]["loss_ratio"] = round(paid / prem * 100, 1)
+
+                                print(f"[chat] Summary metrics populated via library query [{qid}]")
+
+                except Exception as e:
+                    print(f"[chat] Summary metrics via query library failed: {e}")
+
+    # Add canvas suggestion for long responses
+    if suggest_canvas_view and response_text:
+        response_text += "\n\n📊 *For a better view of all the details, check the Intelligent Canvas on the right.*"
 
     await _save_message(sid, "assistant", response_text, db,
                          sources_json=json.dumps(sources) if sources else None)
@@ -612,7 +707,11 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
         inferred_intent=inferred_intent,
         output_type=output_type,
         suggested_outputs=suggested_outputs,
-        artifact=artifact
+        artifact=artifact,
+        clarification_needed=clarification_needed,
+        suggested_intents=suggested_intents,
+        suggest_canvas_view=suggest_canvas_view,
+        show_canvas_summary=show_canvas_summary
     )
 
 
