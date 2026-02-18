@@ -40,7 +40,8 @@ async def lifespan(app: FastAPI):
     api_key_g = os.getenv("GOOGLE_API_KEY", "")
     api_key_o = os.getenv("OPENAI_API_KEY", "")
     if api_key_g and api_key_g != "your-google-api-key-here":
-        print("[LLM] Google Gemini 2.0 Flash (FREE)")
+        gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-lite")
+        print(f"[LLM] Google Gemini ({gemini_model}) — FREE tier")
     elif api_key_o and api_key_o != "your-openai-api-key-here":
         print("[LLM] OpenAI GPT-4o-mini (paid)")
     else:
@@ -94,9 +95,17 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    api_key = os.getenv("OPENAI_API_KEY", "")
+    gemini_key = os.getenv("GOOGLE_API_KEY", "")
+    openai_key = os.getenv("OPENAI_API_KEY", "")
+    anthropic_key = os.getenv("ANTHROPIC_API_KEY", "")
+    llm_active = (
+        bool(gemini_key and gemini_key != "your-google-api-key-here") or
+        bool(openai_key and openai_key != "your-openai-api-key-here") or
+        bool(anthropic_key and anthropic_key != "your-anthropic-api-key-here")
+    )
     return {
         "status": "healthy",
-        "llm_active": bool(api_key and api_key != "your-openai-api-key-here"),
+        "llm_active": llm_active,
+        "model": os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
         "environment": os.getenv("APP_ENV", "development")
     }

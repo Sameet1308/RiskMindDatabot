@@ -57,6 +57,16 @@ export interface ChatResponse {
     output_type?: string
     suggested_outputs?: string[]
     suggested_prompts?: string[]
+    suggested_intents?: Array<{
+        label: string
+        intent: string
+        output_type: string
+        example: string
+        keywords: string[]
+    }>
+    clarification_needed?: boolean
+    suggest_canvas_view?: boolean
+    show_canvas_summary?: boolean
     artifact?: {
         type: string
         data: Record<string, any>
@@ -381,6 +391,12 @@ export const apiService = {
     // Dashboard
     async getDashboardData(): Promise<DashboardData> {
         const response = await api.get('/dashboard/data')
+        return response.data
+    },
+
+    // Geo
+    async getGeoPolicies(): Promise<any[]> {
+        const response = await api.get('/chat/geo/policies')
         return response.data
     },
 }

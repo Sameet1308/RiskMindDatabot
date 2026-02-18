@@ -1,9 +1,9 @@
 """
-Chat Router — Multi-LLM (Gemini FREE / OpenAI / Mock)
-ChromaDB RAG, NL→SQL, Persistent Sessions, File Upload, Vision
+Chat Router — Chat-first architecture with LangGraph agent pipeline.
+LangChain unified LLM (Bedrock / Gemini / Claude / OpenAI), ChromaDB RAG,
+Persistent Sessions, File Upload, Vision
 """
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, text, delete
@@ -13,32 +13,20 @@ import os
 import json
 import base64
 import uuid
-import re
 import time
 
 from database.connection import get_db
 from models.schemas import ChatSession, ChatMessage, Document
-from services.intent_engine import run_intent_pipeline
-from services.vector_store import search_similar, search_knowledge
+from services.agent_graph import run_agent_pipeline
+from services.llm_providers import get_available_providers
+from services.prompts import SYSTEM_PROMPT
 
 router = APIRouter()
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-# DB schema info for NL→SQL
-DB_SCHEMA = """
-Tables in the SQLite database:
-1. policies(id, policy_number, policyholder_name, industry_type, effective_date, expiration_date, premium, created_at)
-2. claims(id, claim_number, policy_id FK->policies.id, claim_date, claim_amount, claim_type, status, description, created_at)
-3. guidelines(id, section_code, title, content, category, threshold_type, threshold_value, action)
-4. decisions(id, policy_number, decision, reason, risk_level, decided_by, created_at)
-5. chat_sessions(id, user_email, title, created_at, updated_at)
-6. chat_messages(id, session_id FK->chat_sessions.id, role, content, file_url, sources, created_at)
-"""
 
 
 # ──── Pydantic Schemas ────
@@ -58,13 +46,9 @@ class ChatResponse(BaseModel):
     provider: str = "mock"
     session_id: int = 0
     analysis_object: Optional[dict] = None
-    recommended_modes: Optional[List[str]] = None
-    default_mode: Optional[str] = None
     provenance: Optional[dict] = None
     inferred_intent: Optional[str] = None
     output_type: Optional[str] = None
-    suggested_outputs: Optional[List[str]] = None
-    artifact: Optional[dict] = None
     clarification_needed: Optional[bool] = False
     suggested_intents: Optional[List[dict]] = []
     suggest_canvas_view: Optional[bool] = False
@@ -98,463 +82,54 @@ class VisionRequest(BaseModel):
     user_email: str = "demo@ltm.com"
 
 
-# ──── System Prompt ────
+# ──── Cached Dashboard Data ────
 
-SYSTEM_PROMPT = """You are RiskMind DataBot, an AI-powered underwriting co-pilot for LTM's commercial insurance.
-You help underwriters with:
-- Policy risk analysis and claims data interpretation
-- Underwriting guideline questions with section citations
-- Loss ratio calculations and industry benchmarks
-- Risk assessment recommendations
-- Document and image analysis for underwriting
-- Answering ANY question about the structured data in the database (policies, claims, guidelines, decisions)
+_dashboard_cache: Optional[dict] = None
+_dashboard_cache_time: float = 0
 
-When you receive DATABASE CONTEXT, use it to form accurate, data-driven answers.
-When you receive GUIDELINE CONTEXT from vector search, cite the relevant sections.
-Always be professional and provide actionable insights.
-Format responses with markdown for readability.
-If asked about specific data, provide numbers, tables, and calculations."""
+async def _get_cached_dashboard_data(db: AsyncSession) -> dict:
+    """Fetch all tables, cached for 60 seconds."""
+    global _dashboard_cache, _dashboard_cache_time
+    if _dashboard_cache and (time.time() - _dashboard_cache_time) < 60:
+        return _dashboard_cache
 
+    async def _fetch(sql: str):
+        result = await db.execute(text(sql))
+        return [dict(row._mapping) for row in result.fetchall()]
 
-# ──── NL→SQL: Query any structured data ────
-
-async def _nl_to_sql_query(message: str, db: AsyncSession) -> str:
-    """Fetch relevant structured data context based on the user's message.
-    Covers policies, claims, decisions, industry, risk, loss ratios, and more."""
-
-    msg_lower = message.lower()
-    context_parts = []
-
-    # ── Specific policy lookup (COMM-YYYY-NNN) ────────────────────────────────
-    policy_match = re.search(r'(COMM-\d{4}-\d{3}|P-\d{4})', message, re.IGNORECASE)
-    if policy_match:
-        policy_num = policy_match.group(1).upper()
-        result = await db.execute(text(f"""
-            SELECT p.policy_number, p.policyholder_name, p.industry_type, p.premium,
-                   p.effective_date, p.expiration_date,
-                   COUNT(c.id) as claim_count,
-                   COALESCE(SUM(c.claim_amount), 0) as total_claims,
-                   COALESCE(AVG(c.claim_amount), 0) as avg_claim,
-                   COALESCE(MAX(c.claim_amount), 0) as max_claim
-            FROM policies p
-            LEFT JOIN claims c ON p.id = c.policy_id
-            WHERE p.policy_number = '{policy_num}'
-            GROUP BY p.id
-        """))
-        row = result.fetchone()
-        if row:
-            pn, name, ind, prem, eff, exp, cnt, tot, avg_c, mx = row
-            lr = (tot / prem * 100) if prem > 0 else 0
-            risk = "HIGH" if (cnt >= 5 or tot >= 100000) else "MEDIUM" if (cnt >= 3 or tot >= 50000) else "LOW"
-            context_parts.append(f"""
-POLICY {pn}:
-- Policyholder: {name}
-- Industry: {ind}
-- Premium: ${prem:,.2f}
-- Effective: {eff} → Expiration: {exp}
-- Claims: {cnt} | Total: ${tot:,.2f} | Avg: ${avg_c:,.2f} | Max: ${mx:,.2f}
-- Loss Ratio: {lr:.1f}%
-- Risk Level: {risk}
-""")
-        # Also fetch claim details for this policy
-        result2 = await db.execute(text(f"""
-            SELECT claim_number, claim_type, claim_amount, status, claim_date, description
-            FROM claims c
-            JOIN policies p ON c.policy_id = p.id
-            WHERE p.policy_number = '{policy_num}'
-            ORDER BY claim_date DESC LIMIT 10
-        """))
-        claim_rows = result2.fetchall()
-        if claim_rows:
-            lines = f"CLAIMS FOR {policy_num}:\n"
-            for r in claim_rows:
-                desc_short = (r[5] or "")[:80]
-                lines += f"- {r[0]} | {r[1]} | ${r[2]:,.2f} | {r[3]} | {r[4]} | {desc_short}\n"
-            context_parts.append(lines)
-        # Past decisions for this policy
-        result3 = await db.execute(text(f"""
-            SELECT decision, risk_level, reason, decided_by, created_at
-            FROM decisions WHERE policy_number = '{policy_num}'
-            ORDER BY created_at DESC LIMIT 3
-        """))
-        dec_rows = result3.fetchall()
-        if dec_rows:
-            lines = f"DECISIONS FOR {policy_num}:\n"
-            for r in dec_rows:
-                lines += f"- {r[0].upper()} (Risk: {r[1]}) by {r[3]} on {r[4]}: {(r[2] or '')[:120]}\n"
-            context_parts.append(lines)
-
-    # ── Specific claim lookup (CLM-YYYY-NNN) ─────────────────────────────────
-    claim_match = re.search(r'(CLM-\d{4}-\d{3})', message, re.IGNORECASE)
-    if claim_match:
-        claim_num = claim_match.group(1).upper()
-        result = await db.execute(text(f"""
-            SELECT c.claim_number, c.claim_type, c.claim_amount, c.status,
-                   c.claim_date, c.description, p.policy_number, p.policyholder_name
-            FROM claims c JOIN policies p ON c.policy_id = p.id
-            WHERE c.claim_number = '{claim_num}'
-        """))
-        row = result.fetchone()
-        if row:
-            context_parts.append(f"""
-CLAIM {row[0]}:
-- Type: {row[1]} | Amount: ${row[2]:,.2f} | Status: {row[3]}
-- Date: {row[4]}
-- Policy: {row[6]} ({row[7]})
-- Description: {row[5]}
-""")
-
-    # ── Portfolio overview ────────────────────────────────────────────────────
-    if any(w in msg_lower for w in ["portfolio", "overview", "all policies", "total policies",
-                                     "how many", "summary", "snapshot"]):
-        result = await db.execute(text("""
-            SELECT COUNT(*) as total, COALESCE(SUM(premium), 0) as total_premium,
-                   COALESCE(AVG(premium), 0) as avg_premium,
-                   SUM(CASE WHEN expiration_date < date('now') THEN 1 ELSE 0 END) as expired,
-                   SUM(CASE WHEN expiration_date BETWEEN date('now') AND date('now','+30 days') THEN 1 ELSE 0 END) as expiring_soon
-            FROM policies
-        """))
-        row = result.fetchone()
-        if row:
-            context_parts.append(f"""
-PORTFOLIO SUMMARY:
-- Total Policies: {row[0]}
-- Total Premium: ${row[1]:,.2f}  |  Average Premium: ${row[2]:,.2f}
-- Expired: {row[3]}  |  Expiring in 30 days: {row[4]}
-""")
-
-    # ── Claims overview ───────────────────────────────────────────────────────
-    if any(w in msg_lower for w in ["claim", "loss", "incident", "severity", "frequency", "damage"]):
-        result = await db.execute(text("""
-            SELECT COUNT(*) as total, COALESCE(SUM(claim_amount), 0) as total_amount,
-                   COALESCE(AVG(claim_amount), 0) as avg_amount,
-                   COALESCE(MAX(claim_amount), 0) as max_amount,
-                   SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) as open_claims,
-                   SUM(CASE WHEN status = 'closed' THEN 1 ELSE 0 END) as closed_claims
-            FROM claims
-        """))
-        row = result.fetchone()
-        if row:
-            context_parts.append(f"""
-CLAIMS OVERVIEW:
-- Total: {row[0]} (Open: {row[4]}, Closed: {row[5]})
-- Total Amount: ${row[1]:,.2f}  |  Average: ${row[2]:,.2f}  |  Largest: ${row[3]:,.2f}
-""")
-        # Claims by type
-        result2 = await db.execute(text("""
-            SELECT claim_type, COUNT(*) as cnt, COALESCE(SUM(claim_amount), 0) as total
-            FROM claims GROUP BY claim_type ORDER BY total DESC
-        """))
-        type_rows = result2.fetchall()
-        if type_rows:
-            lines = "CLAIMS BY TYPE:\n"
-            for r in type_rows:
-                lines += f"- {r[0]}: {r[1]} claims, ${r[2]:,.2f}\n"
-            context_parts.append(lines)
-
-    # ── Industry breakdown ────────────────────────────────────────────────────
-    if any(w in msg_lower for w in ["industry", "sector", "construction", "restaurant",
-                                     "retail", "manufacturing", "healthcare", "technology"]):
-        result = await db.execute(text("""
-            SELECT p.industry_type, COUNT(DISTINCT p.id) as policies,
-                   COALESCE(SUM(p.premium), 0) as total_premium,
-                   COUNT(c.id) as claim_count,
-                   COALESCE(SUM(c.claim_amount), 0) as total_claims,
-                   CASE WHEN SUM(p.premium) > 0
-                        THEN ROUND(SUM(c.claim_amount) * 100.0 / SUM(p.premium), 1)
-                        ELSE 0 END as loss_ratio
-            FROM policies p
-            LEFT JOIN claims c ON p.id = c.policy_id
-            GROUP BY p.industry_type ORDER BY total_claims DESC
-        """))
-        rows = result.fetchall()
-        if rows:
-            lines = "INDUSTRY BREAKDOWN:\n"
-            for r in rows:
-                lines += f"- {r[0]}: {r[1]} policies, ${r[2]:,.2f} premium, {r[3]} claims, loss ratio {r[5]}%\n"
-            context_parts.append(lines)
-
-    # ── Loss ratio analysis ───────────────────────────────────────────────────
-    if any(w in msg_lower for w in ["loss ratio", "profitability", "profitable", "underperform"]):
-        result = await db.execute(text("""
-            SELECT p.policy_number, p.policyholder_name, p.industry_type,
-                   p.premium, COALESCE(SUM(c.claim_amount), 0) as total_claims,
-                   ROUND(COALESCE(SUM(c.claim_amount), 0) * 100.0 / p.premium, 1) as loss_ratio
-            FROM policies p
-            LEFT JOIN claims c ON p.id = c.policy_id
-            GROUP BY p.id
-            HAVING loss_ratio > 60
-            ORDER BY loss_ratio DESC LIMIT 10
-        """))
-        rows = result.fetchall()
-        if rows:
-            lines = "HIGH LOSS RATIO POLICIES (>60%):\n"
-            for r in rows:
-                lines += f"- {r[0]} ({r[1]}, {r[2]}): premium ${r[3]:,.2f}, claims ${r[4]:,.2f}, LR {r[5]}%\n"
-            context_parts.append(lines)
-
-    # ── High risk policies ────────────────────────────────────────────────────
-    if any(w in msg_lower for w in ["high risk", "risky", "worst", "danger", "most claims",
-                                     "problematic", "concern", "worry"]):
-        result = await db.execute(text("""
-            SELECT p.policy_number, p.policyholder_name, p.industry_type,
-                   COUNT(c.id) as claims, COALESCE(SUM(c.claim_amount), 0) as total,
-                   p.premium,
-                   ROUND(COALESCE(SUM(c.claim_amount), 0) * 100.0 / NULLIF(p.premium, 0), 1) as lr
-            FROM policies p
-            LEFT JOIN claims c ON p.id = c.policy_id
-            GROUP BY p.id
-            HAVING claims >= 3 OR total >= 50000
-            ORDER BY total DESC LIMIT 8
-        """))
-        rows = result.fetchall()
-        if rows:
-            lines = "HIGH RISK POLICIES:\n"
-            for r in rows:
-                lines += f"- {r[0]} ({r[1]}, {r[2]}): {r[3]} claims, ${r[4]:,.2f} total, LR {r[6]}%\n"
-            context_parts.append(lines)
-
-    # ── Decision history ──────────────────────────────────────────────────────
-    if any(w in msg_lower for w in ["decision", "accept", "decline", "refer", "approved",
-                                     "rejected", "underwriting decision", "past decision"]):
-        result = await db.execute(text("""
-            SELECT decision, COUNT(*) as cnt FROM decisions GROUP BY decision
-        """))
-        rows = result.fetchall()
-        if rows:
-            lines = "DECISION SUMMARY:\n"
-            for r in rows:
-                lines += f"- {r[0].title()}: {r[1]}\n"
-            context_parts.append(lines)
-        # Recent decisions
-        result2 = await db.execute(text("""
-            SELECT policy_number, decision, risk_level, reason, decided_by, created_at
-            FROM decisions ORDER BY created_at DESC LIMIT 5
-        """))
-        recent = result2.fetchall()
-        if recent:
-            lines = "RECENT DECISIONS:\n"
-            for r in recent:
-                lines += f"- {r[0]}: {r[1].upper()} (Risk: {r[2]}) — {(r[3] or '')[:100]}\n"
-            context_parts.append(lines)
-
-    # ── Policyholder name search ──────────────────────────────────────────────
-    name_keywords = [w for w in msg_lower.split() if len(w) > 4
-                     and w not in {"about", "policy", "claim", "show", "tell", "what", "which",
-                                   "their", "there", "where", "those", "these", "industry"}]
-    if name_keywords and not policy_match and not claim_match:
-        like_clause = " OR ".join([f"LOWER(p.policyholder_name) LIKE '%{w}%'" for w in name_keywords[:3]])
-        result = await db.execute(text(f"""
-            SELECT p.policy_number, p.policyholder_name, p.industry_type, p.premium,
-                   COUNT(c.id) as claims, COALESCE(SUM(c.claim_amount), 0) as total_claims
-            FROM policies p
-            LEFT JOIN claims c ON p.id = c.policy_id
-            WHERE {like_clause}
-            GROUP BY p.id LIMIT 5
-        """))
-        rows = result.fetchall()
-        if rows:
-            lines = "MATCHING POLICIES BY NAME:\n"
-            for r in rows:
-                lines += f"- {r[0]}: {r[1]} ({r[2]}) | Premium: ${r[3]:,.2f} | {r[4]} claims, ${r[5]:,.2f}\n"
-            context_parts.append(lines)
-
-    # ── Expiring policies ─────────────────────────────────────────────────────
-    if any(w in msg_lower for w in ["expir", "renew", "upcoming", "soon"]):
-        result = await db.execute(text("""
-            SELECT policy_number, policyholder_name, industry_type, premium, expiration_date
-            FROM policies
-            WHERE expiration_date BETWEEN date('now') AND date('now', '+60 days')
-            ORDER BY expiration_date ASC LIMIT 10
-        """))
-        rows = result.fetchall()
-        if rows:
-            lines = "POLICIES EXPIRING IN 60 DAYS:\n"
-            for r in rows:
-                lines += f"- {r[0]} ({r[1]}, {r[2]}): ${r[3]:,.2f} premium, expires {r[4]}\n"
-            context_parts.append(lines)
-
-    return "\n".join(context_parts)
+    _dashboard_cache = {
+        "policies": await _fetch("""
+            SELECT id, policy_number, policyholder_name, industry_type,
+                   effective_date, expiration_date, premium, latitude, longitude
+            FROM policies ORDER BY policy_number
+        """),
+        "claims": await _fetch("""
+            SELECT c.id, c.claim_number, c.policy_id, c.claim_date, c.claim_amount,
+                   c.claim_type, c.status, c.description, c.evidence_files, c.created_at,
+                   p.policy_number, p.policyholder_name
+            FROM claims c LEFT JOIN policies p ON p.id = c.policy_id
+            ORDER BY c.claim_date DESC
+        """),
+        "decisions": await _fetch("""
+            SELECT id, policy_number, decision, reason, risk_level, decided_by, created_at
+            FROM decisions ORDER BY created_at DESC
+        """),
+        "guidelines": await _fetch("""
+            SELECT id, section_code, title, content, category
+            FROM guidelines ORDER BY section_code
+        """),
+    }
+    _dashboard_cache_time = time.time()
+    return _dashboard_cache
 
 
-# ──── LLM Providers ────
-
-def _has_claude():
-    return bool(ANTHROPIC_API_KEY and ANTHROPIC_API_KEY != "your-anthropic-api-key-here")
+# ──── LLM Helpers (vision only) ────
 
 def _has_gemini():
     return bool(GOOGLE_API_KEY and GOOGLE_API_KEY != "your-google-api-key-here")
 
 def _has_openai():
     return bool(OPENAI_API_KEY and OPENAI_API_KEY != "your-openai-api-key-here")
-
-
-async def _claude_response(message: str, history: list, context: str, guideline_context: str) -> str:
-    """Anthropic Claude response (claude-haiku-4-5 - fast and cost-effective)."""
-    import anthropic
-
-    client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
-
-    system = SYSTEM_PROMPT
-    if guideline_context:
-        system += f"\n\nRELEVANT GUIDELINES:\n{guideline_context}"
-    if context:
-        system += f"\n\nDATABASE CONTEXT (use this real data in your response):\n{context}"
-
-    messages = []
-    for msg in history[-20:]:
-        messages.append({"role": msg["role"], "content": msg["content"]})
-    messages.append({"role": "user", "content": message})
-
-    response = await client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=1024,
-        system=system,
-        messages=messages,
-    )
-    return response.content[0].text
-
-
-async def _gemini_response(message: str, history: list, context: str, guideline_context: str) -> str:
-    """Google Gemini 1.5 Flash response (FREE tier — 1,500 req/day)."""
-    import google.generativeai as genai
-
-    genai.configure(api_key=GOOGLE_API_KEY)
-
-    full_prompt = SYSTEM_PROMPT
-    if guideline_context:
-        full_prompt += f"\n\nRELEVANT GUIDELINES:\n{guideline_context}"
-    if context:
-        full_prompt += f"\n\nDATABASE CONTEXT:\n{context}"
-
-    # Convert history to Gemini format
-    gemini_history = []
-    for msg in history[-20:]:
-        role = "user" if msg["role"] == "user" else "model"
-        gemini_history.append({"role": role, "parts": [msg["content"]]})
-
-    gemini_history.append({"role": "user", "parts": [message]})
-
-    try:
-        model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
-        model = genai.GenerativeModel(model_name, system_instruction=full_prompt)
-        response = model.generate_content(
-            gemini_history,
-            generation_config={"temperature": 0.7, "max_output_tokens": 1000}
-        )
-        return response.text
-    except Exception as e:
-        print(f"Gemini error details: {str(e)}")
-        raise e
-
-
-async def _openai_response(message: str, history: list, context: str, guideline_context: str) -> str:
-    """OpenAI GPT-4o-mini response."""
-    from openai import AsyncOpenAI
-    client = AsyncOpenAI(api_key=OPENAI_API_KEY)
-
-    full_context = SYSTEM_PROMPT
-    if guideline_context:
-        full_context += f"\n\nRELEVANT GUIDELINES:\n{guideline_context}"
-    if context:
-        full_context += f"\n\nDATABASE CONTEXT:\n{context}"
-
-    messages = [{"role": "system", "content": full_context}]
-    for msg in history[-20:]:
-        messages.append({"role": msg["role"], "content": msg["content"]})
-    messages.append({"role": "user", "content": message})
-
-    response = await client.chat.completions.create(
-        model="gpt-4o-mini", messages=messages, temperature=0.7, max_tokens=800
-    )
-    return response.choices[0].message.content
-
-
-async def _llm_response(message: str, history: list, db: AsyncSession) -> tuple:
-    """Unified LLM call with 3-source context: SQL data + guidelines RAG + knowledge RAG."""
-
-    # 1. Guidelines RAG (underwriting rules and thresholds)
-    rag_results = search_similar(message, k=5)
-    sources = [{"section": r["section"], "title": r["title"]} for r in rag_results] if rag_results else []
-    guideline_context = "\n".join([f"- [{r['section']}] {r['content']}" for r in rag_results]) if rag_results else ""
-
-    # 2. Structured data: exact SQL queries
-    data_context = await _nl_to_sql_query(message, db)
-
-    # 3. Knowledge RAG: similar past claims and decisions (semantic search)
-    knowledge_results = search_knowledge(message, k=4)
-    knowledge_context = ""
-    if knowledge_results:
-        claims_ctx = [r for r in knowledge_results if r.get("type") == "claim"]
-        decisions_ctx = [r for r in knowledge_results if r.get("type") == "decision"]
-        parts = []
-        if claims_ctx:
-            parts.append("SIMILAR PAST CLAIMS:\n" + "\n".join(f"- {r['content']}" for r in claims_ctx))
-        if decisions_ctx:
-            parts.append("SIMILAR PAST DECISIONS:\n" + "\n".join(f"- {r['content']}" for r in decisions_ctx))
-        knowledge_context = "\n\n".join(parts)
-        # Add knowledge sources to sources list
-        for r in decisions_ctx:
-            pnum = r.get("policy_number", "")
-            if pnum:
-                sources.append({"section": pnum, "title": f"{r.get('decision','').upper()} decision"})
-
-    # Combine all context
-    full_data_context = "\n\n".join(filter(None, [data_context, knowledge_context]))
-
-    # 4. Try LLMs in order: Claude → Gemini → OpenAI → Mock
-    if _has_claude():
-        try:
-            text_resp = await _claude_response(message, history, full_data_context, guideline_context)
-            return text_resp, sources, "claude"
-        except Exception as e:
-            print(f"Claude error: {e}")
-
-    if _has_gemini():
-        try:
-            text_resp = await _gemini_response(message, history, full_data_context, guideline_context)
-            return text_resp, sources, "gemini"
-        except Exception as e:
-            print(f"Gemini error: {e}")
-
-    if _has_openai():
-        try:
-            text_resp = await _openai_response(message, history, full_data_context, guideline_context)
-            return text_resp, sources, "openai"
-        except Exception as e:
-            print(f"OpenAI error: {e}")
-
-    # 5. Smart mock fallback
-    text_resp = _build_mock_response(message, full_data_context, guideline_context, rag_results)
-    return text_resp, sources, "mock"
-
-
-def _build_mock_response(message: str, data_context: str, guideline_context: str, rag_results: list) -> str:
-    """Smart mock that uses real data but no LLM."""
-    parts = []
-
-    if data_context:
-        parts.append(data_context.strip())
-
-    if rag_results:
-        parts.append("\n📖 **Relevant Guidelines:**")
-        for r in rag_results[:3]:
-            parts.append(f"- **{r['section']}**: {r['content'][:200]}")
-
-    if parts:
-        result = "\n".join(parts)
-        result += "\n\n💡 *For AI-powered insights, set a Google API key (free) in backend/.env*"
-        return result
-
-    return (
-        "I'm **RiskMind DataBot**. Try asking:\n"
-        "• \"Analyze COMM-2024-001\"\n"
-        "• \"Show me the claims overview\"\n"
-        "• \"What are the underwriting guidelines?\"\n"
-        "• \"Which policies are high risk?\"\n"
-        "• \"What's the portfolio breakdown by industry?\"\n\n"
-        "💡 *Set `GOOGLE_API_KEY` in backend/.env for full AI capabilities (free)*"
-    )
 
 
 # ──── Vision Analysis ────
@@ -566,7 +141,6 @@ async def _analyze_image_gemini(image_base64: str, prompt: str) -> str:
     import io
 
     genai.configure(api_key=GOOGLE_API_KEY)
-
     image_bytes = base64.b64decode(image_base64)
     image = PIL.Image.open(io.BytesIO(image_bytes))
 
@@ -621,21 +195,18 @@ async def _analyze_image(image_base64_or_path: str, prompt: str, is_file: bool =
     return "Image analysis requires a Google API key (free) or OpenAI API key. Please configure one in backend/.env"
 
 
-
 # ──── Video Analysis ────
 
 async def _analyze_video(file_path: str, prompt: str) -> str:
-    """Analyze video using Gemini File API (Upload -> Process -> Generate)."""
+    """Analyze video using Gemini File API."""
     import google.generativeai as genai
     genai.configure(api_key=GOOGLE_API_KEY)
 
     try:
-        # 1. Upload file
         print(f"Uploading video: {file_path}")
         video_file = genai.upload_file(file_path)
         print(f"Upload complete: {video_file.uri}")
 
-        # 2. Wait for processing
         while video_file.state.name == "PROCESSING":
             print("Processing video...")
             time.sleep(2)
@@ -644,17 +215,11 @@ async def _analyze_video(file_path: str, prompt: str) -> str:
         if video_file.state.name == "FAILED":
             raise ValueError("Video processing failed.")
 
-        # 3. Generate content
         model_name = os.getenv("GEMINI_MODEL", "").strip()
-        model_candidates = [
-            model_name,
-            "gemini-2.5-flash-lite",
-            "gemini-2.5-flash",
-            "gemini-2.0-flash",
-        ]
+        model_candidates = [model_name, "gemini-2.0-flash", "gemini-2.5-flash-lite", "gemini-2.5-flash"]
         model_candidates = [m for m in model_candidates if m]
 
-        last_error: Exception | None = None
+        last_error = None
         for candidate in model_candidates:
             try:
                 model = genai.GenerativeModel(candidate, system_instruction=SYSTEM_PROMPT)
@@ -710,7 +275,7 @@ async def _analyze_pdf(file_path: str) -> str:
         except Exception as e:
             print(f"OpenAI PDF error: {e}")
 
-    return f"**Extracted Text (first 2000 chars):**\n\n{full_text[:2000]}\n\n💡 *Set GOOGLE_API_KEY for AI-powered analysis*"
+    return f"**Extracted Text (first 2000 chars):**\n\n{full_text[:2000]}\n\n*Set GOOGLE_API_KEY for AI-powered analysis*"
 
 
 # ──── Session Management ────
@@ -756,7 +321,7 @@ async def _update_session_title(session_id: int, first_message: str, db: AsyncSe
 
 @router.post("/", response_model=ChatResponse)
 async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
-    """Send a message to RiskMind DataBot. Uses Gemini (free) → OpenAI → mock."""
+    """Chat-first: LangGraph agent handles intent routing, RAG, LLM call, and guardrails."""
     sid = await _get_or_create_session(request.session_id, request.user_email, db)
     await _save_message(sid, "user", request.message, db)
     await _update_session_title(sid, request.message, db)
@@ -768,130 +333,14 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
     db_msgs = result.scalars().all()
     history = [{"role": m.role, "content": m.content} for m in db_msgs[:-1]]
 
-    # Intent-driven pipeline (context-aware SQL + analysis object)
-    response_text = None
-    sources = []
-    provider = "intent-engine"
-    analysis_object = None
-    recommended_modes = None
-    default_mode = None
-    provenance = None
-    inferred_intent = None
-    output_type = None
-    suggested_outputs = None
-    artifact = None
+    # Load cached data snapshot (all tables, cached 60s)
+    dashboard_data = await _get_cached_dashboard_data(db)
 
-    clarification_needed = False
-    suggested_intents = []
-    suggest_canvas_view = False
-    show_canvas_summary = True
+    # Run LangGraph agent pipeline (intent → data → RAG → confidence → LLM → guardrails)
+    pipeline = await run_agent_pipeline(request.message, dashboard_data, history)
 
-    try:
-        # Pass history for context-aware follow-up questions
-        pipeline = await run_intent_pipeline(request.message, db, history)
-        response_text = pipeline.get("analysis_text")
-        analysis_object = pipeline.get("analysis_object")
-        recommended_modes = pipeline.get("recommended_modes")
-        default_mode = pipeline.get("default_mode")
-        provenance = pipeline.get("provenance")
-        inferred_intent = pipeline.get("inferred_intent")
-        output_type = pipeline.get("output_type")
-        suggested_outputs = pipeline.get("suggested_outputs")
-        artifact = pipeline.get("artifact")
-        clarification_needed = pipeline.get("clarification_needed", False)
-        suggested_intents = pipeline.get("suggested_intents", [])
-        suggest_canvas_view = pipeline.get("suggest_canvas_view", False)
-        show_canvas_summary = pipeline.get("show_canvas_summary", True)
-    except Exception as e:
-        import traceback
-        print(f"Intent pipeline error: {e}")
-        traceback.print_exc()
-
-    # Handle clarification needed
-    if clarification_needed and not response_text:
-        response_text = (
-            "I'm not entirely sure what you're looking for. Could you help me understand better?\n\n"
-            "You can click one of the options below, or rephrase your question with more details."
-        )
-        provider = "intent-engine"
-
-    if not response_text:
-        # Fallback to LLM response
-        response_text, sources, provider = await _llm_response(request.message, history, db)
-
-        # Check if LLM-generated response is long and should suggest canvas view
-        if response_text and len(response_text) > 500:
-            suggest_canvas_view = True
-            # For UNDERSTAND intent (or when pipeline failed) with long response, show canvas summary
-            if inferred_intent in ("Understand", None):
-                show_canvas_summary = True
-
-                # Use Query Library (Tier 1) to fetch contextual summary metrics.
-                # The library's PF-006 "portfolio overview" query covers the common
-                # case. For more specific questions, it matches the right golden query.
-                # This is NOT hardcoded SQL — it routes through the same golden query
-                # library used across the entire intent engine pipeline.
-                try:
-                    from services.query_library import get_query_by_id, match_query
-                    from sqlalchemy import text as sql_text
-
-                    # Find best matching library query for this message
-                    match = match_query(request.message)
-                    if match is None:
-                        # Fallback to portfolio overview (PF-006) for general portfolio queries
-                        lower_msg = request.message.lower()
-                        if any(w in lower_msg for w in ["portfolio", "policies", "claims", "overview", "high risk", "risk"]):
-                            match = ("PF-006", get_query_by_id("PF-006"))
-
-                    if match:
-                        qid, entry = match
-                        # Only run aggregate queries (single-row summaries) for the metrics card
-                        if entry and entry.get("is_aggregate") and not entry.get("params"):
-                            result = await db.execute(sql_text(entry["sql"]))
-                            row = result.fetchone()
-                            columns = result.keys() if hasattr(result, 'keys') else []
-
-                            if row:
-                                if not analysis_object:
-                                    analysis_object = {}
-                                if "metrics" not in analysis_object:
-                                    analysis_object["metrics"] = {}
-
-                                # Map returned columns to metrics dict dynamically
-                                row_dict = dict(zip(columns, row)) if columns else {}
-                                # Normalize common column name variants
-                                col_map = {
-                                    "policy_count": "policy_count",
-                                    "total_policies": "policy_count",
-                                    "total_premium": "total_premium",
-                                    "total_premium_ever": "total_premium",
-                                    "claim_count": "claim_count",
-                                    "total_claims": "total_amount",
-                                    "total_paid": "total_amount",
-                                    "avg_claim": "avg_amount",
-                                    "avg_claim_amount": "avg_amount",
-                                    "max_claim": "max_claim",
-                                    "loss_ratio_pct": "loss_ratio",
-                                }
-                                for src_col, dest_key in col_map.items():
-                                    if src_col in row_dict and row_dict[src_col] is not None:
-                                        analysis_object["metrics"][dest_key] = row_dict[src_col]
-
-                                # Compute loss_ratio if not directly returned
-                                if "loss_ratio" not in analysis_object["metrics"]:
-                                    prem = analysis_object["metrics"].get("total_premium", 0)
-                                    paid = analysis_object["metrics"].get("total_amount", 0)
-                                    if prem and prem > 0:
-                                        analysis_object["metrics"]["loss_ratio"] = round(paid / prem * 100, 1)
-
-                                print(f"[chat] Summary metrics populated via library query [{qid}]")
-
-                except Exception as e:
-                    print(f"[chat] Summary metrics via query library failed: {e}")
-
-    # Add canvas suggestion for long responses
-    if suggest_canvas_view and response_text:
-        response_text += "\n\n📊 *For a better view of all the details, check the Intelligent Canvas on the right.*"
+    response_text = pipeline.get("response", "")
+    sources = pipeline.get("sources", [])
 
     await _save_message(sid, "assistant", response_text, db,
                          sources_json=json.dumps(sources) if sources else None)
@@ -899,28 +348,24 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
     return ChatResponse(
         response=response_text,
         sources=sources,
-        provider=provider,
+        provider=pipeline.get("provider", "mock"),
         session_id=sid,
-        analysis_object=analysis_object,
-        recommended_modes=recommended_modes,
-        default_mode=default_mode,
-        provenance=provenance,
-        inferred_intent=inferred_intent,
-        output_type=output_type,
-        suggested_outputs=suggested_outputs,
-        artifact=artifact,
-        clarification_needed=clarification_needed,
-        suggested_intents=suggested_intents,
-        suggest_canvas_view=suggest_canvas_view,
-        show_canvas_summary=show_canvas_summary
+        analysis_object=pipeline.get("analysis_object"),
+        provenance=pipeline.get("provenance"),
+        inferred_intent=pipeline.get("inferred_intent"),
+        output_type=pipeline.get("output_type"),
+        clarification_needed=pipeline.get("clarification_needed", False),
+        suggested_intents=pipeline.get("suggested_intents", []),
+        suggest_canvas_view=pipeline.get("suggest_canvas_view", False),
+        show_canvas_summary=pipeline.get("show_canvas_summary", True),
     )
 
 
 @router.post("/vision", response_model=ChatResponse)
 async def vision_chat(request: VisionRequest, db: AsyncSession = Depends(get_db)):
-    """Analyze an image from camera or upload (base64). Gemini Vision (free) or GPT-4o."""
+    """Analyze an image from camera or upload (base64)."""
     sid = await _get_or_create_session(request.session_id, request.user_email, db)
-    await _save_message(sid, "user", f"📷 [Image captured] {request.prompt}", db)
+    await _save_message(sid, "user", f"[Image captured] {request.prompt}", db)
 
     analysis = await _analyze_image(request.image_base64, request.prompt)
     provider = "gemini" if _has_gemini() else "openai" if _has_openai() else "mock"
@@ -986,7 +431,6 @@ async def upload_file(
 ):
     """Upload PDF or image for AI analysis."""
     ext = os.path.splitext(file.filename)[1].lower()
-    ext = os.path.splitext(file.filename)[1].lower()
     allowed = {".pdf", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tiff", ".mp4", ".mov", ".avi", ".mkv"}
     if ext not in allowed:
         raise HTTPException(400, f"Unsupported type: {ext}")
@@ -1025,12 +469,32 @@ async def upload_file(
     )
 
 
+@router.get("/geo/policies")
+async def get_geo_policies(db: AsyncSession = Depends(get_db)):
+    """Return policies with lat/lon and computed risk_level for geo map."""
+    sql = text("""
+        SELECT
+            p.policy_number, p.policyholder_name, p.industry_type,
+            p.premium, p.latitude, p.longitude,
+            COUNT(c.id) AS claim_count,
+            COALESCE(SUM(c.claim_amount), 0) AS total_claims,
+            CASE
+                WHEN COUNT(c.id) >= 5 OR COALESCE(SUM(c.claim_amount), 0) >= 100000 THEN 'high'
+                WHEN COUNT(c.id) BETWEEN 2 AND 4 THEN 'medium'
+                ELSE 'low'
+            END AS risk_level
+        FROM policies p
+        LEFT JOIN claims c ON p.id = c.policy_id
+        WHERE p.latitude IS NOT NULL AND p.longitude IS NOT NULL
+        GROUP BY p.id
+        ORDER BY total_claims DESC
+    """)
+    result = await db.execute(sql)
+    rows = [dict(r._mapping) for r in result.fetchall()]
+    return rows
+
+
 @router.get("/provider")
 async def get_provider_info():
-    """Get current LLM provider status."""
-    return {
-        "gemini_active": _has_gemini(),
-        "openai_active": _has_openai(),
-        "active_provider": "gemini" if _has_gemini() else "openai" if _has_openai() else "mock",
-        "vision_available": _has_gemini() or _has_openai()
-    }
+    """Get current LLM provider status (LangChain unified)."""
+    return get_available_providers()

@@ -5,7 +5,6 @@ import Workbench from './pages/Workbench'
 import SavedIntelligence from './pages/SavedIntelligence'
 import ClaimDetail from './components/ClaimDetail'
 import Login from './pages/Login'
-
 function App() {
     return (
         <Routes>

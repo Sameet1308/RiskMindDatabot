@@ -136,9 +136,9 @@ async def _gemini_analysis(claims_summary: Dict[str, Any], policy_number: str) -
         model_name = os.getenv("GEMINI_MODEL", "").strip()
         model_candidates: List[str] = [
             model_name,
+            "gemini-2.0-flash",
             "gemini-2.5-flash-lite",
             "gemini-2.5-flash",
-            "gemini-2.0-flash",
         ]
         model_candidates = [m for m in model_candidates if m]
 

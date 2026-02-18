@@ -1,9 +1,12 @@
-import { useEffect, useState } from 'react'
-import { Bookmark, FileText, Sparkles } from 'lucide-react'
+import { useEffect, useState, useRef } from 'react'
+import { Bookmark, FileText, Sparkles, Trash2, Download } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import { exportElementAsPdf, exportAllSavedAsPdf } from '../utils/exportPdf'
 
 type SavedItem = {
     id: string
-    type: 'summary' | 'card' | 'memo' | 'dashboard' | 'decision'
+    type: 'summary' | 'card' | 'memo' | 'dashboard' | 'decision' | 'narrative' | 'geo_map'
     title: string
     output_type?: string
     inferred_intent?: string
@@ -13,13 +16,14 @@ type SavedItem = {
         submission_id?: string
     }
     artifact?: Record<string, any>
-    provenance?: Record<string, any> | null
     content?: string
+    provenance?: Record<string, any> | null
     created_at: string
 }
 
 export default function SavedIntelligence() {
     const [items, setItems] = useState<SavedItem[]>([])
+    const listRef = useRef<HTMLDivElement>(null)
     const outputLabels: Record<string, string> = {
         analysis: 'Summary',
         dashboard: 'Dashboard',
@@ -27,6 +31,8 @@ export default function SavedIntelligence() {
         memo: 'Underwriter Memo',
         decision: 'Decision Recommendation',
         summary: 'Summary',
+        narrative: 'Conversation Insight',
+        geo_map: 'Geospatial Intelligence',
     }
 
     useEffect(() => {
@@ -40,6 +46,21 @@ export default function SavedIntelligence() {
         }
     }, [])
 
+    const removeItem = (id: string) => {
+        const updated = items.filter(item => item.id !== id)
+        setItems(updated)
+        localStorage.setItem('riskmind_saved', JSON.stringify(updated))
+    }
+
+    const handleExportItem = (id: string) => {
+        const el = document.getElementById(`saved-${id}`)
+        if (el) exportElementAsPdf(el, `riskmind-saved-${id}.pdf`)
+    }
+
+    const handleExportAll = () => {
+        if (listRef.current) exportAllSavedAsPdf(listRef.current, `riskmind-intelligence-report-${Date.now()}.pdf`)
+    }
+
     const renderSummary = (item: SavedItem) => {
         const metrics = item.artifact?.metrics || {}
         const bullets = item.artifact?.bullets || []
@@ -47,19 +68,19 @@ export default function SavedIntelligence() {
             <div className="summary-kpis">
                 <div>
                     <span>Policy</span>
-                    <strong>{item.context?.policy_number || 'Not available'}</strong>
+                    <strong>{item.context?.policy_number || 'Portfolio'}</strong>
                 </div>
                 <div>
                     <span>Claims</span>
-                    <strong>{metrics.claim_count ?? 'Not available'}</strong>
+                    <strong>{metrics.claim_count ?? 'N/A'}</strong>
                 </div>
                 <div>
                     <span>Total Loss</span>
-                    <strong>{metrics.total_amount ?? 'Not available'}</strong>
+                    <strong>{metrics.total_amount != null ? `$${Number(metrics.total_amount).toLocaleString()}` : 'N/A'}</strong>
                 </div>
                 <div>
                     <span>Loss Ratio</span>
-                    <strong>{metrics.loss_ratio ?? 'Not available'}</strong>
+                    <strong>{metrics.loss_ratio != null ? `${metrics.loss_ratio}%` : 'N/A'}</strong>
                 </div>
                 {bullets.length > 0 && (
                     <div className="summary-drivers">
@@ -85,7 +106,7 @@ export default function SavedIntelligence() {
                         <strong>{card.insight || item.title}</strong>
                     </div>
                     <div className="hyper-meta">
-                        <span className="hyper-confidence">{card.confidence || '—'} Confidence</span>
+                        <span className="hyper-confidence">{card.confidence || '\u2014'} Confidence</span>
                     </div>
                 </div>
                 <div className="hyper-metrics">
@@ -157,13 +178,40 @@ export default function SavedIntelligence() {
         )
     }
 
+    const renderNarrative = (item: SavedItem) => {
+        const text = item.content || item.artifact?.content || 'No content available.'
+        return (
+            <div className="conversation-view">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+            </div>
+        )
+    }
+
+    const renderGeoMap = (item: SavedItem) => {
+        const text = item.content || item.artifact?.content || 'Geospatial risk analysis snapshot.'
+        return (
+            <div className="conversation-view">
+                <p style={{ color: 'var(--text-muted)', fontStyle: 'italic', marginBottom: '0.5rem' }}>
+                    Geospatial Risk Map ({item.artifact?.policy_count || 'N/A'} policies analyzed)
+                </p>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+            </div>
+        )
+    }
+
     return (
         <div className="animate-fadeIn">
-            <div className="page-header">
+            <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                     <h1 className="page-title">Saved Intelligence</h1>
                     <p className="page-subtitle">Evidence-backed insights captured from RiskMind Copilot.</p>
                 </div>
+                {items.length > 0 && (
+                    <button className="btn btn-primary" onClick={handleExportAll}>
+                        <Download style={{ width: '1rem', height: '1rem', marginRight: '0.25rem' }} />
+                        Export All as PDF
+                    </button>
+                )}
             </div>
 
             {items.length === 0 ? (
@@ -173,31 +221,51 @@ export default function SavedIntelligence() {
                     <p style={{ color: 'var(--text-muted)' }}>Save insight cards or memos from RiskMind to keep them here.</p>
                 </div>
             ) : (
-                <div style={{ display: 'grid', gap: '1rem' }}>
+                <div ref={listRef} style={{ display: 'grid', gap: '1rem' }}>
                     {items.map((item) => (
-                        <div key={item.id} className="card" style={{ padding: '1.5rem' }}>
+                        <div key={item.id} id={`saved-${item.id}`} className="card" style={{ padding: '1.5rem' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                     <Bookmark style={{ width: '1rem', height: '1rem', color: 'var(--primary)' }} />
                                     <strong>{item.title}</strong>
                                 </div>
-                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{new Date(item.created_at).toLocaleString()}</span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <button
+                                        className="btn btn-secondary"
+                                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                                        onClick={() => handleExportItem(item.id)}
+                                        title="Export as PDF"
+                                    >
+                                        <Download style={{ width: '0.75rem', height: '0.75rem' }} />
+                                    </button>
+                                    <button
+                                        className="btn btn-secondary"
+                                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#ef4444' }}
+                                        onClick={() => removeItem(item.id)}
+                                        title="Delete"
+                                    >
+                                        <Trash2 style={{ width: '0.75rem', height: '0.75rem' }} />
+                                    </button>
+                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{new Date(item.created_at).toLocaleString()}</span>
+                                </div>
                             </div>
                             {item.type === 'summary' && renderSummary(item)}
                             {item.type === 'card' && renderCard(item)}
                             {item.type === 'memo' && renderMemo(item)}
                             {item.type === 'dashboard' && renderDashboard(item)}
                             {item.type === 'decision' && renderDecision(item)}
-                            {item.content && !item.type && (
-                                <p style={{ color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>{item.content}</p>
+                            {item.type === 'narrative' && renderNarrative(item)}
+                            {item.type === 'geo_map' && renderGeoMap(item)}
+                            {item.content && !['narrative', 'geo_map'].includes(item.type) && (
+                                <p style={{ color: 'var(--text-secondary)', marginBottom: '0.75rem', marginTop: '0.5rem', fontSize: '0.875rem' }}>{item.content}</p>
                             )}
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '0.75rem' }}>
                                 <FileText style={{ width: '0.75rem', height: '0.75rem' }} />
                                 {outputLabels[item.output_type || item.type] || (item.output_type || item.type).toUpperCase()}
-                                {item.context?.policy_number ? ` · ${item.context.policy_number}` : ''}
-                                {item.context?.claim_number ? ` · ${item.context.claim_number}` : ''}
-                                {item.context?.submission_id ? ` · ${item.context.submission_id}` : ''}
-                                {item.inferred_intent ? ` · ${item.inferred_intent}` : ''}
+                                {item.context?.policy_number ? ` \u00B7 ${item.context.policy_number}` : ''}
+                                {item.context?.claim_number ? ` \u00B7 ${item.context.claim_number}` : ''}
+                                {item.context?.submission_id ? ` \u00B7 ${item.context.submission_id}` : ''}
+                                {item.inferred_intent ? ` \u00B7 ${item.inferred_intent}` : ''}
                             </div>
                         </div>
                     ))}

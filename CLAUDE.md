@@ -5,8 +5,9 @@ AI-powered underwriting assistant for commercial insurance. Uses a "Glass Box" a
 
 ## Tech Stack
 - **Backend:** FastAPI + SQLite + ChromaDB (RAG) — runs on http://localhost:8000
-- **Frontend:** React 19 + TypeScript + TailwindCSS + Recharts + Vite — runs on http://localhost:5174
-- **AI:** Gemini 2.0 Flash (primary, FREE tier), OpenAI GPT-4o-mini (fallback)
+- **Frontend:** React 19 + TypeScript + TailwindCSS + Recharts + Vite — runs on http://localhost:5173
+- **AI:** LangGraph + LangChain (Bedrock Claude / Gemini / OpenAI) — agentic 8-node pipeline
+- **PDF Export:** html2canvas-pro + jspdf
 - **Shell:** Windows — use `bash` syntax, not PowerShell
 
 ## How to Run
@@ -45,20 +46,26 @@ documents : id, filename, file_path, file_type, file_size, uploaded_by,
 ## Key File Locations
 | File | Purpose |
 |---|---|
-| `backend/services/intent_engine.py` | Intent routing, SQL generation, 4-tier strategy |
+| `backend/services/agent_graph.py` | LangGraph 8-node state machine (main pipeline) |
+| `backend/services/llm_providers.py` | LangChain unified LLM factory (Bedrock/Gemini/Claude/OpenAI) |
+| `backend/services/prompts.py` | System prompt constant |
+| `backend/services/intent_engine.py` | Intent routing, data snapshot, analysis utilities |
 | `backend/services/query_library.py` | 100 pre-built golden SQL queries (Tier 1) |
-| `backend/routers/chat.py` | Main chat API endpoint |
+| `backend/routers/chat.py` | Chat API + geo policies endpoint |
 | `backend/routers/dashboard.py` | Dashboard data API |
 | `backend/services/vector_store.py` | ChromaDB RAG for guidelines |
-| `backend/services/join_context.py` | Allowed JOIN paths between tables |
 | `frontend/src/pages/RiskMind.tsx` | Main intelligence canvas UI |
+| `frontend/src/pages/Workbench.tsx` | Underwriter workbench (5 tabs) |
+| `frontend/src/pages/SavedIntelligence.tsx` | Saved items + PDF export |
+| `frontend/src/components/RiskMap.tsx` | Leaflet geospatial risk map |
+| `frontend/src/utils/exportPdf.ts` | PDF export utility |
 | `frontend/src/index.css` | All CSS including markdown styles |
 
 ## Intent Routing Architecture
 3-layer system:
 1. **Specific Intent** (what): `policy_risk_summary`, `claim_summary`, `portfolio_summary`, `ad_hoc_query`, `geo_risk`
 2. **Canonical Intent** (goal): `Understand`, `Analyze`, `Decide`, `Document`
-3. **Output Type** (UI): `analysis`, `dashboard`, `memo`, `decision`, `card`
+3. **Output Type** (UI): `analysis`, `dashboard`, `memo`, `decision`, `card`, `geo_map`
 
 ### Tiered SQL Strategy (ZERO LLM cost for ~80% of queries)
 ```
@@ -116,9 +123,21 @@ Edit `backend/services/query_library.py`, add entry to `QUERY_LIBRARY` dict:
 
 ### Frontend canvas rendering flow:
 1. Chat API returns `output_type` + `analysis_object`
-2. `RiskMind.tsx` checks `output_type` → renders Summary card / Focus Insight / Dashboard
-3. For dashboard: fetches `/api/dashboard/data` → builds `dashboardCache` → calls `addWidgetDirect()`
+2. `RiskMind.tsx` checks `output_type` → renders Summary / Narrative / Memo / Decision / Geo Map
+3. For geo_map: renders `<RiskMap />` component (Leaflet) with AI insights panel
 4. Focus Insight uses `<ReactMarkdown remarkPlugins={[remarkGfm]}>` for markdown
+5. Save button on all canvas cards → stores to localStorage → viewable at `/saved`
+6. Export PDF button on all canvas cards → uses html2canvas-pro + jspdf
+
+### Geospatial risk map keywords (trigger geo_map output):
+`map`, `geo`, `geography`, `spatial`, `geospatial`, `location`, `region`
+
+### Workbench tabs:
+1. **Overview** — Portfolio KPIs, risk distribution, policy table
+2. **Submissions** — New business triage with AI risk scores
+3. **Renewals** — Renewal pricing with AI recommendations
+4. **Quote Decisions** — AI-suggested pricing with accept/refer/decline
+5. **Broker Communications** — Messages with AI-drafted responses
 
 ## Known Issues / Watch Out For
 - `policies` table has NO `risk_level` column — always compute it via CASE/HAVING

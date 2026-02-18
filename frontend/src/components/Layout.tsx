@@ -32,7 +32,7 @@ export default function Layout() {
                                 className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
                             >
                                 <Icon className="nav-icon" />
-                                <span className="hidden sm:inline">{label}</span>
+                                <span>{label}</span>
                             </NavLink>
                         ))}
 

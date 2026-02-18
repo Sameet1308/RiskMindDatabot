@@ -50,9 +50,10 @@ const lowRiskIcon = new L.Icon({
 type RiskMapProps = {
     policies?: any[];
     height?: string;
+    aiInsights?: string;
 };
 
-export default function RiskMap({ policies: providedPolicies, height = '60vh' }: RiskMapProps) {
+export default function RiskMap({ policies: providedPolicies, height = '60vh', aiInsights }: RiskMapProps) {
     const [policies, setPolicies] = useState<any[]>(providedPolicies || []);
     const [loading, setLoading] = useState(!providedPolicies);
 
@@ -160,6 +161,13 @@ export default function RiskMap({ policies: providedPolicies, height = '60vh' }:
                     </Marker>
                 ))}
             </MapContainer>
+
+            {aiInsights && (
+                <div className="geo-insights-panel">
+                    <h4><Shield className="h-4 w-4 inline mr-1" /> AI Risk Insights</h4>
+                    <p>{aiInsights}</p>
+                </div>
+            )}
         </div>
     );
 }
