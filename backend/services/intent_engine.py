@@ -64,6 +64,12 @@ def _route_intent(message: str) -> Dict[str, Any]:
         ]):
             intent = "ad_hoc_query"
 
+    # Analytics playground keywords
+    _PLAYGROUND_KW = {"interactive", "self-service", "self service", "playground", "slice and dice", "slice & dice", "explore data"}
+    is_playground = any(kw in lower for kw in _PLAYGROUND_KW)
+    if is_playground:
+        intent = "analytics_playground"
+
     # Geo keywords → geo_risk intent
     _GEO_KEYWORDS = {"map", "geo", "geography", "spatial", "geospatial", "location", "region"}
     is_geo = any(word in lower for word in _GEO_KEYWORDS)

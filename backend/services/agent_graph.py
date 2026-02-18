@@ -380,9 +380,15 @@ def format_output_node(state: AgentState) -> dict:
     if not show_canvas and not state.get("suggest_canvas_view", False):
         analysis_object = {}
 
+    # Inject analytics playground link when intent matches
+    response_text = state.get("response_text", "")
+    intent_payload = state.get("intent_payload") or {}
+    if intent_payload.get("intent") == "analytics_playground":
+        response_text += "\n\n**[Open Analytics Playground](/analytics)** -- Slice and dice your portfolio data interactively."
+
     return {
         "final_response": {
-            "response": state.get("response_text", ""),
+            "response": response_text,
             "sources": state.get("sources", []),
             "provider": state.get("provider", "mock"),
             "analysis_object": analysis_object if analysis_object else None,

@@ -31,6 +31,14 @@ async def init_db():
             await conn.execute(text("ALTER TABLE guidelines ADD COLUMN policy_number VARCHAR(50)"))
             await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_guidelines_policy_number ON guidelines (policy_number)"))
 
+        # Ensure policies.assigned_to exists for user-based filtering
+        result = await conn.execute(
+            text("SELECT name FROM pragma_table_info('policies') WHERE name='assigned_to'")
+        )
+        if result.fetchone() is None:
+            await conn.execute(text("ALTER TABLE policies ADD COLUMN assigned_to VARCHAR(255)"))
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_policies_assigned_to ON policies (assigned_to)"))
+
 async def get_db():
     """Dependency for getting database session"""
     async with async_session() as session:

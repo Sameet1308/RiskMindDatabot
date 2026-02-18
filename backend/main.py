@@ -17,6 +17,8 @@ from routers.memo import router as memo_router
 from routers.policies import router as policies_router
 from routers.decisions import router as decisions_router
 from routers.dashboard import router as dashboard_router
+from routers.auth import router as auth_router
+from routers.analytics import router as analytics_router
 from database.connection import init_db, get_db, async_session
 
 @asynccontextmanager
@@ -36,6 +38,13 @@ async def lifespan(app: FastAPI):
             print(f"[OK] ChromaDB: {n_claims} claims + {n_decisions} decisions indexed")
     except Exception as e:
         print(f"[WARN] ChromaDB indexing skipped: {e}")
+
+    # Pre-warm analytics engine
+    try:
+        from services.analytics_service import AnalyticsEngine
+        AnalyticsEngine.load()
+    except Exception as e:
+        print(f"[WARN] Analytics engine skipped: {e}")
 
     api_key_g = os.getenv("GOOGLE_API_KEY", "")
     api_key_o = os.getenv("OPENAI_API_KEY", "")
@@ -83,6 +92,8 @@ app.include_router(memo_router, prefix="/api/memo", tags=["Memo"])
 app.include_router(policies_router, prefix="/api/policies", tags=["Policies"])
 app.include_router(decisions_router, prefix="/api/decisions", tags=["Decisions"])
 app.include_router(dashboard_router, prefix="/api/dashboard", tags=["Dashboard"])
+app.include_router(auth_router, prefix="/api/auth", tags=["Auth"])
+app.include_router(analytics_router, prefix="/api/analytics", tags=["Analytics"])
 
 @app.get("/")
 async def root():

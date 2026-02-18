@@ -32,10 +32,10 @@ class PolicyDetail(PolicyListItem):
 
 
 @router.get("/", response_model=List[PolicyListItem])
-async def list_policies(db: AsyncSession = Depends(get_db)):
-    """List all policies with summary statistics."""
-    result = await db.execute(text("""
-        SELECT 
+async def list_policies(user_email: Optional[str] = None, db: AsyncSession = Depends(get_db)):
+    """List policies with summary statistics. Optionally filter by assigned user."""
+    base_sql = """
+        SELECT
             p.policy_number,
             p.policyholder_name,
             p.industry_type,
@@ -49,9 +49,13 @@ async def list_policies(db: AsyncSession = Depends(get_db)):
             COALESCE(MAX(c.claim_amount), 0) as max_claim
         FROM policies p
         LEFT JOIN claims c ON p.id = c.policy_id
-        GROUP BY p.id
-        ORDER BY p.policy_number
-    """))
+    """
+    params = {}
+    if user_email:
+        base_sql += " WHERE p.assigned_to = :user_email"
+        params["user_email"] = user_email
+    base_sql += " GROUP BY p.id ORDER BY p.policy_number"
+    result = await db.execute(text(base_sql), params)
     rows = result.fetchall()
 
     policies = []

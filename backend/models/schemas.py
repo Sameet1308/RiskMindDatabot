@@ -12,7 +12,7 @@ from database.connection import Base
 # SQLAlchemy Models
 class Policy(Base):
     __tablename__ = "policies"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     policy_number = Column(String(50), unique=True, index=True)
     policyholder_name = Column(String(200))
@@ -22,8 +22,9 @@ class Policy(Base):
     premium = Column(Float)
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
+    assigned_to = Column(String(255), nullable=True, index=True)  # user email
     created_at = Column(DateTime, default=datetime.utcnow)
-    
+
     claims = relationship("ClaimRecord", back_populates="policy")
 
 

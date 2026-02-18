@@ -206,6 +206,25 @@ export interface EvidenceUploadResponse {
     local_path: string
 }
 
+export interface AnalyticsMeta {
+    attributes: { key: string; label: string }[]
+    metrics: { key: string; label: string; agg: string }[]
+}
+
+export interface AnalyticsQueryPayload {
+    dimensions: string[]
+    metrics: string[]
+    filters?: { field: string; op: string; values: string[] }[]
+    user_email?: string
+}
+
+export interface AnalyticsQueryResult {
+    columns: string[]
+    rows: Record<string, any>[]
+    totals: Record<string, number>
+    row_count: number
+}
+
 export interface DashboardData {
     policies: any[]
     claims: any[]
@@ -217,9 +236,22 @@ export interface DashboardData {
     snapshot: string
 }
 
+export interface LoginResponse {
+    email: string
+    full_name: string
+    role: string
+    assigned_policies: string[]
+}
+
 // ──── API Service ────
 
 export const apiService = {
+    // Auth
+    async login(email: string, password: string): Promise<LoginResponse> {
+        const response = await api.post('/auth/login', { email, password })
+        return response.data
+    },
+
     // Health
     async getHealth() {
         const response = await api.get('/health')
@@ -288,7 +320,7 @@ export const apiService = {
     },
 
     // Chat — with persistent sessions
-    async chat(message: string, sessionId?: number, userEmail: string = 'demo@ltm.com'): Promise<ChatResponse> {
+    async chat(message: string, sessionId?: number, userEmail: string = 'demo@apexuw.com'): Promise<ChatResponse> {
         const response = await api.post('/chat/', {
             message,
             session_id: sessionId || null,
@@ -297,7 +329,7 @@ export const apiService = {
         return response.data
     },
 
-    async getChatSessions(userEmail: string = 'demo@ltm.com'): Promise<ChatSession[]> {
+    async getChatSessions(userEmail: string = 'demo@apexuw.com'): Promise<ChatSession[]> {
         const response = await api.get('/chat/sessions', { params: { user_email: userEmail } })
         return response.data
     },
@@ -339,8 +371,10 @@ export const apiService = {
     },
 
     // Policies
-    async getPolicies(): Promise<PolicyItem[]> {
-        const response = await api.get('/policies/')
+    async getPolicies(userEmail?: string): Promise<PolicyItem[]> {
+        const params: any = {}
+        if (userEmail) params.user_email = userEmail
+        const response = await api.get('/policies/', { params })
         return response.data
     },
 
@@ -377,7 +411,7 @@ export const apiService = {
             image_base64: imageBase64,
             prompt: prompt || 'Analyze this image in the context of commercial insurance underwriting.',
             session_id: sessionId || null,
-            user_email: 'demo@ltm.com'
+            user_email: 'demo@apexuw.com'
         })
         return response.data
     },
@@ -397,6 +431,22 @@ export const apiService = {
     // Geo
     async getGeoPolicies(): Promise<any[]> {
         const response = await api.get('/chat/geo/policies')
+        return response.data
+    },
+
+    // Analytics Playground
+    async getAnalyticsMeta(): Promise<AnalyticsMeta> {
+        const response = await api.get('/analytics/meta')
+        return response.data
+    },
+
+    async runAnalyticsQuery(payload: AnalyticsQueryPayload): Promise<AnalyticsQueryResult> {
+        const response = await api.post('/analytics/query', payload)
+        return response.data
+    },
+
+    async getAnalyticsFilterValues(field: string): Promise<string[]> {
+        const response = await api.get(`/analytics/filter-values/${field}`)
         return response.data
     },
 }

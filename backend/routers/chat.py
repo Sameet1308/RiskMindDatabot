@@ -38,7 +38,7 @@ class ChatMessageIn(BaseModel):
 class ChatRequest(BaseModel):
     message: str
     session_id: Optional[int] = None
-    user_email: str = "demo@ltm.com"
+    user_email: str = "demo@apexuw.com"
 
 class ChatResponse(BaseModel):
     response: str
@@ -79,7 +79,7 @@ class VisionRequest(BaseModel):
     image_base64: str
     prompt: str = "Analyze this image in the context of commercial insurance underwriting."
     session_id: Optional[int] = None
-    user_email: str = "demo@ltm.com"
+    user_email: str = "demo@apexuw.com"
 
 
 # ──── Cached Dashboard Data ────
@@ -376,7 +376,7 @@ async def vision_chat(request: VisionRequest, db: AsyncSession = Depends(get_db)
 
 
 @router.get("/sessions", response_model=List[SessionOut])
-async def list_sessions(user_email: str = "demo@ltm.com", db: AsyncSession = Depends(get_db)):
+async def list_sessions(user_email: str = "demo@apexuw.com", db: AsyncSession = Depends(get_db)):
     """List chat sessions (last 2 days)."""
     cutoff = datetime.utcnow() - timedelta(days=2)
     result = await db.execute(

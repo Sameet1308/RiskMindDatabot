@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
     Bot,
     Send,
@@ -16,6 +16,10 @@ import {
     ThumbsDown,
     Download,
     MapPin,
+    History,
+    Plus,
+    Trash2,
+    Zap,
 } from 'lucide-react'
 import RiskMap from '../components/RiskMap'
 import { exportElementAsPdf } from '../utils/exportPdf'
@@ -24,6 +28,7 @@ import apiService, {
     PolicyItem,
     Claim,
     MemoResponse,
+    ChatSession,
 } from '../services/api'
 
 type CanvasMode = 'empty' | 'analysis' | 'memo' | 'decision' | 'geo_map'
@@ -96,6 +101,12 @@ const suggestedPromptGroups = [
             { label: 'Draft an underwriting memo for COMM-2024-016 with guideline alignment.' },
         ],
     },
+    {
+        title: 'Explore',
+        prompts: [
+            { label: 'Open the self-service analytics playground to slice and dice my data.' },
+        ],
+    },
 ]
 
 const policyRegex = /(COMM-\d{4}-\d{3}|P-\d{4})/i
@@ -124,6 +135,7 @@ const saveItem = (item: SavedItem) => {
 }
 
 export default function RiskMind() {
+    const navigate = useNavigate()
     const [searchParams] = useSearchParams()
     const [messages, setMessages] = useState<Message[]>([])
     const [input, setInput] = useState('')
@@ -147,12 +159,27 @@ export default function RiskMind() {
     const [decisionLoading, setDecisionLoading] = useState(false)
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
+
+    // Custom link renderer: internal paths use client-side navigation
+    const mdComponents = {
+        a: ({ href, children, ...props }: any) => {
+            if (href && href.startsWith('/')) {
+                return <a href={href} onClick={(e: React.MouseEvent) => { e.preventDefault(); navigate(href) }} {...props}>{children}</a>
+            }
+            return <a href={href} target="_blank" rel="noopener noreferrer" {...props}>{children}</a>
+        },
+    }
     const [analysisObject, setAnalysisObject] = useState<Record<string, any> | null>(null)
     const [inferredIntent, setInferredIntent] = useState<string>('')
     const [inferredOutputType, setInferredOutputType] = useState<CanvasMode>('analysis')
     const [provenance, setProvenance] = useState<Record<string, any> | null>(null)
     const [intentConfidence, setIntentConfidence] = useState<number | null>(null)
     const [intentReasonCodes, setIntentReasonCodes] = useState<string[]>([])
+    const [showHistory, setShowHistory] = useState(false)
+    const [chatSessions, setChatSessions] = useState<ChatSession[]>([])
+    const [activeSessionId, setActiveSessionId] = useState<number | null>(null)
+    const [historyLoading, setHistoryLoading] = useState(false)
+    const historyRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
         const policyParam = searchParams.get('policy')
@@ -196,6 +223,73 @@ export default function RiskMind() {
         }
         fetchPolicy()
     }, [activePolicy])
+
+    // Close history dropdown on outside click
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (historyRef.current && !historyRef.current.contains(e.target as Node)) {
+                setShowHistory(false)
+            }
+        }
+        if (showHistory) document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [showHistory])
+
+    const currentUser = (() => {
+        try { return JSON.parse(localStorage.getItem('riskmind_user') || '{}') } catch { return {} }
+    })()
+
+    const fetchChatHistory = async () => {
+        setHistoryLoading(true)
+        try {
+            const sessions = await apiService.getChatSessions(currentUser.email || 'demo@apexuw.com')
+            setChatSessions(sessions)
+        } catch { /* ignore */ }
+        setHistoryLoading(false)
+    }
+
+    const toggleHistory = () => {
+        if (!showHistory) fetchChatHistory()
+        setShowHistory(prev => !prev)
+    }
+
+    const loadSession = async (session: ChatSession) => {
+        try {
+            const msgs = await apiService.getSessionMessages(session.id)
+            setMessages(msgs.map((m, i) => ({
+                id: i,
+                role: m.role as 'user' | 'assistant',
+                content: m.content,
+                timestamp: new Date(m.created_at),
+            })))
+            setActiveSessionId(session.id)
+            setShowHistory(false)
+            setCanvasMode('empty')
+            setCanvasNarrative('')
+            setAnalysisObject(null)
+            setProvenance(null)
+        } catch { /* ignore */ }
+    }
+
+    const startNewChat = () => {
+        setMessages([])
+        setActiveSessionId(null)
+        setCanvasMode('empty')
+        setCanvasNarrative('')
+        setAnalysisObject(null)
+        setProvenance(null)
+        setShowHistory(false)
+    }
+
+    const deleteSession = async (e: React.MouseEvent, sessionId: number) => {
+        e.stopPropagation()
+        try {
+            await apiService.deleteSession(sessionId)
+            setChatSessions(prev => prev.filter(s => s.id !== sessionId))
+            if (activeSessionId === sessionId) startNewChat()
+        } catch { /* ignore */ }
+    }
+
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -924,13 +1018,66 @@ export default function RiskMind() {
     return (
         <div className="riskmind-shell">
             <section className="panel">
-                <div className="panel-header">
+                <div className="panel-header chat-header">
                     <div className="panel-title">
-                        <Bot />
+                        <div className="chat-bot-avatar">
+                            <Bot style={{ width: '1rem', height: '1rem' }} />
+                            <span className="chat-online-dot" />
+                        </div>
                         <div className="panel-title-text">
                             <span className="panel-title-main">RiskMind</span>
                             <span className="panel-title-sub">Copilot</span>
                         </div>
+                    </div>
+                    <div className="chat-history-wrapper" ref={historyRef}>
+                        <button className="chat-history-btn" onClick={toggleHistory} title="Chat history">
+                            <History style={{ width: '1rem', height: '1rem' }} />
+                        </button>
+                        {showHistory && (
+                            <div className="chat-history-dropdown">
+                                <div className="chat-history-header">
+                                    <span>Recent Chats</span>
+                                    <button className="chat-history-new" onClick={startNewChat} title="New chat">
+                                        <Plus style={{ width: '0.875rem', height: '0.875rem' }} /> New
+                                    </button>
+                                </div>
+                                <div className="chat-history-list">
+                                    {historyLoading ? (
+                                        <div className="chat-history-empty">
+                                            <Loader2 style={{ width: '1rem', height: '1rem', animation: 'spin 1s linear infinite' }} />
+                                            <span>Loading...</span>
+                                        </div>
+                                    ) : chatSessions.length === 0 ? (
+                                        <div className="chat-history-empty">
+                                            <MessageSquare style={{ width: '1rem', height: '1rem' }} />
+                                            <span>No recent chats</span>
+                                        </div>
+                                    ) : (
+                                        chatSessions.map(session => (
+                                            <div
+                                                key={session.id}
+                                                className={`chat-history-item${activeSessionId === session.id ? ' active' : ''}`}
+                                                onClick={() => loadSession(session)}
+                                            >
+                                                <div className="chat-history-item-info">
+                                                    <span className="chat-history-item-title">{session.title}</span>
+                                                    <span className="chat-history-item-meta">
+                                                        {session.message_count} msgs &middot; {new Date(session.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                    </span>
+                                                </div>
+                                                <button
+                                                    className="chat-history-item-delete"
+                                                    onClick={(e) => deleteSession(e, session.id)}
+                                                    title="Delete chat"
+                                                >
+                                                    <Trash2 style={{ width: '0.75rem', height: '0.75rem' }} />
+                                                </button>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
                 <div className="panel-body">
@@ -955,15 +1102,25 @@ export default function RiskMind() {
                     <div className="conversation">
                         {messages.length === 0 && (
                             <div className="conversation-empty">
-                                <MessageSquare />
-                                <p>Start a conversation to generate intelligence and decisions.</p>
+                                <div className="empty-icon-ring">
+                                    <Zap />
+                                </div>
+                                <h4>Ready to assist</h4>
+                                <p>Ask about policies, claims, risk assessments, or portfolio performance.</p>
                             </div>
                         )}
                         {messages.map((m) => (
                             <div key={m.id} className={`conversation-bubble ${m.role}`}>
+                                <div className="bubble-avatar">
+                                    {m.role === 'assistant'
+                                        ? <Bot style={{ width: '0.8rem', height: '0.8rem' }} />
+                                        : <span>{(currentUser.name || 'U').charAt(0)}</span>
+                                    }
+                                </div>
+                                <div className="bubble-body">
                                 <div className="bubble-content">
                                     {m.role === 'assistant' ? (
-                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
+                                        <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{m.content}</ReactMarkdown>
                                     ) : (
                                         m.content
                                     )}
@@ -1022,8 +1179,24 @@ export default function RiskMind() {
                                         </div>
                                     </div>
                                 )}
+                                <span className="bubble-time">
+                                    {m.timestamp.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                                </div>
                             </div>
                         ))}
+                        {loading && (
+                            <div className="conversation-bubble assistant">
+                                <div className="bubble-avatar">
+                                    <Bot style={{ width: '0.8rem', height: '0.8rem' }} />
+                                </div>
+                                <div className="bubble-body">
+                                    <div className="typing-indicator">
+                                        <span /><span /><span />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                         <div ref={messagesEndRef} />
                     </div>
                 </div>
@@ -1102,7 +1275,7 @@ export default function RiskMind() {
                         <div>
                             <h4>Focus Insight</h4>
                             <div className="focus-insight-content">
-                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{focusInsight}</ReactMarkdown>
+                                <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{focusInsight}</ReactMarkdown>
                             </div>
                         </div>
                         <button

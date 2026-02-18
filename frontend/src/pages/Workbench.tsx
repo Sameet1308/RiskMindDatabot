@@ -22,13 +22,18 @@ export default function Workbench() {
     const [activeTab, setActiveTab] = useState<WorkbenchTab>('overview')
     const navigate = useNavigate()
 
+    // Get logged-in user's email for filtering
+    const currentUser = (() => {
+        try { return JSON.parse(localStorage.getItem('riskmind_user') || '{}') } catch { return {} }
+    })()
+
     useEffect(() => {
         loadPolicies()
     }, [])
 
     const loadPolicies = async () => {
         try {
-            const data = await apiService.getPolicies()
+            const data = await apiService.getPolicies(currentUser.email)
             setPolicies(data)
             const decisions = await Promise.all(
                 data.map((policy) => apiService.getDecisions(policy.policy_number).catch(() => []))

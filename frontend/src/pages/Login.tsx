@@ -1,6 +1,12 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Shield, Mail, Lock, ArrowRight, Loader2 } from 'lucide-react'
+import { Shield, Mail, Lock, ArrowRight, Loader2, User } from 'lucide-react'
+import apiService from '../services/api'
+
+const USERS = [
+    { email: 'sarah@apexuw.com', masked: 'sa***@apexuw.com', name: 'Sarah Mitchell', initials: 'SM', role: 'Senior Underwriter' },
+    { email: 'james@apexuw.com', masked: 'ja***@apexuw.com', name: 'James Cooper', initials: 'JC', role: 'Underwriter' },
+]
 
 export default function Login() {
     const navigate = useNavigate()
@@ -8,27 +14,35 @@ export default function Login() {
     const [password, setPassword] = useState('')
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
+    const [selectedUser, setSelectedUser] = useState<string | null>(null)
+
+    const selectUser = (userEmail: string) => {
+        setEmail(userEmail)
+        setSelectedUser(userEmail)
+        setError('')
+    }
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault()
         setError('')
         setLoading(true)
 
-        // Demo authentication — connects to users table in SQLite
-        setTimeout(() => {
-            if (email.includes('@')) {
-                localStorage.setItem('riskmind_user', JSON.stringify({
-                    email,
-                    name: email.split('@')[0],
-                    role: 'Underwriter',
-                    loginTime: new Date().toISOString()
-                }))
-                navigate('/')
-            } else {
-                setError('Please enter a valid email address')
-            }
+        try {
+            const data = await apiService.login(email.trim().toLowerCase(), password)
+            localStorage.setItem('riskmind_user', JSON.stringify({
+                email: data.email,
+                name: data.full_name,
+                role: data.role,
+                assigned_policies: data.assigned_policies,
+                loginTime: new Date().toISOString(),
+            }))
+            navigate('/')
+        } catch (err: any) {
+            const msg = err?.response?.data?.detail || 'Login failed. Please check your credentials.'
+            setError(msg)
+        } finally {
             setLoading(false)
-        }, 800)
+        }
     }
 
     return (
@@ -67,6 +81,26 @@ export default function Login() {
                     </div>
                 )}
 
+                {/* User Selection */}
+                <div className="login-users">
+                    {USERS.map(u => (
+                        <button
+                            key={u.email}
+                            type="button"
+                            className={`login-user-tile${selectedUser === u.email ? ' active' : ''}`}
+                            onClick={() => selectUser(u.email)}
+                        >
+                            <div className="login-user-avatar">
+                                <span>{u.initials}</span>
+                            </div>
+                            <div className="login-user-info">
+                                <span className="login-user-name">{u.name}</span>
+                                <span className="login-user-email">{u.masked}</span>
+                            </div>
+                        </button>
+                    ))}
+                </div>
+
                 {/* Form */}
                 <form onSubmit={handleLogin}>
                     <div className="input-group">
@@ -85,7 +119,7 @@ export default function Login() {
                                 type="email"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                placeholder="you@ltm.com"
+                                placeholder="you@apexuw.com"
                                 className="input-field"
                                 style={{ paddingLeft: '2.75rem' }}
                                 required
@@ -137,22 +171,6 @@ export default function Login() {
                     </button>
                 </form>
 
-                {/* Demo Credentials */}
-                <div style={{
-                    marginTop: '2rem',
-                    padding: '1rem',
-                    background: '#FFF1F1',
-                    borderRadius: '0.75rem',
-                    border: '1px solid rgba(255, 90, 95, 0.15)'
-                }}>
-                    <p style={{ fontSize: '0.75rem', fontWeight: 600, color: '#FF5A5F', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        Demo Access
-                    </p>
-                    <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                        Email: <strong>demo@ltm.com</strong><br />
-                        Password: <strong>any password</strong>
-                    </p>
-                </div>
             </div>
         </div>
     )
