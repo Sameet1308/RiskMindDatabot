@@ -471,18 +471,25 @@ async def upload_file(
 
 @router.get("/geo/policies")
 async def get_geo_policies(db: AsyncSession = Depends(get_db)):
-    """Return policies with lat/lon and computed risk_level for geo map."""
+    """Return policies with lat/lon, computed risk_level, and enriched geo analytics."""
+    # Per-policy data with claim breakdown
     sql = text("""
         SELECT
             p.policy_number, p.policyholder_name, p.industry_type,
             p.premium, p.latitude, p.longitude,
+            p.effective_date, p.expiration_date,
             COUNT(c.id) AS claim_count,
             COALESCE(SUM(c.claim_amount), 0) AS total_claims,
+            COALESCE(MAX(c.claim_amount), 0) AS max_claim,
             CASE
                 WHEN COUNT(c.id) >= 5 OR COALESCE(SUM(c.claim_amount), 0) >= 100000 THEN 'high'
                 WHEN COUNT(c.id) BETWEEN 2 AND 4 THEN 'medium'
                 ELSE 'low'
-            END AS risk_level
+            END AS risk_level,
+            CASE
+                WHEN p.premium > 0 THEN ROUND(COALESCE(SUM(c.claim_amount), 0) * 100.0 / p.premium, 1)
+                ELSE 0
+            END AS loss_ratio
         FROM policies p
         LEFT JOIN claims c ON p.id = c.policy_id
         WHERE p.latitude IS NOT NULL AND p.longitude IS NOT NULL
@@ -490,8 +497,86 @@ async def get_geo_policies(db: AsyncSession = Depends(get_db)):
         ORDER BY total_claims DESC
     """)
     result = await db.execute(sql)
-    rows = [dict(r._mapping) for r in result.fetchall()]
-    return rows
+    policies = [dict(r._mapping) for r in result.fetchall()]
+
+    # Claim type breakdown per policy
+    ct_sql = text("""
+        SELECT p.policy_number, c.claim_type, COUNT(*) as cnt
+        FROM claims c JOIN policies p ON p.id = c.policy_id
+        WHERE p.latitude IS NOT NULL
+        GROUP BY p.policy_number, c.claim_type
+    """)
+    ct_result = await db.execute(ct_sql)
+    claim_types_map: dict = {}
+    for r in ct_result.fetchall():
+        row = dict(r._mapping)
+        pn = row["policy_number"]
+        if pn not in claim_types_map:
+            claim_types_map[pn] = []
+        claim_types_map[pn].append({"type": row["claim_type"], "count": row["cnt"]})
+
+    for p in policies:
+        p["claim_types"] = claim_types_map.get(p["policy_number"], [])
+
+    # Compute portfolio-level geo analytics
+    total_premium = sum(p["premium"] for p in policies)
+    total_claims_amt = sum(p["total_claims"] for p in policies)
+    portfolio_loss_ratio = round(total_claims_amt * 100.0 / total_premium, 1) if total_premium > 0 else 0
+
+    # Industry concentration
+    industry_stats: dict = {}
+    for p in policies:
+        ind = p["industry_type"]
+        if ind not in industry_stats:
+            industry_stats[ind] = {"count": 0, "premium": 0, "claims": 0}
+        industry_stats[ind]["count"] += 1
+        industry_stats[ind]["premium"] += p["premium"]
+        industry_stats[ind]["claims"] += p["total_claims"]
+
+    # Regional clustering (group by rounded lat/lon — ~100km grid)
+    clusters: dict = {}
+    for p in policies:
+        key = f"{round(p['latitude'], 0)},{round(p['longitude'], 0)}"
+        if key not in clusters:
+            clusters[key] = {"lat": p["latitude"], "lon": p["longitude"], "policies": [], "total_claims": 0, "total_premium": 0}
+        clusters[key]["policies"].append(p["policy_number"])
+        clusters[key]["total_claims"] += p["total_claims"]
+        clusters[key]["total_premium"] += p["premium"]
+
+    # Find hotspots (clusters with 2+ policies or high total claims)
+    hotspots = [
+        {"lat": v["lat"], "lon": v["lon"], "policy_count": len(v["policies"]),
+         "total_claims": v["total_claims"], "total_premium": v["total_premium"],
+         "loss_ratio": round(v["total_claims"] * 100.0 / v["total_premium"], 1) if v["total_premium"] > 0 else 0}
+        for v in clusters.values()
+        if len(v["policies"]) >= 2 or v["total_claims"] >= 80000
+    ]
+
+    return {
+        "policies": policies,
+        "analytics": {
+            "total_policies": len(policies),
+            "total_premium": total_premium,
+            "total_claims": total_claims_amt,
+            "portfolio_loss_ratio": portfolio_loss_ratio,
+            "risk_distribution": {
+                "high": len([p for p in policies if p["risk_level"] == "high"]),
+                "medium": len([p for p in policies if p["risk_level"] == "medium"]),
+                "low": len([p for p in policies if p["risk_level"] == "low"]),
+            },
+            "industry_concentration": [
+                {"industry": k, "count": v["count"], "premium": v["premium"], "claims": v["claims"],
+                 "loss_ratio": round(v["claims"] * 100.0 / v["premium"], 1) if v["premium"] > 0 else 0}
+                for k, v in sorted(industry_stats.items(), key=lambda x: x[1]["claims"], reverse=True)
+            ],
+            "hotspots": sorted(hotspots, key=lambda x: x["total_claims"], reverse=True),
+            "top_risk_policies": [
+                {"policy_number": p["policy_number"], "name": p["policyholder_name"],
+                 "loss_ratio": p["loss_ratio"], "total_claims": p["total_claims"]}
+                for p in policies[:5]
+            ],
+        },
+    }
 
 
 @router.get("/provider")

@@ -990,7 +990,7 @@ export default function RiskMind() {
                         <div className="canvas-card-header">
                             <div>
                                 <h3><MapPin className="inline h-4 w-4 mr-1" /> Geospatial Risk Intelligence</h3>
-                                <p>Interactive risk map with AI-powered insights</p>
+                                <p>Interactive risk map with AI-powered analytics</p>
                             </div>
                             <div className="dashboard-actions">
                                 <button className="btn btn-secondary" onClick={() => saveArtifact('geo_map', 'Geospatial Risk Map', { content: canvasNarrative, policy_count: policies.length })}>
@@ -1004,8 +1004,8 @@ export default function RiskMind() {
                                 </button>
                             </div>
                         </div>
-                        <div className="canvas-card-body geo-map-canvas">
-                            <RiskMap height="45vh" aiInsights={canvasNarrative} />
+                        <div className="canvas-card-body geo-map-canvas-full">
+                            <RiskMap height="calc(100vh - 12rem)" aiInsights={canvasNarrative} />
                         </div>
                     </div>
                 </div>

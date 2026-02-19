@@ -11,6 +11,7 @@ const api = axios.create({
 
 export interface ClaimsSummary {
     total_claims: number
+    claim_count: number
     total_amount: number
     avg_amount: number
     max_claim: number
@@ -429,7 +430,7 @@ export const apiService = {
     },
 
     // Geo
-    async getGeoPolicies(): Promise<any[]> {
+    async getGeoPolicies(): Promise<{ policies: any[]; analytics: any }> {
         const response = await api.get('/chat/geo/policies')
         return response.data
     },
