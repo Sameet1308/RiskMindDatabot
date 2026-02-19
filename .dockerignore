@@ -1,0 +1,33 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+.venv
+venv
+.pytest_cache
+.coverage
+
+# Node
+frontend/node_modules
+frontend/dist
+
+# IDE
+.vscode
+.idea
+.claude
+
+# Data (will be on persistent disk)
+backend/data
+*.db
+
+# Docs
+docs/
+*.md
+!README.md
+
+# OS
+.DS_Store
+Thumbs.db

@@ -9,7 +9,7 @@ from typing import List, Optional
 
 OPENAI_KEY = os.getenv("OPENAI_API_KEY", "")
 AWS_KEY = os.getenv("AWS_ACCESS_KEY_ID", "")
-CHROMA_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "chroma_db")
+CHROMA_DIR = os.getenv("CHROMA_DIR", os.path.join(os.path.dirname(__file__), "..", "data", "chroma_db"))
 
 _client: Optional[chromadb.ClientAPI] = None
 _collection = None

@@ -1,0 +1,32 @@
+# Render Blueprint — auto-deploy on push to main
+# Docs: https://docs.render.com/blueprint-spec
+
+services:
+  - type: web
+    name: riskmind
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    region: oregon
+    plan: free          # free tier (spins down after 15min idle)
+                        # change to "starter" ($7/mo) for always-on
+    branch: main
+    autoDeploy: true    # auto-deploy on every push
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        value: sqlite+aiosqlite:///./data/riskmind.db
+      - key: CHROMA_DIR
+        value: /app/data/chroma_db
+      - key: APP_ENV
+        value: production
+      - key: GOOGLE_API_KEY
+        sync: false     # set manually in Render dashboard (not in code)
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+    disk:
+      name: riskmind-data
+      mountPath: /app/data
+      sizeGB: 1         # 1GB persistent disk for SQLite + ChromaDB + uploads

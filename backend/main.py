@@ -4,6 +4,7 @@ RiskMind API - Underwriting Co-Pilot Backend
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 import os
 from dotenv import load_dotenv
@@ -101,15 +102,6 @@ app.include_router(auth_router, prefix="/api/auth", tags=["Auth"])
 app.include_router(analytics_router, prefix="/api/analytics", tags=["Analytics"])
 app.include_router(data_router, prefix="/api/data", tags=["Data"])
 
-@app.get("/")
-async def root():
-    return {
-        "message": "Welcome to RiskMind API",
-        "version": "3.0.0",
-        "docs": "/docs",
-        "health": "/health"
-    }
-
 @app.get("/health")
 async def health_check():
     gemini_key = os.getenv("GOOGLE_API_KEY", "")
@@ -126,3 +118,30 @@ async def health_check():
         "model": os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
         "environment": os.getenv("APP_ENV", "development")
     }
+
+# ── Serve React frontend in production ──
+# In production, /app/static contains the built React app.
+# All non-API routes serve index.html for SPA client-side routing.
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+if os.path.isdir(STATIC_DIR):
+    # Serve static assets (JS, CSS, images)
+    app.mount("/assets", StaticFiles(directory=os.path.join(STATIC_DIR, "assets")), name="static-assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        # Try to serve the exact file (e.g. favicon.ico, manifest.json)
+        file_path = os.path.join(STATIC_DIR, full_path)
+        if full_path and os.path.isfile(file_path):
+            return FileResponse(file_path)
+        # Fallback to index.html for SPA routing
+        return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+else:
+    # Dev mode — frontend served by Vite dev server
+    @app.get("/")
+    async def root():
+        return {
+            "message": "Welcome to RiskMind API",
+            "version": "3.0.0",
+            "docs": "/docs",
+            "health": "/health"
+        }
