@@ -24,6 +24,35 @@ class Policy(Base):
     longitude = Column(Float, nullable=True)
     assigned_to = Column(String(255), nullable=True, index=True)  # user email
     created_at = Column(DateTime, default=datetime.utcnow)
+    # Third-party enrichment columns
+    property_address = Column(String(500), nullable=True)
+    property_city = Column(String(100), nullable=True)
+    property_state = Column(String(10), nullable=True)
+    property_zip = Column(String(20), nullable=True)
+    insured_value = Column(Float, nullable=True)
+    fema_flood_zone = Column(String(10), nullable=True)
+    flood_risk_score = Column(Integer, nullable=True)
+    flood_zone_change_flag = Column(String(20), nullable=True)
+    cat_aal = Column(Float, nullable=True)
+    cat_pml_250yr = Column(Float, nullable=True)
+    primary_peril = Column(String(50), nullable=True)
+    cat_model_version = Column(String(20), nullable=True)
+    construction_type = Column(String(50), nullable=True)
+    year_built = Column(Integer, nullable=True)
+    stories = Column(Integer, nullable=True)
+    roof_type = Column(String(50), nullable=True)
+    replacement_cost = Column(Float, nullable=True)
+    protection_class = Column(Integer, nullable=True)
+    crime_index = Column(Integer, nullable=True)
+    property_crime_rate = Column(Float, nullable=True)
+    business_credit_score = Column(Integer, nullable=True)
+    financial_stability = Column(String(20), nullable=True)
+    cresta_zone = Column(String(20), nullable=True)
+    risk_zone = Column(String(50), nullable=True)
+    weather_hail_events_5yr = Column(Integer, nullable=True)
+    wildfire_risk_score = Column(Integer, nullable=True)
+    distance_to_fire_station = Column(Float, nullable=True)
+    third_party_data_date = Column(String(20), nullable=True)
 
     claims = relationship("ClaimRecord", back_populates="policy")
 
@@ -58,6 +87,53 @@ class Guideline(Base):
     threshold_type = Column(String(50))
     threshold_value = Column(Float, nullable=True)
     action = Column(String(100))
+
+
+class ZoneThreshold(Base):
+    __tablename__ = "zone_thresholds"
+
+    id = Column(Integer, primary_key=True, index=True)
+    threshold_id = Column(String(50), unique=True)
+    zone_type = Column(String(50))
+    metric = Column(String(50))
+    limit_value = Column(Float)
+    limit_unit = Column(String(20))
+    action = Column(String(50))
+    set_by = Column(String(100))
+    effective_date = Column(String(20))
+    notes = Column(Text, nullable=True)
+
+
+class ZoneAccumulation(Base):
+    __tablename__ = "zone_accumulation"
+
+    id = Column(Integer, primary_key=True, index=True)
+    zone_id = Column(String(20))
+    zone_type = Column(String(50))
+    zone_name = Column(String(100))
+    total_tiv = Column(Float)
+    policy_count = Column(Integer)
+    max_single_loss = Column(Float)
+    pml_250yr = Column(Float)
+    avg_loss_ratio = Column(Float)
+    gross_premium = Column(Float)
+    tiv_qoq_change = Column(Float)
+    computed_date = Column(String(20))
+
+
+class DataSource(Base):
+    __tablename__ = "data_sources"
+
+    id = Column(Integer, primary_key=True, index=True)
+    source_id = Column(String(50), unique=True)
+    source_name = Column(String(200))
+    provider = Column(String(100))
+    data_type = Column(String(50))
+    update_frequency = Column(String(50))
+    last_updated = Column(String(20))
+    record_count = Column(Integer)
+    storage = Column(String(20))
+    description = Column(Text, nullable=True)
 
 
 class User(Base):

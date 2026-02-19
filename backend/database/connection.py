@@ -18,8 +18,9 @@ async def init_db():
     """Initialize database tables"""
     # Import all models to ensure they are registered with Base.metadata
     from models.schemas import (
-        ClaimRecord, Policy, Guideline, User, Decision, 
-        ChatSession, ChatMessage, Document
+        ClaimRecord, Policy, Guideline, User, Decision,
+        ChatSession, ChatMessage, Document,
+        ZoneThreshold, ZoneAccumulation, DataSource
     )
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
