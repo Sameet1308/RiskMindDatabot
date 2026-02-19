@@ -246,6 +246,39 @@ def check_confidence_node(state: AgentState) -> dict:
     msg_lower = message.lower()
     show_evidence = any(kw in msg_lower for kw in _EVIDENCE_KEYWORDS)
 
+    # If user asked for evidence but no specific entity → lower confidence to trigger clarification
+    if show_evidence and not entities.get("policy_number") and not entities.get("claim_number"):
+        evidence_items = analysis_object.get("evidence", [])
+        if not evidence_items or all(
+            (e.get("type") == "evidence" and not e.get("url")) for e in evidence_items
+        ):
+            confidence = max(confidence - 25, 30)
+            clarification_needed = True
+            suggested_intents = [
+                {
+                    "label": "Policy evidence",
+                    "intent": "policy_risk_summary",
+                    "output_type": "analysis",
+                    "example": "Show evidence for COMM-2024-016",
+                    "keywords": ["evidence", "policy"],
+                },
+                {
+                    "label": "Claim evidence",
+                    "intent": "claim_summary",
+                    "output_type": "analysis",
+                    "example": "Show evidence for CLM-2024-005",
+                    "keywords": ["evidence", "claim"],
+                },
+                {
+                    "label": "Portfolio evidence trail",
+                    "intent": "portfolio_summary",
+                    "output_type": "analysis",
+                    "example": "Show audit trail for my portfolio",
+                    "keywords": ["audit trail", "portfolio"],
+                },
+            ]
+            show_canvas_summary = False
+
     return {
         "confidence": confidence,
         "clarification_needed": clarification_needed,

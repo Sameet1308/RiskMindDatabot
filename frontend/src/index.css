@@ -1690,8 +1690,9 @@ button.send-button svg {
 /* Conversation View & Focus Insight - Markdown Formatting */
 .conversation-view,
 .focus-insight-content {
-  line-height: 1.8;
+  line-height: 1.55;
   color: var(--text);
+  font-size: 0.85rem;
 }
 
 .conversation-view h1,
@@ -1701,24 +1702,24 @@ button.send-button svg {
 .focus-insight-content h1,
 .focus-insight-content h2,
 .focus-insight-content h3 {
-  margin-top: 1.5rem;
-  margin-bottom: 0.75rem;
+  margin-top: 0.75rem;
+  margin-bottom: 0.35rem;
   font-weight: 600;
   color: var(--text);
 }
 
 .conversation-view h2,
 .focus-insight-content h2 {
-  font-size: 1.2rem;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--text);
   border-bottom: 2px solid var(--primary);
-  padding-bottom: 0.5rem;
+  padding-bottom: 0.3rem;
 }
 
 .conversation-view h3,
 .focus-insight-content h3 {
-  font-size: 1.05rem;
+  font-size: 0.9rem;
   font-weight: 700;
   border-bottom: none;
   padding-bottom: 0;
@@ -1727,21 +1728,21 @@ button.send-button svg {
 
 .conversation-view p,
 .focus-insight-content p {
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
 }
 
 .conversation-view ul,
 .focus-insight-content ul,
 .conversation-view ol,
 .focus-insight-content ol {
-  margin-left: 1.5rem;
-  margin-bottom: 1rem;
+  margin-left: 1.25rem;
+  margin-bottom: 0.5rem;
 }
 
 .conversation-view li,
 .focus-insight-content li {
-  margin-bottom: 0.4rem;
-  line-height: 1.65;
+  margin-bottom: 0.2rem;
+  line-height: 1.5;
 }
 
 .conversation-view strong,
@@ -1757,8 +1758,8 @@ button.send-button svg {
 .focus-insight-content table {
   width: 100%;
   border-collapse: collapse;
-  margin: 1rem 0;
-  font-size: 0.85rem;
+  margin: 0.5rem 0;
+  font-size: 0.8rem;
   border-radius: 0.5rem;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
@@ -1771,19 +1772,19 @@ button.send-button svg {
 
 .conversation-view th,
 .focus-insight-content th {
-  padding: 0.65rem 0.85rem;
+  padding: 0.45rem 0.65rem;
   text-align: left;
   font-weight: 600;
   border-bottom: none;
   color: #ffffff;
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
 .conversation-view td,
 .focus-insight-content td {
-  padding: 0.65rem 0.85rem;
+  padding: 0.4rem 0.65rem;
   border-bottom: 1px solid var(--border);
 }
 
@@ -1796,7 +1797,7 @@ button.send-button svg {
 .focus-insight-content hr {
   border: none;
   border-top: 1px solid var(--border);
-  margin: 1.5rem 0;
+  margin: 0.75rem 0;
 }
 
 .conversation-view code,
@@ -2024,8 +2025,9 @@ button.send-button svg {
 }
 
 .canvas-narrative {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: var(--text-secondary);
+  line-height: 1.55;
 }
 
 .canvas-metrics {

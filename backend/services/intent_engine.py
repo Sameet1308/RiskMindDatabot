@@ -64,12 +64,6 @@ def _route_intent(message: str) -> Dict[str, Any]:
         ]):
             intent = "ad_hoc_query"
 
-    # Analytics playground keywords
-    _PLAYGROUND_KW = {"interactive", "self-service", "self service", "playground", "slice and dice", "slice & dice", "explore data"}
-    is_playground = any(kw in lower for kw in _PLAYGROUND_KW)
-    if is_playground:
-        intent = "analytics_playground"
-
     # Geo keywords → geo_risk intent
     _GEO_KEYWORDS = {"map", "geo", "geography", "spatial", "geospatial", "location", "region"}
     is_geo = any(word in lower for word in _GEO_KEYWORDS)
@@ -82,6 +76,16 @@ def _route_intent(message: str) -> Dict[str, Any]:
 
     if is_geo:
         intent = "geo_risk"
+
+    # Analytics playground keywords — MUST be after ad_hoc so it wins
+    _PLAYGROUND_KW = {
+        "interactive", "self-service", "self service", "playground",
+        "slice and dice", "slice & dice", "explore data",
+        "open analytics", "analytics playground", "analytics page",
+        "self service analytics", "data explorer",
+    }
+    if any(kw in lower for kw in _PLAYGROUND_KW):
+        intent = "analytics_playground"
 
     canonical_intent = CANONICAL_INTENTS["understand"]
     output_type = "analysis"
