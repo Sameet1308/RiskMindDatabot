@@ -39,6 +39,16 @@ node_modules/
 .coverage
 htmlcov/
 
+# Claude Code
+.claude/
+
+# ChromaDB
+chromadb_data/
+chroma_data/
+
+# Uploads
+uploads/
+
 # Internal Team Tracker (DO NOT PUSH)
 docs/tasks/
 docs/Team-Task-Assignments.md

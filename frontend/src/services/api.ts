@@ -435,6 +435,19 @@ export const apiService = {
         return response.data
     },
 
+    // Data Connector
+    async getDataStatus(): Promise<{
+        status: string
+        database: string
+        database_name: string
+        tables: { table: string; label: string; description: string; rows: number; columns: number }[]
+        total_records: number
+        vector_store: { guidelines_indexed: number; knowledge_indexed: number; embedding_provider: string }
+    }> {
+        const response = await api.get('/data/status')
+        return response.data
+    },
+
     // Analytics Playground
     async getAnalyticsMeta(): Promise<AnalyticsMeta> {
         const response = await api.get('/analytics/meta')

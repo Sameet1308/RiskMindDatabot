@@ -36,6 +36,8 @@ export default function Login() {
                 assigned_policies: data.assigned_policies,
                 loginTime: new Date().toISOString(),
             }))
+            // Clear connector flag so Data Connector shows on fresh login
+            sessionStorage.removeItem('riskmind_connected')
             navigate('/')
         } catch (err: any) {
             const msg = err?.response?.data?.detail || 'Login failed. Please check your credentials.'

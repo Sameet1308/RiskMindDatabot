@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
 import RiskMind from './pages/RiskMind'
@@ -6,6 +7,7 @@ import SavedIntelligence from './pages/SavedIntelligence'
 import ClaimDetail from './components/ClaimDetail'
 import Login from './pages/Login'
 import Analytics from './pages/Analytics'
+import DataConnector from './components/DataConnector'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
     const raw = localStorage.getItem('riskmind_user')
@@ -19,11 +21,28 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
     return <>{children}</>
 }
 
+function AppWithConnector() {
+    const [connectorDone, setConnectorDone] = useState(() => {
+        return sessionStorage.getItem('riskmind_connected') === '1'
+    })
+
+    const handleConnectorComplete = () => {
+        sessionStorage.setItem('riskmind_connected', '1')
+        setConnectorDone(true)
+    }
+
+    if (!connectorDone) {
+        return <DataConnector onComplete={handleConnectorComplete} />
+    }
+
+    return <Layout />
+}
+
 function App() {
     return (
         <Routes>
             <Route path="/login" element={<Login />} />
-            <Route path="/" element={<RequireAuth><Layout /></RequireAuth>}>
+            <Route path="/" element={<RequireAuth><AppWithConnector /></RequireAuth>}>
                 <Route index element={<RiskMind />} />
                 <Route path="workbench" element={<Workbench />} />
                 <Route path="saved" element={<SavedIntelligence />} />

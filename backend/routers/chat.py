@@ -82,45 +82,115 @@ class VisionRequest(BaseModel):
     user_email: str = "demo@apexuw.com"
 
 
-# ──── Cached Dashboard Data ────
+# ──── Cached Dashboard Data (per-user) ────
 
-_dashboard_cache: Optional[dict] = None
-_dashboard_cache_time: float = 0
+_dashboard_cache: dict = {}       # keyed by user_email
+_dashboard_cache_times: dict = {} # TTL per user
+_global_cache: Optional[dict] = None   # guidelines + zone tables (org-wide)
+_global_cache_time: float = 0
 
-async def _get_cached_dashboard_data(db: AsyncSession) -> dict:
-    """Fetch all tables, cached for 60 seconds."""
-    global _dashboard_cache, _dashboard_cache_time
-    if _dashboard_cache and (time.time() - _dashboard_cache_time) < 60:
-        return _dashboard_cache
+# Enriched policy SELECT — includes third-party data, flood, cat, property, credit, zone
+_POLICY_SELECT = """
+    SELECT id, policy_number, policyholder_name, industry_type,
+           effective_date, expiration_date, premium, latitude, longitude,
+           policy_status, property_address, property_city, property_state, property_zip,
+           insured_value, fema_flood_zone, flood_risk_score, flood_zone_change_flag,
+           cat_aal, cat_pml_250yr, primary_peril, cat_model_version,
+           construction_type, year_built, stories, roof_type, replacement_cost,
+           protection_class, crime_index, property_crime_rate,
+           business_credit_score, financial_stability,
+           cresta_zone, risk_zone, weather_hail_events_5yr,
+           wildfire_risk_score, distance_to_fire_station
+    FROM policies
+"""
 
-    async def _fetch(sql: str):
-        result = await db.execute(text(sql))
+async def _get_cached_dashboard_data(db: AsyncSession, user_email: str = "") -> dict:
+    """Fetch tables scoped to the user's assigned policies, cached 60s per user.
+    Guidelines and zone tables are shared (cached globally)."""
+    global _global_cache, _global_cache_time
+    now = time.time()
+
+    # Org-wide data — guidelines + zone thresholds + zone accumulation
+    if not _global_cache or (now - _global_cache_time) >= 60:
+        async def _fetch_global(sql: str):
+            result = await db.execute(text(sql))
+            return [dict(row._mapping) for row in result.fetchall()]
+        _global_cache = {
+            "guidelines": await _fetch_global("""
+                SELECT id, section_code, title, content, category
+                FROM guidelines ORDER BY section_code
+            """),
+            "zone_thresholds": await _fetch_global("""
+                SELECT threshold_id, zone_type, metric, limit_value, limit_unit, action, notes
+                FROM zone_thresholds ORDER BY zone_type, metric
+            """),
+            "zone_accumulation": await _fetch_global("""
+                SELECT zone_id, zone_type, zone_name, total_tiv, policy_count,
+                       max_single_loss, pml_250yr, avg_loss_ratio, gross_premium, tiv_qoq_change
+                FROM zone_accumulation ORDER BY total_tiv DESC
+            """),
+        }
+        _global_cache_time = now
+
+    cache_key = user_email or "__all__"
+    if cache_key in _dashboard_cache and (now - _dashboard_cache_times.get(cache_key, 0)) < 60:
+        return _dashboard_cache[cache_key]
+
+    async def _fetch(sql: str, params: dict = None):
+        result = await db.execute(text(sql), params or {})
         return [dict(row._mapping) for row in result.fetchall()]
 
-    _dashboard_cache = {
-        "policies": await _fetch("""
-            SELECT id, policy_number, policyholder_name, industry_type,
-                   effective_date, expiration_date, premium, latitude, longitude
-            FROM policies ORDER BY policy_number
-        """),
-        "claims": await _fetch("""
+    # Filter policies/claims/decisions by assigned_to when user is known
+    if user_email and user_email != "demo@apexuw.com":
+        policies = await _fetch(
+            _POLICY_SELECT + " WHERE assigned_to = :email ORDER BY policy_number",
+            {"email": user_email},
+        )
+        policy_ids = [p["id"] for p in policies]
+        policy_numbers = [p["policy_number"] for p in policies]
+
+        if policy_ids:
+            id_list = ",".join(str(i) for i in policy_ids)
+            claims = await _fetch(f"""
+                SELECT c.id, c.claim_number, c.policy_id, c.claim_date, c.claim_amount,
+                       c.claim_type, c.status, c.description, c.evidence_files, c.created_at,
+                       p.policy_number, p.policyholder_name
+                FROM claims c LEFT JOIN policies p ON p.id = c.policy_id
+                WHERE c.policy_id IN ({id_list})
+                ORDER BY c.claim_date DESC
+            """)
+            pn_list = ",".join(f"'{pn}'" for pn in policy_numbers)
+            decisions = await _fetch(f"""
+                SELECT id, policy_number, decision, reason, risk_level, decided_by, created_at
+                FROM decisions WHERE policy_number IN ({pn_list})
+                ORDER BY created_at DESC
+            """)
+        else:
+            claims, decisions = [], []
+    else:
+        # Demo user or unknown — show everything
+        policies = await _fetch(_POLICY_SELECT + " ORDER BY policy_number")
+        claims = await _fetch("""
             SELECT c.id, c.claim_number, c.policy_id, c.claim_date, c.claim_amount,
                    c.claim_type, c.status, c.description, c.evidence_files, c.created_at,
                    p.policy_number, p.policyholder_name
             FROM claims c LEFT JOIN policies p ON p.id = c.policy_id
             ORDER BY c.claim_date DESC
-        """),
-        "decisions": await _fetch("""
+        """)
+        decisions = await _fetch("""
             SELECT id, policy_number, decision, reason, risk_level, decided_by, created_at
             FROM decisions ORDER BY created_at DESC
-        """),
-        "guidelines": await _fetch("""
-            SELECT id, section_code, title, content, category
-            FROM guidelines ORDER BY section_code
-        """),
+        """)
+
+    data = {
+        "policies": policies,
+        "claims": claims,
+        "decisions": decisions,
+        **_global_cache,  # guidelines + zone_thresholds + zone_accumulation
     }
-    _dashboard_cache_time = time.time()
-    return _dashboard_cache
+    _dashboard_cache[cache_key] = data
+    _dashboard_cache_times[cache_key] = now
+    return data
 
 
 # ──── LLM Helpers (vision only) ────
@@ -333,8 +403,22 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
     db_msgs = result.scalars().all()
     history = [{"role": m.role, "content": m.content} for m in db_msgs[:-1]]
 
-    # Load cached data snapshot (all tables, cached 60s)
-    dashboard_data = await _get_cached_dashboard_data(db)
+    # Load cached data snapshot scoped to this user's assigned policies
+    dashboard_data = await _get_cached_dashboard_data(db, request.user_email)
+
+    # Attach recent session documents so the LLM knows what was uploaded
+    doc_result = await db.execute(
+        text("""
+            SELECT filename, file_type, analysis_summary, policy_number, claim_number
+            FROM documents WHERE session_id = :sid
+            AND analysis_summary IS NOT NULL AND trim(analysis_summary) != ''
+            ORDER BY created_at DESC LIMIT 5
+        """),
+        {"sid": sid},
+    )
+    session_docs = [dict(r._mapping) for r in doc_result.fetchall()]
+    if session_docs:
+        dashboard_data = {**dashboard_data, "session_documents": session_docs}
 
     # Run LangGraph agent pipeline (intent → data → RAG → confidence → LLM → guardrails)
     pipeline = await run_agent_pipeline(request.message, dashboard_data, history)
@@ -458,10 +542,19 @@ async def upload_file(
 
     doc = Document(
         filename=file.filename, file_path=file_path, file_type=file_type,
-        file_size=len(content), uploaded_by="demo_user", analysis_summary=analysis
+        file_size=len(content), uploaded_by="demo_user", analysis_summary=analysis,
+        session_id=session_id if session_id else None,
     )
     db.add(doc)
     await db.commit()
+
+    # Index analysis into ChromaDB so RAG can find it later
+    if analysis and not analysis.startswith("Analysis error"):
+        try:
+            from services.vector_store import index_document
+            index_document(doc.id, file.filename, file_type, analysis)
+        except Exception as e:
+            print(f"[Vector Store] document indexing skipped: {e}")
 
     return UploadResponse(
         file_url=f"/api/uploads/{unique_name}", filename=file.filename,
@@ -470,10 +563,18 @@ async def upload_file(
 
 
 @router.get("/geo/policies")
-async def get_geo_policies(db: AsyncSession = Depends(get_db)):
-    """Return policies with lat/lon, computed risk_level, and enriched geo analytics."""
+async def get_geo_policies(user_email: str = "demo@apexuw.com", db: AsyncSession = Depends(get_db)):
+    """Return policies with lat/lon, computed risk_level, and enriched geo analytics.
+    Respects RBAC: filters by assigned_to for non-demo users."""
+    # RBAC filter
+    rbac_where = ""
+    params: dict = {}
+    if user_email and user_email != "demo@apexuw.com":
+        rbac_where = "AND p.assigned_to = :email"
+        params["email"] = user_email
+
     # Per-policy data with claim breakdown
-    sql = text("""
+    sql = text(f"""
         SELECT
             p.policy_number, p.policyholder_name, p.industry_type,
             p.premium, p.latitude, p.longitude,
@@ -492,21 +593,21 @@ async def get_geo_policies(db: AsyncSession = Depends(get_db)):
             END AS loss_ratio
         FROM policies p
         LEFT JOIN claims c ON p.id = c.policy_id
-        WHERE p.latitude IS NOT NULL AND p.longitude IS NOT NULL
+        WHERE p.latitude IS NOT NULL AND p.longitude IS NOT NULL {rbac_where}
         GROUP BY p.id
         ORDER BY total_claims DESC
     """)
-    result = await db.execute(sql)
+    result = await db.execute(sql, params)
     policies = [dict(r._mapping) for r in result.fetchall()]
 
     # Claim type breakdown per policy
-    ct_sql = text("""
+    ct_sql = text(f"""
         SELECT p.policy_number, c.claim_type, COUNT(*) as cnt
         FROM claims c JOIN policies p ON p.id = c.policy_id
-        WHERE p.latitude IS NOT NULL
+        WHERE p.latitude IS NOT NULL {rbac_where}
         GROUP BY p.policy_number, c.claim_type
     """)
-    ct_result = await db.execute(ct_sql)
+    ct_result = await db.execute(ct_sql, params)
     claim_types_map: dict = {}
     for r in ct_result.fetchall():
         row = dict(r._mapping)

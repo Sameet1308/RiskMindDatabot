@@ -106,7 +106,8 @@ async def fetch_data_node(state: AgentState) -> dict:
 # ══════════════════════════════════════════════════════════════
 
 def fetch_guidelines_node(state: AgentState) -> dict:
-    """Search ChromaDB for relevant underwriting guidelines."""
+    """Search ChromaDB for relevant underwriting guidelines.
+    Fallback: if RAG returns <2 results, append summary from cached guidelines table."""
     message = state["message"]
     analysis_object = dict(state["analysis_object"])           # shallow copy
     evidence = list(analysis_object.get("evidence", []))       # shallow copy
@@ -125,6 +126,18 @@ def fetch_guidelines_node(state: AgentState) -> dict:
     guideline_context = "\n".join(
         f"- [{r['section']}] {r['content']}" for r in guideline_results
     ) if guideline_results else ""
+
+    # Fallback: if ChromaDB returned <2 results, append summary from cached table
+    if len(guideline_results) < 2:
+        cached_guidelines = state.get("dashboard_data", {}).get("guidelines", [])
+        if cached_guidelines:
+            fallback_lines = ["FULL GUIDELINE REFERENCE:"]
+            for g in cached_guidelines:
+                sec = g.get("section_code", "")
+                title = g.get("title", "")
+                content = (g.get("content") or "")[:200]
+                fallback_lines.append(f"- [{sec}] {title}: {content}")
+            guideline_context += "\n" + "\n".join(fallback_lines)
 
     # Append guidelines to evidence list
     for g in guideline_results:
@@ -246,8 +259,10 @@ def check_confidence_node(state: AgentState) -> dict:
     msg_lower = message.lower()
     show_evidence = any(kw in msg_lower for kw in _EVIDENCE_KEYWORDS)
 
-    # If user asked for evidence but no specific entity → lower confidence to trigger clarification
-    if show_evidence and not entities.get("policy_number") and not entities.get("claim_number"):
+    # If user typed ONLY "evidence" (1-2 words, no context) with no entity → clarify
+    # Phrases like "show evidence for high risk" should NOT be penalized
+    word_count = len(message.split())
+    if show_evidence and not entities.get("policy_number") and not entities.get("claim_number") and word_count <= 2:
         evidence_items = analysis_object.get("evidence", [])
         if not evidence_items or all(
             (e.get("type") == "evidence" and not e.get("url")) for e in evidence_items

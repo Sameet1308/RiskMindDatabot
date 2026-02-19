@@ -75,6 +75,30 @@ type SavedItem = {
     created_at: string
 }
 
+const CHAT_STATE_KEY = 'riskmind_chat_state'
+
+const saveChatState = (state: Record<string, any>) => {
+    try {
+        sessionStorage.setItem(CHAT_STATE_KEY, JSON.stringify(state))
+    } catch { /* quota exceeded, ignore */ }
+}
+
+const loadChatState = (): Record<string, any> | null => {
+    try {
+        const raw = sessionStorage.getItem(CHAT_STATE_KEY)
+        if (!raw) return null
+        const parsed = JSON.parse(raw)
+        // Restore Date objects in messages
+        if (parsed.messages) {
+            parsed.messages = parsed.messages.map((m: any) => ({
+                ...m,
+                timestamp: new Date(m.timestamp),
+            }))
+        }
+        return parsed
+    } catch { return null }
+}
+
 const suggestedPromptGroups = [
     {
         title: 'Understand',
@@ -137,23 +161,24 @@ const saveItem = (item: SavedItem) => {
 export default function RiskMind() {
     const navigate = useNavigate()
     const [searchParams] = useSearchParams()
-    const [messages, setMessages] = useState<Message[]>([])
+    const _restored = loadChatState()
+    const [messages, setMessages] = useState<Message[]>(_restored?.messages || [])
     const [input, setInput] = useState('')
     const [loading, setLoading] = useState(false)
     const [uploading, setUploading] = useState(false)
     const [uploadStatus, setUploadStatus] = useState<{ state: 'uploading' | 'success' | 'error'; message: string } | null>(null)
     const [pendingPolicy, setPendingPolicy] = useState<string | null>(null)
-    const [canvasMode, setCanvasMode] = useState<CanvasMode>('empty')
-    const [showCanvasSummary, setShowCanvasSummary] = useState(true)
+    const [canvasMode, setCanvasMode] = useState<CanvasMode>(_restored?.canvasMode || 'empty')
+    const [showCanvasSummary, setShowCanvasSummary] = useState(_restored?.showCanvasSummary ?? true)
     const [focusExpanded, setFocusExpanded] = useState(true)
-    const [canvasNarrative, setCanvasNarrative] = useState('')
-    const [activePolicy, setActivePolicy] = useState<string>('')
-    const [activeClaim, setActiveClaim] = useState<string>('')
-    const [activeSubmission, setActiveSubmission] = useState<string>('')
+    const [canvasNarrative, setCanvasNarrative] = useState(_restored?.canvasNarrative || '')
+    const [activePolicy, setActivePolicy] = useState<string>(_restored?.activePolicy || '')
+    const [activeClaim, setActiveClaim] = useState<string>(_restored?.activeClaim || '')
+    const [activeSubmission, setActiveSubmission] = useState<string>(_restored?.activeSubmission || '')
     const [alerts, setAlerts] = useState<AlertItem[]>([])
     const [policies, setPolicies] = useState<PolicyItem[]>([])
     const [policyClaims, setPolicyClaims] = useState<Claim[]>([])
-    const [memo, setMemo] = useState<MemoResponse | null>(null)
+    const [memo, setMemo] = useState<MemoResponse | null>(_restored?.memo || null)
     const [decisionNote, setDecisionNote] = useState('')
     const [decisionSaved, setDecisionSaved] = useState<string | null>(null)
     const [decisionLoading, setDecisionLoading] = useState(false)
@@ -169,17 +194,40 @@ export default function RiskMind() {
             return <a href={href} target="_blank" rel="noopener noreferrer" {...props}>{children}</a>
         },
     }
-    const [analysisObject, setAnalysisObject] = useState<Record<string, any> | null>(null)
-    const [inferredIntent, setInferredIntent] = useState<string>('')
-    const [inferredOutputType, setInferredOutputType] = useState<CanvasMode>('analysis')
-    const [provenance, setProvenance] = useState<Record<string, any> | null>(null)
-    const [intentConfidence, setIntentConfidence] = useState<number | null>(null)
-    const [intentReasonCodes, setIntentReasonCodes] = useState<string[]>([])
+    const [analysisObject, setAnalysisObject] = useState<Record<string, any> | null>(_restored?.analysisObject || null)
+    const [inferredIntent, setInferredIntent] = useState<string>(_restored?.inferredIntent || '')
+    const [inferredOutputType, setInferredOutputType] = useState<CanvasMode>(_restored?.inferredOutputType || 'analysis')
+    const [provenance, setProvenance] = useState<Record<string, any> | null>(_restored?.provenance || null)
+    const [intentConfidence, setIntentConfidence] = useState<number | null>(_restored?.intentConfidence ?? null)
+    const [intentReasonCodes, setIntentReasonCodes] = useState<string[]>(_restored?.intentReasonCodes || [])
     const [showHistory, setShowHistory] = useState(false)
     const [chatSessions, setChatSessions] = useState<ChatSession[]>([])
-    const [activeSessionId, setActiveSessionId] = useState<number | null>(null)
+    const [activeSessionId, setActiveSessionId] = useState<number | null>(_restored?.activeSessionId ?? null)
     const [historyLoading, setHistoryLoading] = useState(false)
     const historyRef = useRef<HTMLDivElement>(null)
+
+    // Persist chat state to sessionStorage on changes
+    useEffect(() => {
+        saveChatState({
+            messages,
+            canvasMode,
+            canvasNarrative,
+            activePolicy,
+            activeClaim,
+            activeSubmission,
+            analysisObject,
+            inferredIntent,
+            inferredOutputType,
+            provenance,
+            intentConfidence,
+            intentReasonCodes,
+            activeSessionId,
+            showCanvasSummary,
+            memo,
+        })
+    }, [messages, canvasMode, canvasNarrative, activePolicy, activeClaim, activeSubmission,
+        analysisObject, inferredIntent, inferredOutputType, provenance, intentConfidence,
+        intentReasonCodes, activeSessionId, showCanvasSummary, memo])
 
     useEffect(() => {
         const policyParam = searchParams.get('policy')
@@ -278,7 +326,16 @@ export default function RiskMind() {
         setCanvasNarrative('')
         setAnalysisObject(null)
         setProvenance(null)
+        setInferredIntent('')
+        setInferredOutputType('analysis')
+        setIntentConfidence(null)
+        setIntentReasonCodes([])
+        setActivePolicy('')
+        setActiveClaim('')
+        setActiveSubmission('')
+        setMemo(null)
         setShowHistory(false)
+        sessionStorage.removeItem(CHAT_STATE_KEY)
     }
 
     const deleteSession = async (e: React.MouseEvent, sessionId: number) => {
@@ -369,7 +426,7 @@ export default function RiskMind() {
         if (!raw) return 'Ask RiskMind to generate a focused insight.'
         const cleaned = raw
             .split('\n')
-            .filter(line => !line.includes('\u{1F4CA}') && !line.includes('Intelligent Canvas'))
+            .filter((line: string) => !line.includes('\u{1F4CA}') && !line.includes('Intelligent Canvas'))
             .join('\n')
             .trim()
         const firstPara = cleaned.split(/\n{2,}/)[0].trim()

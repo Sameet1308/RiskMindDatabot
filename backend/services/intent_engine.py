@@ -207,6 +207,7 @@ def _estimate_confidence(intent: str, analysis_object: Dict[str, Any], message: 
     metrics = analysis_object.get("metrics", {})
     evidence = analysis_object.get("evidence", [])
     reason_codes: List[str] = []
+    lower = message.lower()
 
     confidence = 72
     if metrics:
@@ -218,14 +219,30 @@ def _estimate_confidence(intent: str, analysis_object: Dict[str, Any], message: 
     if intent == "ad_hoc_query":
         confidence -= 6
         reason_codes.append("ad_hoc_query")
-    if len(message.split()) <= 3:
+
+    # Short prompt penalty — BUT skip if query contains known intent keywords
+    _INTENT_KEYWORDS = {
+        "risk", "claims", "policy", "policies", "portfolio", "loss", "ratio",
+        "premium", "industry", "high", "low", "medium", "show", "list",
+        "analyze", "summary", "overview", "compare", "trend", "top",
+        "total", "count", "average", "breakdown", "report", "underwriting",
+        "renew", "decline", "accept", "refer", "memo", "decision",
+    }
+    has_intent_keyword = any(kw in lower for kw in _INTENT_KEYWORDS)
+    if len(message.split()) <= 3 and not has_intent_keyword:
         confidence -= 14
         reason_codes.append("short_prompt")
+
     if not entities.get("policy_number") and not entities.get("claim_number"):
         confidence -= 8
         reason_codes.append("no_entity")
 
-    keyword_boost = any(word in message.lower() for word in [
+    # Portfolio-level query boost (most common query type)
+    if intent in ("portfolio_summary", "ad_hoc_query") and has_intent_keyword:
+        confidence += 10
+        reason_codes.append("portfolio_boost")
+
+    keyword_boost = any(word in lower for word in [
         "summarize", "trend", "dashboard", "memo", "renew", "decision", "recommend"
     ])
     if keyword_boost:
@@ -262,10 +279,14 @@ def _format_data_snapshot(dashboard_data: dict, intent_payload: dict) -> str:
     portfolio_lr = round((total_loss / total_premium) * 100, 1) if total_premium else 0
     open_claims = sum(1 for c in claims if c.get("status") == "open")
 
+    active_count = sum(1 for p in policies if p.get("policy_status") == "active")
+    expired_count = len(policies) - active_count
+
     lines = [
         f"PORTFOLIO SNAPSHOT ({len(policies)} policies, {len(claims)} claims):",
         f"- Total Premium: ${total_premium:,.0f} | Total Incurred: ${total_loss:,.0f} | Portfolio LR: {portfolio_lr}%",
         f"- Open Claims: {open_claims} | Closed: {len(claims) - open_claims}",
+        f"- Active Policies: {active_count} | Expired: {expired_count}",
         "",
     ]
 
@@ -298,6 +319,55 @@ def _format_data_snapshot(dashboard_data: dict, intent_payload: dict) -> str:
             lines.append(f"- Premium: ${pol_premium:,.0f} | Period: {pol.get('effective_date', '?')} to {pol.get('expiration_date', '?')}")
             lines.append(f"- Claims: {len(pol_claims)} total ({pol_open} open, {len(pol_claims) - pol_open} closed)")
             lines.append(f"- Total Loss: ${pol_total:,.0f} | Loss Ratio: {pol_lr}% | Risk: {risk.upper()}")
+            pol_status = pol.get("policy_status", "active")
+            lines.append(f"- Status: {pol_status.upper()}")
+
+            # Third-party enrichment data (if available)
+            enrichment_fields = []
+            if pol.get("property_address"):
+                enrichment_fields.append(f"Address: {pol['property_address']}, {pol.get('property_city', '')}, {pol.get('property_state', '')} {pol.get('property_zip', '')}")
+            if pol.get("insured_value"):
+                enrichment_fields.append(f"Insured Value (TIV): ${pol['insured_value']:,.0f}")
+            if pol.get("replacement_cost"):
+                enrichment_fields.append(f"Replacement Cost: ${pol['replacement_cost']:,.0f}")
+            if pol.get("fema_flood_zone"):
+                fz = f"FEMA Flood Zone: {pol['fema_flood_zone']}"
+                if pol.get("flood_risk_score"):
+                    fz += f" (Risk Score: {pol['flood_risk_score']}/100)"
+                if pol.get("flood_zone_change_flag") and pol["flood_zone_change_flag"] != "no_change":
+                    fz += f" [{pol['flood_zone_change_flag']}]"
+                enrichment_fields.append(fz)
+            if pol.get("primary_peril"):
+                cat_line = f"Primary Peril: {pol['primary_peril']}"
+                if pol.get("cat_aal"):
+                    cat_line += f" | AAL: ${pol['cat_aal']:,.0f}"
+                if pol.get("cat_pml_250yr"):
+                    cat_line += f" | PML-250yr: ${pol['cat_pml_250yr']:,.0f}"
+                enrichment_fields.append(cat_line)
+            if pol.get("construction_type"):
+                bldg = f"Construction: {pol['construction_type']}"
+                if pol.get("year_built"):
+                    bldg += f" | Built: {pol['year_built']}"
+                if pol.get("stories"):
+                    bldg += f" | {pol['stories']} stories"
+                if pol.get("roof_type"):
+                    bldg += f" | Roof: {pol['roof_type']}"
+                enrichment_fields.append(bldg)
+            if pol.get("business_credit_score"):
+                fin = f"Credit Score: {pol['business_credit_score']}"
+                if pol.get("financial_stability"):
+                    fin += f" | Stability: {pol['financial_stability']}"
+                enrichment_fields.append(fin)
+            if pol.get("wildfire_risk_score"):
+                enrichment_fields.append(f"Wildfire Risk: {pol['wildfire_risk_score']}/100")
+            if pol.get("cresta_zone"):
+                enrichment_fields.append(f"CRESTA Zone: {pol['cresta_zone']} ({pol.get('risk_zone', '')})")
+            if pol.get("protection_class"):
+                enrichment_fields.append(f"Protection Class: {pol['protection_class']}")
+            if enrichment_fields:
+                lines.append("PROPERTY & RISK DATA:")
+                for ef in enrichment_fields:
+                    lines.append(f"  - {ef}")
 
             if pol_claims:
                 lines.append("CLAIM HISTORY:")
@@ -351,6 +421,40 @@ def _format_data_snapshot(dashboard_data: dict, intent_payload: dict) -> str:
         lines.append(f"  - {ind}: {int(vals['count'])} policies | Premium: ${vals['premium']:,.0f} | Loss: ${vals['loss']:,.0f} | LR: {lr}%")
     lines.append("")
 
+    # ── Pre-computed rankings (so LLM reads answers, not raw data)
+
+    # Claim count by type
+    type_counts: Dict[str, int] = {}
+    type_amounts: Dict[str, float] = {}
+    for c in claims:
+        ct = c.get("claim_type") or "Unknown"
+        type_counts[ct] = type_counts.get(ct, 0) + 1
+        type_amounts[ct] = type_amounts.get(ct, 0) + (c.get("claim_amount", 0) or 0)
+    lines.append("CLAIMS BY TYPE:")
+    for ct, cnt in sorted(type_counts.items(), key=lambda x: x[1], reverse=True):
+        lines.append(f"  - {ct}: {cnt} claims | ${type_amounts.get(ct, 0):,.0f} total")
+    lines.append("")
+
+    # Risk distribution
+    risk_dist = {"high": 0, "medium": 0, "low": 0}
+    for p in policies:
+        pc = claims_by_policy.get(p.get("policy_number", ""), [])
+        ptotal = sum(c.get("claim_amount", 0) or 0 for c in pc)
+        r = _compute_risk(len(pc), ptotal)
+        risk_dist[r] += 1
+    lines.append(f"RISK DISTRIBUTION: HIGH: {risk_dist['high']} | MEDIUM: {risk_dist['medium']} | LOW: {risk_dist['low']}")
+    lines.append("")
+
+    # Industry ranked by loss ratio (worst first)
+    lines.append("INDUSTRY RANKED BY LOSS RATIO (worst first):")
+    industry_ranked = []
+    for ind, vals in industry_map.items():
+        lr = round((vals["loss"] / vals["premium"]) * 100, 1) if vals["premium"] else 0
+        industry_ranked.append((ind, lr, int(vals["count"]), vals["premium"], vals["loss"]))
+    for ind, lr, cnt, prem, loss in sorted(industry_ranked, key=lambda x: x[1], reverse=True):
+        lines.append(f"  - {ind}: LR {lr}% | {cnt} policies | Premium: ${prem:,.0f} | Loss: ${loss:,.0f}")
+    lines.append("")
+
     # ── Top risk policies
     enriched = []
     for p in policies:
@@ -365,16 +469,86 @@ def _format_data_snapshot(dashboard_data: dict, intent_payload: dict) -> str:
     if high_risk:
         high_risk.sort(key=lambda x: x["lr"], reverse=True)
         lines.append("HIGH RISK POLICIES:")
-        for h in high_risk[:5]:
+        for h in high_risk[:10]:
             lines.append(f"  - {h['pn']} ({h['name']}): LR {h['lr']}% | {h['claims']} claims | Risk: {h['risk'].upper()}")
         lines.append("")
 
+    # ── Top 10 claims by amount
+    sorted_claims = sorted(claims, key=lambda c: c.get("claim_amount", 0) or 0, reverse=True)
+    if sorted_claims:
+        lines.append("TOP 10 CLAIMS BY AMOUNT:")
+        for c in sorted_claims[:10]:
+            lines.append(
+                f"  - {c.get('claim_number', '?')} | {c.get('policy_number', '?')} | "
+                f"{c.get('claim_type', '?')} | ${c.get('claim_amount', 0):,.0f} | {c.get('status', '?')}"
+            )
+        lines.append("")
+
+    # ── Zone accumulation (concentration risk)
+    zone_accum = dashboard_data.get("zone_accumulation", [])
+    if zone_accum:
+        lines.append("ZONE CONCENTRATION (top zones by TIV):")
+        for z in zone_accum[:10]:
+            lr_str = f"LR: {z.get('avg_loss_ratio', 0):.1f}%" if z.get("avg_loss_ratio") else ""
+            lines.append(
+                f"  - {z.get('zone_name', '?')} ({z.get('zone_type', '')}): "
+                f"TIV ${z.get('total_tiv', 0):,.0f} | {z.get('policy_count', 0)} policies | "
+                f"PML-250yr ${z.get('pml_250yr', 0):,.0f} | {lr_str}"
+            )
+        lines.append("")
+
+    # ── Zone thresholds (breaches)
+    zone_thresholds = dashboard_data.get("zone_thresholds", [])
+    if zone_thresholds and zone_accum:
+        breaches = []
+        for zt in zone_thresholds:
+            metric = zt.get("metric", "")
+            limit_val = zt.get("limit_value", 0)
+            for za in zone_accum:
+                actual = za.get(metric, 0) or 0
+                if actual > limit_val and limit_val > 0:
+                    breaches.append({
+                        "zone": za.get("zone_name", "?"),
+                        "metric": metric,
+                        "actual": actual,
+                        "limit": limit_val,
+                        "action": zt.get("action", "review"),
+                    })
+        if breaches:
+            lines.append("ZONE THRESHOLD BREACHES:")
+            for b in breaches[:10]:
+                lines.append(
+                    f"  - {b['zone']}: {b['metric']} = {b['actual']:,.0f} "
+                    f"(limit: {b['limit']:,.0f}) -> Action: {b['action'].upper()}"
+                )
+            lines.append("")
+
     # ── Recent decisions
-    recent_dec = sorted(decisions, key=lambda d: d.get("created_at", ""), reverse=True)[:5]
+    recent_dec = sorted(decisions, key=lambda d: d.get("created_at", ""), reverse=True)[:10]
     if recent_dec:
         lines.append("RECENT DECISIONS:")
         for d in recent_dec:
             lines.append(f"  - {d.get('policy_number', '?')}: {d.get('decision', '?').upper()} by {d.get('decided_by', '?')} ({d.get('created_at', '?')[:10]})")
+        lines.append("")
+
+    # ── Session documents (uploaded files with AI analysis in this chat session)
+    session_docs = dashboard_data.get("session_documents", [])
+    if session_docs:
+        lines.append("UPLOADED DOCUMENTS IN THIS SESSION:")
+        for sd in session_docs:
+            fname = sd.get("filename", "unknown")
+            ftype = sd.get("file_type", "")
+            pn = sd.get("policy_number") or ""
+            cn = sd.get("claim_number") or ""
+            summary = sd.get("analysis_summary", "")[:300]
+            label = f"{fname} ({ftype})"
+            if pn:
+                label += f" [Policy: {pn}]"
+            if cn:
+                label += f" [Claim: {cn}]"
+            lines.append(f"  - {label}")
+            if summary:
+                lines.append(f"    Analysis: {summary}")
         lines.append("")
 
     return "\n".join(lines)

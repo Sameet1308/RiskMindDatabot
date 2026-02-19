@@ -19,6 +19,7 @@ from routers.decisions import router as decisions_router
 from routers.dashboard import router as dashboard_router
 from routers.auth import router as auth_router
 from routers.analytics import router as analytics_router
+from routers.data import router as data_router
 from database.connection import init_db, get_db, async_session
 
 @asynccontextmanager
@@ -27,15 +28,19 @@ async def lifespan(app: FastAPI):
     await init_db()
     print("[OK] Database initialized")
 
-    # Index guidelines + claims + decisions into ChromaDB
+    # Index guidelines + claims + decisions + documents into ChromaDB
     try:
-        from services.vector_store import index_guidelines, index_claims_and_decisions
+        from services.vector_store import index_guidelines, index_claims_and_decisions, index_documents
         async with async_session() as session:
             count = await index_guidelines(session)
             print(f"[OK] ChromaDB: {count} guidelines indexed")
         async with async_session() as session:
             n_claims, n_decisions = await index_claims_and_decisions(session)
             print(f"[OK] ChromaDB: {n_claims} claims + {n_decisions} decisions indexed")
+        async with async_session() as session:
+            n_docs = await index_documents(session)
+            if n_docs:
+                print(f"[OK] ChromaDB: {n_docs} documents indexed")
     except Exception as e:
         print(f"[WARN] ChromaDB indexing skipped: {e}")
 
@@ -73,7 +78,7 @@ app = FastAPI(
 # CORS for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:5174", "http://localhost:5175", "http://localhost:5176", "http://localhost:5177"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -94,6 +99,7 @@ app.include_router(decisions_router, prefix="/api/decisions", tags=["Decisions"]
 app.include_router(dashboard_router, prefix="/api/dashboard", tags=["Dashboard"])
 app.include_router(auth_router, prefix="/api/auth", tags=["Auth"])
 app.include_router(analytics_router, prefix="/api/analytics", tags=["Analytics"])
+app.include_router(data_router, prefix="/api/data", tags=["Data"])
 
 @app.get("/")
 async def root():

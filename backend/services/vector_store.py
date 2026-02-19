@@ -1,18 +1,20 @@
 """
-ChromaDB Vector Store — Embed underwriting guidelines, claim narratives, and decisions for RAG
+ChromaDB Vector Store — Embed underwriting guidelines, claim narratives, and decisions for RAG.
+Embedding priority: AWS Bedrock Titan > OpenAI > ChromaDB default.
 """
 import os
 import chromadb
 from chromadb.config import Settings
 from typing import List, Optional
 
-# Use OpenAI embeddings if key is available, else a simple fallback
 OPENAI_KEY = os.getenv("OPENAI_API_KEY", "")
+AWS_KEY = os.getenv("AWS_ACCESS_KEY_ID", "")
 CHROMA_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "chroma_db")
 
 _client: Optional[chromadb.ClientAPI] = None
 _collection = None
 _knowledge_collection = None
+_ef_name: Optional[str] = None  # track which embedding provider is active
 
 
 def _get_client():
@@ -23,35 +25,106 @@ def _get_client():
 
 
 def _make_ef():
-    """Return OpenAI embedding function if key available, else None (default)."""
+    """Return best available embedding function: Bedrock Titan > OpenAI > default."""
+    global _ef_name
+
+    # 1. AWS Bedrock Titan embeddings (best quality, free with AWS account)
+    if AWS_KEY and not AWS_KEY.startswith("your-"):
+        try:
+            import boto3
+            from chromadb.utils.embedding_functions import AmazonBedrockEmbeddingFunction
+            session = boto3.Session(
+                aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+                aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+                region_name=os.getenv("AWS_REGION", "us-east-1"),
+            )
+            ef = AmazonBedrockEmbeddingFunction(
+                session=session,
+                model_name="amazon.titan-embed-text-v2:0",
+            )
+            _ef_name = "bedrock-titan"
+            print("[Vector Store] Using AWS Bedrock Titan embeddings")
+            return ef
+        except Exception as e:
+            print(f"[Vector Store] Bedrock embedding init failed: {e}")
+
+    # 2. OpenAI embeddings
     if OPENAI_KEY and OPENAI_KEY != "your-openai-api-key-here":
-        from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
-        return OpenAIEmbeddingFunction(api_key=OPENAI_KEY, model_name="text-embedding-3-small")
+        try:
+            from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
+            ef = OpenAIEmbeddingFunction(api_key=OPENAI_KEY, model_name="text-embedding-3-small")
+            _ef_name = "openai"
+            print("[Vector Store] Using OpenAI embeddings")
+            return ef
+        except Exception as e:
+            print(f"[Vector Store] OpenAI embedding init failed: {e}")
+
+    # 3. Default (ChromaDB built-in sentence-transformers)
+    _ef_name = "default"
+    print("[Vector Store] Using default embeddings (sentence-transformers)")
     return None
+
+
+def _ensure_clean_collection(client, name: str, ef):
+    """Get or recreate a collection. If the embedding function changed, wipe and recreate
+    so vectors are consistent (can't mix embedding dimensions)."""
+    marker_file = os.path.join(os.path.abspath(CHROMA_DIR), f".{name}_ef")
+    prev_ef = ""
+    if os.path.exists(marker_file):
+        with open(marker_file, "r") as f:
+            prev_ef = f.read().strip()
+
+    current_ef = _ef_name or "default"
+
+    if prev_ef and prev_ef != current_ef:
+        # Embedding provider changed — must recreate collection
+        try:
+            client.delete_collection(name)
+            print(f"[Vector Store] Recreated '{name}' collection (switched from {prev_ef} to {current_ef})")
+        except Exception:
+            pass
+
+    kwargs = {"name": name, "metadata": {"hnsw:space": "cosine"}}
+    if ef:
+        kwargs["embedding_function"] = ef
+    collection = client.get_or_create_collection(**kwargs)
+
+    # Persist marker
+    os.makedirs(os.path.dirname(marker_file), exist_ok=True)
+    with open(marker_file, "w") as f:
+        f.write(current_ef)
+
+    return collection
+
+
+# Lazy singleton for the embedding function
+_ef_instance = None
+_ef_initialized = False
+
+def _get_ef():
+    global _ef_instance, _ef_initialized
+    if not _ef_initialized:
+        _ef_instance = _make_ef()
+        _ef_initialized = True
+    return _ef_instance
 
 
 def get_collection():
     global _collection
     if _collection is None:
         client = _get_client()
-        ef = _make_ef()
-        kwargs = {"name": "guidelines"}
-        if ef:
-            kwargs["embedding_function"] = ef
-        _collection = client.get_or_create_collection(**kwargs)
+        ef = _get_ef()
+        _collection = _ensure_clean_collection(client, "guidelines", ef)
     return _collection
 
 
 def get_knowledge_collection():
-    """Separate collection for claim descriptions + decision reasons (semantic search)."""
+    """Separate collection for claim descriptions + decision reasons + documents (semantic search)."""
     global _knowledge_collection
     if _knowledge_collection is None:
         client = _get_client()
-        ef = _make_ef()
-        kwargs = {"name": "knowledge"}
-        if ef:
-            kwargs["embedding_function"] = ef
-        _knowledge_collection = client.get_or_create_collection(**kwargs)
+        ef = _get_ef()
+        _knowledge_collection = _ensure_clean_collection(client, "knowledge", ef)
     return _knowledge_collection
 
 
@@ -242,3 +315,67 @@ async def upsert_guideline(guideline) -> None:
         "policy_number": guideline.policy_number or ""
     }
     collection.upsert(ids=[doc_id], documents=[document], metadatas=[metadata])
+
+
+# ── Document indexing (uploaded files) ────────────────────────────────────────
+
+def index_document(doc_id: int, filename: str, file_type: str,
+                   analysis: str, policy_number: str = "",
+                   claim_number: str = "") -> None:
+    """Index a single uploaded document's analysis into ChromaDB (real-time, called on upload)."""
+    if not analysis or len(analysis.strip()) < 20:
+        return
+    knowledge = get_knowledge_collection()
+    chroma_id = f"document_{doc_id}"
+    doc_text = (
+        f"Uploaded {file_type} document: {filename}. "
+        f"{'Policy: ' + policy_number + '. ' if policy_number else ''}"
+        f"{'Claim: ' + claim_number + '. ' if claim_number else ''}"
+        f"AI Analysis: {analysis[:2000]}"
+    )
+    metadata = {
+        "type": "document",
+        "filename": str(filename or ""),
+        "file_type": str(file_type or ""),
+        "policy_number": str(policy_number or ""),
+        "claim_number": str(claim_number or ""),
+    }
+    knowledge.upsert(ids=[chroma_id], documents=[doc_text], metadatas=[metadata])
+
+
+async def index_documents(db_session) -> int:
+    """Batch-index all documents with analysis summaries into ChromaDB (called at startup)."""
+    from sqlalchemy import text
+    result = await db_session.execute(text("""
+        SELECT id, filename, file_type, analysis_summary, policy_number, claim_number
+        FROM documents
+        WHERE analysis_summary IS NOT NULL AND trim(analysis_summary) != ''
+    """))
+    rows = result.fetchall()
+    if not rows:
+        return 0
+
+    knowledge = get_knowledge_collection()
+    ids, docs, metas = [], [], []
+    for row in rows:
+        did, fname, ftype, analysis, pnum, cnum = row
+        chroma_id = f"document_{did}"
+        doc_text = (
+            f"Uploaded {ftype or 'unknown'} document: {fname}. "
+            f"{'Policy: ' + pnum + '. ' if pnum else ''}"
+            f"{'Claim: ' + cnum + '. ' if cnum else ''}"
+            f"AI Analysis: {str(analysis)[:2000]}"
+        )
+        ids.append(chroma_id)
+        docs.append(doc_text)
+        metas.append({
+            "type": "document",
+            "filename": str(fname or ""),
+            "file_type": str(ftype or ""),
+            "policy_number": str(pnum or ""),
+            "claim_number": str(cnum or ""),
+        })
+
+    knowledge.upsert(ids=ids, documents=docs, metadatas=metas)
+    print(f"[Vector Store] Indexed {len(ids)} documents into knowledge base.")
+    return len(ids)

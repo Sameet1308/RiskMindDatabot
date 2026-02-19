@@ -1,18 +1,55 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import {
     Briefcase, AlertTriangle, CheckCircle, Search, FileText,
     ShieldCheck, Sparkles, XCircle, Clock, TrendingUp,
     RefreshCw, Send, DollarSign, Users, BarChart3,
     ArrowUpRight, ArrowDownRight, Minus, MessageSquare,
-    Calendar, MapPin, Zap,
+    Calendar, MapPin, Zap, X, Download, Save, ThumbsUp,
+    ThumbsDown, Loader2,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import apiService, { PolicyItem, DecisionItem } from '../services/api'
+import apiService, { PolicyItem, DecisionItem, MemoResponse, Claim } from '../services/api'
+import { exportElementAsPdf } from '../utils/exportPdf'
 
 const fmt = (n: number) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
 
+/**
+ * AI pricing engine — guideline-driven (refs: 5.1.1, 5.1.2, 5.1.3, 3.1.1)
+ * LR < 50%: loyalty credit -3%  |  50-65%: +5-10%  |  > 65%: +15-25%
+ * 5+ claims: additional +15% surcharge
+ */
+function suggestPremium(p: { premium: number; loss_ratio: number; claim_count: number; total_claims: number }) {
+    if (p.total_claims === 0) return p.premium // no claims = no change
+
+    // Guideline-based rate adjustment
+    let adjustment = 0
+    if (p.loss_ratio < 50) {
+        adjustment = -0.03 // 5.1.1: loyalty credit
+    } else if (p.loss_ratio <= 65) {
+        adjustment = 0.05 + (p.loss_ratio - 50) / 15 * 0.05 // 5.1.2: 5-10% scaled
+    } else {
+        adjustment = 0.15 + Math.min((p.loss_ratio - 65) / 35, 1) * 0.10 // 5.1.3: 15-25% scaled
+    }
+
+    // 3.1.1: 5+ claims surcharge 15%
+    if (p.claim_count >= 5) adjustment += 0.15
+
+    return Math.round(p.premium * (1 + adjustment))
+}
+
+/** Guideline citation for a pricing recommendation */
+function pricingCitation(p: { loss_ratio: number; claim_count: number }): string {
+    const parts: string[] = []
+    if (p.loss_ratio < 50) parts.push('Guideline 5.1.1: Favorable loss ratio — standard renewal')
+    else if (p.loss_ratio <= 65) parts.push('Guideline 5.1.2: Moderate loss ratio — 5-10% rate increase')
+    else parts.push('Guideline 5.1.3: Adverse loss ratio — 15-25% mandatory rate increase')
+    if (p.claim_count >= 5) parts.push('Guideline 3.1.1: High frequency — 15% surcharge applied')
+    return parts.join('. ')
+}
+
 type WorkbenchTab = 'overview' | 'submissions' | 'renewals' | 'quotes' | 'communications'
+type ModalType = 'memo' | 'decision' | 'intel' | null
 
 export default function Workbench() {
     const [policies, setPolicies] = useState<PolicyItem[]>([])
@@ -21,6 +58,95 @@ export default function Workbench() {
     const [decisionMap, setDecisionMap] = useState<Record<string, DecisionItem[]>>({})
     const [activeTab, setActiveTab] = useState<WorkbenchTab>('overview')
     const navigate = useNavigate()
+
+    // --- Modal state ---
+    const [modalType, setModalType] = useState<ModalType>(null)
+    const [modalPolicy, setModalPolicy] = useState<string>('')
+    const [memoData, setMemoData] = useState<MemoResponse | null>(null)
+    const [modalLoading, setModalLoading] = useState(false)
+    const [decisionNotes, setDecisionNotes] = useState('')
+    const [decisionRecorded, setDecisionRecorded] = useState<string | null>(null)
+    const [saveConfirm, setSaveConfirm] = useState(false)
+    const modalRef = useRef<HTMLDivElement>(null)
+
+    const openModal = useCallback(async (type: ModalType, policyNumber: string) => {
+        setModalType(type)
+        setModalPolicy(policyNumber)
+        setMemoData(null)
+        setDecisionNotes('')
+        setDecisionRecorded(null)
+        setSaveConfirm(false)
+
+        if (type === 'memo') {
+            setModalLoading(true)
+            try {
+                const data = await apiService.getMemo(policyNumber)
+                setMemoData(data)
+            } catch (err) {
+                console.error('Failed to load memo:', err)
+            } finally {
+                setModalLoading(false)
+            }
+        }
+    }, [])
+
+    const closeModal = () => {
+        setModalType(null)
+        setModalPolicy('')
+        setMemoData(null)
+        setDecisionRecorded(null)
+    }
+
+    const handleDecisionAction = async (action: string) => {
+        const policy = policies.find(p => p.policy_number === modalPolicy)
+        try {
+            await apiService.recordDecision(modalPolicy, action, decisionNotes || undefined, policy?.risk_level || undefined)
+            setDecisionRecorded(action.toUpperCase())
+            // Refresh decisions
+            const fresh = await apiService.getDecisions(modalPolicy).catch(() => [])
+            setDecisionMap(prev => ({ ...prev, [modalPolicy]: fresh }))
+        } catch (err) {
+            console.error('Failed to record decision:', err)
+        }
+    }
+
+    const handleModalSave = () => {
+        const policy = policies.find(p => p.policy_number === modalPolicy)
+        const saved = JSON.parse(localStorage.getItem('riskmind_saved') || '[]')
+        const item: any = {
+            id: `wb-${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            policy_number: modalPolicy,
+            policyholder: policy?.policyholder_name || '',
+        }
+        if (modalType === 'memo' && memoData) {
+            item.type = 'memo'
+            item.title = `Memo: ${modalPolicy}`
+            item.content = memoData.memo_text
+            item.data = memoData
+        } else if (modalType === 'decision') {
+            item.type = 'decision'
+            item.title = `Decision: ${modalPolicy}`
+            item.content = decisionRecorded ? `Decision: ${decisionRecorded}` : 'Pending'
+            item.data = { policy_number: modalPolicy, decision: decisionRecorded, notes: decisionNotes }
+        } else {
+            item.type = 'summary'
+            item.title = `Intel: ${modalPolicy}`
+            item.content = `Quick intel for ${policy?.policyholder_name || modalPolicy}`
+            item.data = policy
+        }
+        saved.unshift(item)
+        if (saved.length > 50) saved.length = 50
+        localStorage.setItem('riskmind_saved', JSON.stringify(saved))
+        setSaveConfirm(true)
+        setTimeout(() => setSaveConfirm(false), 2000)
+    }
+
+    const handleModalExportPdf = async () => {
+        if (!modalRef.current) return
+        const filename = `riskmind-${modalType}-${modalPolicy}.pdf`
+        await exportElementAsPdf(modalRef.current, filename)
+    }
 
     // Get logged-in user's email for filtering
     const currentUser = (() => {
@@ -70,56 +196,105 @@ export default function Workbench() {
         return { pendingDecisions, needsReview, evidenceMissing, highRisk, mediumRisk, lowRisk, total, totalPremium, totalClaims, avgLossRatio }
     }, [policies, decisionMap])
 
-    // Simulated data for underwriter workflows
+    // Submissions — derived from real policy data
     const submissions = useMemo(() => {
-        return policies.slice(0, 8).map((p, i) => ({
-            id: `SUB-2024-${String(100 + i).padStart(3, '0')}`,
-            policy_number: p.policy_number,
-            policyholder: p.policyholder_name,
-            industry: p.industry_type,
-            premium: p.premium,
-            status: i < 2 ? 'new' : i < 5 ? 'in_review' : 'quoted',
-            priority: p.risk_level === 'high' ? 'urgent' : p.risk_level === 'medium' ? 'normal' : 'low',
-            submitted_date: `2024-${String(1 + (i % 12)).padStart(2, '0')}-${String(5 + i * 3).padStart(2, '0')}`,
-            ai_score: Math.min(95, 60 + Math.round(p.loss_ratio * 0.3) + (p.claim_count * 2)),
-            ai_insight: p.risk_level === 'high'
-                ? `High claims frequency (${p.claim_count} claims). Loss ratio ${p.loss_ratio.toFixed(0)}% exceeds guideline threshold.`
-                : p.risk_level === 'medium'
-                    ? `Moderate risk profile. ${p.claim_count} claims with ${p.loss_ratio.toFixed(0)}% loss ratio. Conditions recommended.`
-                    : `Clean risk profile. Low claims history and favorable loss ratio at ${p.loss_ratio.toFixed(0)}%.`,
-        }))
-    }, [policies])
+        return policies.map(p => {
+            const hasDec = (decisionMap[p.policy_number] || []).length > 0
+            const status = hasDec ? 'quoted' : p.risk_level === 'high' ? 'in_review' : 'new'
+            const riskScore = Math.min(95, Math.round(
+                40 + (p.loss_ratio * 0.35) + (p.claim_count * 3) + (p.total_claims >= 100000 ? 10 : 0)
+            ))
+            return {
+                policy_number: p.policy_number,
+                policyholder: p.policyholder_name,
+                industry: p.industry_type,
+                premium: p.premium,
+                status,
+                priority: p.risk_level === 'high' ? 'urgent' : p.risk_level === 'medium' ? 'normal' : 'low',
+                submitted_date: p.effective_date || '',
+                ai_score: riskScore,
+                ai_insight: p.loss_ratio > 65
+                    ? `Loss ratio ${p.loss_ratio.toFixed(0)}% exceeds Guideline 5.1.3 threshold (65%). ${p.claim_count} claims totaling ${fmt(p.total_claims)}.`
+                    : p.loss_ratio > 50
+                        ? `Guideline 5.1.2 review: ${p.loss_ratio.toFixed(0)}% loss ratio. ${p.claim_count} claims, ${fmt(p.total_claims)} incurred.`
+                        : `Guideline 5.1.1 met: Favorable ${p.loss_ratio.toFixed(0)}% loss ratio. ${p.claim_count} claim(s), ${fmt(p.total_claims)} incurred.`,
+            }
+        })
+    }, [policies, decisionMap])
 
+    // Renewals — real dates + guideline-driven pricing
     const renewals = useMemo(() => {
-        return policies.slice(0, 6).map((p, i) => ({
-            policy_number: p.policy_number,
-            policyholder: p.policyholder_name,
-            industry: p.industry_type,
-            current_premium: p.premium,
-            suggested_premium: p.risk_level === 'high' ? Math.round(p.premium * 1.25) : p.risk_level === 'medium' ? Math.round(p.premium * 1.1) : p.premium,
-            premium_change: p.risk_level === 'high' ? '+25%' : p.risk_level === 'medium' ? '+10%' : '0%',
-            expiry_date: p.expiration_date || '2025-03-15',
-            days_to_expiry: 30 + i * 12,
-            risk_level: p.risk_level,
-            ai_recommendation: p.risk_level === 'high'
-                ? 'Renew with 25% surcharge and additional risk controls. Require updated evidence documentation.'
-                : p.risk_level === 'medium'
-                    ? 'Renew with 10% premium increase and conditions on safety compliance.'
-                    : 'Renew at current terms. Strong risk profile.',
-            claim_trend: p.claim_count > 3 ? 'increasing' : p.claim_count > 1 ? 'stable' : 'decreasing',
-        }))
+        return policies.map(p => {
+            const suggested = suggestPremium(p)
+            const changePct = p.premium > 0 ? ((suggested - p.premium) / p.premium * 100) : 0
+            const expiry = p.expiration_date || ''
+            const daysLeft = expiry ? Math.max(0, Math.round((new Date(expiry).getTime() - Date.now()) / 86400000)) : 0
+            return {
+                policy_number: p.policy_number,
+                policyholder: p.policyholder_name,
+                industry: p.industry_type,
+                current_premium: p.premium,
+                suggested_premium: suggested,
+                premium_change: changePct === 0 ? '0%' : `${changePct > 0 ? '+' : ''}${changePct.toFixed(0)}%`,
+                expiry_date: expiry,
+                days_to_expiry: daysLeft,
+                risk_level: p.risk_level,
+                ai_recommendation: pricingCitation(p),
+                claim_trend: p.claim_count > 3 ? 'increasing' : p.claim_count > 1 ? 'stable' : 'decreasing',
+            }
+        })
     }, [policies])
 
+    // Broker comms — derived from real policy data (high risk → renewal notice, missing evidence → request, pending → quote follow-up)
     const brokerComms = useMemo(() => {
-        const messages = [
-            { broker: 'Sarah Mitchell (Marsh)', subject: 'COMM-2024-016 Renewal Discussion', status: 'unread', date: '2024-12-15', priority: 'high', ai_draft: 'Based on current loss ratio of 156%, I recommend discussing premium adjustment of 25-30% with enhanced risk controls before renewal.' },
-            { broker: 'James Chen (Aon)', subject: 'New Submission - Tech Startup', status: 'replied', date: '2024-12-14', priority: 'normal', ai_draft: 'Tech sector submission shows standard risk profile. Recommended terms: base rate with cyber liability rider.' },
-            { broker: 'Maria Santos (Willis)', subject: 'Evidence Request - Property Claim', status: 'unread', date: '2024-12-13', priority: 'urgent', ai_draft: 'Property damage claim requires updated inspection report and contractor estimates before coverage determination.' },
-            { broker: 'David Park (USI)', subject: 'Quote Request - Manufacturing', status: 'draft', date: '2024-12-12', priority: 'normal', ai_draft: 'Manufacturing risk assessment complete. Suggested premium of $85,000 based on industry benchmarks and claims history.' },
-            { broker: 'Emma Wilson (Gallagher)', subject: 'Portfolio Review Meeting', status: 'read', date: '2024-12-11', priority: 'low', ai_draft: 'Portfolio performance summary prepared. Overall loss ratio improved 8% YoY. 3 accounts flagged for deeper review.' },
-        ]
-        return messages
-    }, [])
+        const msgs: { policy: string; broker: string; subject: string; status: string; date: string; priority: string; ai_draft: string }[] = []
+
+        policies.forEach(p => {
+            const dec = (decisionMap[p.policy_number] || [])[0]
+            const hasEvidence = (p.claims || []).some(c => c.evidence_files && c.evidence_files !== '[]')
+
+            // High risk with no decision → urgent renewal discussion
+            if (p.risk_level === 'high' && !dec) {
+                msgs.push({
+                    policy: p.policy_number,
+                    broker: `Broker: ${p.policyholder_name}`,
+                    subject: `${p.policy_number} — Renewal pricing discussion required`,
+                    status: 'unread',
+                    date: p.expiration_date || '',
+                    priority: 'urgent',
+                    ai_draft: `Loss ratio at ${p.loss_ratio.toFixed(0)}% with ${p.claim_count} claims (${fmt(p.total_claims)} incurred). Per Guideline 5.1.3, recommend ${suggestPremium(p) > p.premium ? fmt(suggestPremium(p)) : 'current'} premium with enhanced risk controls.`,
+                })
+            }
+
+            // Missing evidence → request
+            if (!hasEvidence && p.claim_count > 0) {
+                msgs.push({
+                    policy: p.policy_number,
+                    broker: `Claims: ${p.policyholder_name}`,
+                    subject: `${p.policy_number} — Evidence documentation missing for ${p.claim_count} claim(s)`,
+                    status: p.risk_level === 'high' ? 'unread' : 'read',
+                    date: p.effective_date || '',
+                    priority: p.risk_level === 'high' ? 'high' : 'normal',
+                    ai_draft: `${p.claim_count} claim(s) totaling ${fmt(p.total_claims)} have no supporting evidence on file. Request inspection reports, photos, and adjuster estimates to complete underwriting review.`,
+                })
+            }
+
+            // Pending decision with medium risk → follow-up
+            if (p.risk_level === 'medium' && !dec) {
+                msgs.push({
+                    policy: p.policy_number,
+                    broker: `UW Review: ${p.policyholder_name}`,
+                    subject: `${p.policy_number} — Quote follow-up: ${p.loss_ratio.toFixed(0)}% loss ratio`,
+                    status: 'draft',
+                    date: p.expiration_date || '',
+                    priority: 'normal',
+                    ai_draft: `${p.industry_type} account with ${p.loss_ratio.toFixed(0)}% loss ratio. Per Guideline 5.1.2, recommend renewal at ${fmt(suggestPremium(p))} (${((suggestPremium(p) - p.premium) / p.premium * 100).toFixed(0)}% adjustment) with safety compliance conditions.`,
+                })
+            }
+        })
+
+        return msgs.slice(0, 8) // cap at 8 for UI clarity
+    }, [policies, decisionMap])
 
     const lrColor = (lr: number) => lr > 80 ? 'wb-lr-high' : lr > 60 ? 'wb-lr-med' : 'wb-lr-low'
 
@@ -173,7 +348,7 @@ export default function Workbench() {
         { key: 'submissions', label: 'Submissions', icon: <FileText size={14} />, count: submissions.filter(s => s.status === 'new').length },
         { key: 'renewals', label: 'Renewals', icon: <RefreshCw size={14} />, count: renewals.length },
         { key: 'quotes', label: 'Quote Decisions', icon: <DollarSign size={14} />, count: stats.pendingDecisions },
-        { key: 'communications', label: 'Broker Comms', icon: <MessageSquare size={14} />, count: brokerComms.filter(c => c.status === 'unread').length },
+        { key: 'communications', label: 'Action Items', icon: <MessageSquare size={14} />, count: brokerComms.filter(c => c.status === 'unread').length },
     ]
 
     return (
@@ -192,7 +367,7 @@ export default function Workbench() {
 
             {/* KPI Cards */}
             <div className="wb-kpis">
-                <div className="wb-kpi wb-kpi--purple">
+                <div className="wb-kpi wb-kpi--coral">
                     <div className="wb-kpi-icon"><Briefcase size={16} /></div>
                     <div className="wb-kpi-data">
                         <span className="wb-kpi-label">Total Premium</span>
@@ -323,7 +498,7 @@ export default function Workbench() {
                                                 <button className="wb-action-btn" onClick={() => navigate(`/?policy=${p.policy_number}&output=analysis`)}>
                                                     <FileText size={13} /> Analyze
                                                 </button>
-                                                <button className="wb-action-btn wb-action-btn--accent" onClick={() => navigate(`/?policy=${p.policy_number}&output=analysis`)}>
+                                                <button className="wb-action-btn wb-action-btn--accent" onClick={() => openModal('intel', p.policy_number)}>
                                                     <Sparkles size={13} /> Intel
                                                 </button>
                                             </div>
@@ -354,26 +529,26 @@ export default function Workbench() {
                         <table className="wb-table">
                             <thead>
                                 <tr>
-                                    <th>Submission ID</th>
-                                    <th>Policy</th>
+                                    <th>Policy #</th>
                                     <th>Policyholder</th>
                                     <th>Industry</th>
-                                    <th className="wb-th-r">Quoted Premium</th>
+                                    <th className="wb-th-r">Premium</th>
+                                    <th className="wb-th-c">Effective</th>
                                     <th className="wb-th-c">Status</th>
                                     <th className="wb-th-c">Priority</th>
-                                    <th className="wb-th-c">AI Score</th>
-                                    <th>AI Insight</th>
+                                    <th className="wb-th-c">Risk Score</th>
+                                    <th>Guideline Assessment</th>
                                     <th className="wb-th-c">Action</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {submissions.map(sub => (
-                                    <tr key={sub.id}>
-                                        <td><span className="wb-policy-link">{sub.id}</span></td>
+                                    <tr key={sub.policy_number}>
                                         <td><span className="wb-policy-link" onClick={() => navigate(`/?policy=${sub.policy_number}&output=analysis`)}>{sub.policy_number}</span></td>
                                         <td className="wb-td-name">{sub.policyholder}</td>
                                         <td><span className="wb-industry-tag">{sub.industry}</span></td>
                                         <td className="wb-td-r">{fmt(sub.premium)}</td>
+                                        <td className="wb-td-c">{sub.submitted_date}</td>
                                         <td className="wb-td-c">{statusBadge(sub.status)}</td>
                                         <td className="wb-td-c">{priorityDot(sub.priority)} {sub.priority}</td>
                                         <td className="wb-td-c">
@@ -383,7 +558,7 @@ export default function Workbench() {
                                         </td>
                                         <td className="wb-td-insight">{sub.ai_insight}</td>
                                         <td className="wb-td-c">
-                                            <button className="wb-action-btn wb-action-btn--accent" onClick={() => navigate(`/?policy=${sub.policy_number}&output=analysis`)}>
+                                            <button className="wb-action-btn wb-action-btn--accent" onClick={() => openModal('intel', sub.policy_number)}>
                                                 <Sparkles size={13} /> Review
                                             </button>
                                         </td>
@@ -444,14 +619,14 @@ export default function Workbench() {
                                     <span>{r.ai_recommendation}</span>
                                 </div>
                                 <div className="wb-renewal-actions">
-                                    <button className="wb-action-btn" onClick={() => navigate(`/?policy=${r.policy_number}&output=decision`)}>
+                                    <button className="wb-action-btn" onClick={() => openModal('decision', r.policy_number)}>
                                         <ShieldCheck size={13} /> Decide
                                     </button>
-                                    <button className="wb-action-btn" onClick={() => navigate(`/?policy=${r.policy_number}&output=memo`)}>
+                                    <button className="wb-action-btn" onClick={() => openModal('memo', r.policy_number)}>
                                         <FileText size={13} /> Memo
                                     </button>
                                     <button className="wb-action-btn wb-action-btn--accent" onClick={() => navigate(`/?policy=${r.policy_number}&output=analysis`)}>
-                                        <Sparkles size={13} /> AI Review
+                                        <Sparkles size={13} /> Analyze
                                     </button>
                                 </div>
                             </div>
@@ -489,17 +664,17 @@ export default function Workbench() {
                             </thead>
                             <tbody>
                                 {filteredPolicies.map(p => {
-                                    const suggestedPremium = p.risk_level === 'high' ? Math.round(p.premium * 1.3) : p.risk_level === 'medium' ? Math.round(p.premium * 1.12) : p.premium
-                                    const changePercent = ((suggestedPremium - p.premium) / p.premium * 100).toFixed(0)
+                                    const suggested = suggestPremium(p)
+                                    const changePercent = p.premium > 0 ? ((suggested - p.premium) / p.premium * 100).toFixed(0) : '0'
                                     return (
                                         <tr key={p.policy_number}>
                                             <td>
-                                                <span className="wb-policy-link" onClick={() => navigate(`/?policy=${p.policy_number}&output=decision`)}>{p.policy_number}</span>
+                                                <span className="wb-policy-link" onClick={() => openModal('intel', p.policy_number)}>{p.policy_number}</span>
                                             </td>
                                             <td className="wb-td-name">{p.policyholder_name}</td>
                                             <td><span className="wb-industry-tag">{p.industry_type}</span></td>
                                             <td className="wb-td-r">{fmt(p.premium)}</td>
-                                            <td className="wb-td-r"><strong>{fmt(suggestedPremium)}</strong></td>
+                                            <td className="wb-td-r"><strong>{fmt(suggested)}</strong></td>
                                             <td className="wb-td-c">
                                                 <span className={Number(changePercent) > 0 ? 'wb-change-up' : ''}>
                                                     {Number(changePercent) > 0 ? `+${changePercent}%` : '0%'}
@@ -511,7 +686,7 @@ export default function Workbench() {
                                             </td>
                                             <td className="wb-td-c">{decisionBadge(p.policy_number)}</td>
                                             <td className="wb-td-c">
-                                                <button className="wb-action-btn wb-action-btn--accent" onClick={() => navigate(`/?policy=${p.policy_number}&output=decision`)}>
+                                                <button className="wb-action-btn wb-action-btn--accent" onClick={() => openModal('decision', p.policy_number)}>
                                                     <DollarSign size={13} /> Quote
                                                 </button>
                                             </td>
@@ -528,12 +703,16 @@ export default function Workbench() {
             {activeTab === 'communications' && (
                 <>
                     <div className="wb-ai-insight">
-                        <div className="wb-ai-insight-icon"><Users size={16} /></div>
+                        <div className="wb-ai-insight-icon"><AlertTriangle size={16} /></div>
                         <div className="wb-ai-insight-text">
-                            <strong>AI Communication Assistant</strong>
-                            <p>{brokerComms.filter(c => c.status === 'unread').length} unread messages. AI has prepared draft responses based on policy data and underwriting guidelines.</p>
+                            <strong>AI Action Items</strong>
+                            <p>{brokerComms.filter(c => c.status === 'unread').length} urgent items requiring attention. Generated from real policy data, claims history, and underwriting guidelines.</p>
                         </div>
                     </div>
+
+                    {brokerComms.length === 0 && (
+                        <div className="wb-empty">No action items — all policies are reviewed and documented.</div>
+                    )}
 
                     <div className="wb-comm-list">
                         {brokerComms.map((comm, i) => (
@@ -548,21 +727,21 @@ export default function Workbench() {
                                     </div>
                                     <div className="wb-comm-meta">
                                         <span className={`wb-comm-status wb-comm-status--${comm.status}`}>
-                                            {comm.status === 'unread' ? 'Unread' : comm.status === 'replied' ? 'Replied' : comm.status === 'draft' ? 'Draft' : 'Read'}
+                                            {comm.status === 'unread' ? 'Urgent' : comm.status === 'draft' ? 'Draft' : 'Noted'}
                                         </span>
                                         <span className="wb-comm-date">{comm.date}</span>
                                     </div>
                                 </div>
                                 <div className="wb-comm-ai-draft">
                                     <Sparkles size={12} />
-                                    <span><strong>AI Draft:</strong> {comm.ai_draft}</span>
+                                    <span><strong>AI Analysis:</strong> {comm.ai_draft}</span>
                                 </div>
                                 <div className="wb-comm-actions">
-                                    <button className="wb-action-btn">
-                                        <Send size={13} /> Reply
+                                    <button className="wb-action-btn" onClick={() => openModal('intel', comm.policy)}>
+                                        <FileText size={13} /> View Intel
                                     </button>
-                                    <button className="wb-action-btn wb-action-btn--accent">
-                                        <Sparkles size={13} /> Use AI Draft
+                                    <button className="wb-action-btn wb-action-btn--accent" onClick={() => openModal('decision', comm.policy)}>
+                                        <ShieldCheck size={13} /> Decide
                                     </button>
                                 </div>
                             </div>
@@ -570,6 +749,286 @@ export default function Workbench() {
                     </div>
                 </>
             )}
+
+            {/* ═══════ MODAL OVERLAY ═══════ */}
+            {modalType && (() => {
+                const policy = policies.find(p => p.policy_number === modalPolicy)
+                return (
+                    <div className="wbm-overlay" onClick={(e) => { if (e.target === e.currentTarget) closeModal() }}>
+                        <div className="wbm-card animate-slideUp" ref={modalRef}>
+                            {/* Modal header */}
+                            <div className="wbm-header">
+                                <div className="wbm-header-left">
+                                    <span className={`wbm-type-badge wbm-type-badge--${modalType}`}>
+                                        {modalType === 'memo' ? 'Memo' : modalType === 'decision' ? 'Decision' : 'Intel'}
+                                    </span>
+                                    <div>
+                                        <h3 className="wbm-title">{modalPolicy}</h3>
+                                        <p className="wbm-subtitle">{policy?.policyholder_name} - {policy?.industry_type}</p>
+                                    </div>
+                                </div>
+                                <div className="wbm-header-actions">
+                                    <button className="wbm-btn wbm-btn--save" onClick={handleModalSave} title="Save">
+                                        {saveConfirm ? <><CheckCircle size={14} /> Saved</> : <><Save size={14} /> Save</>}
+                                    </button>
+                                    <button className="wbm-btn wbm-btn--pdf" onClick={handleModalExportPdf} title="Export PDF">
+                                        <Download size={14} /> PDF
+                                    </button>
+                                    <button className="wbm-close" onClick={closeModal}><X size={18} /></button>
+                                </div>
+                            </div>
+
+                            {/* Loading spinner */}
+                            {modalLoading && (
+                                <div className="wbm-loading">
+                                    <Loader2 size={24} style={{ animation: 'spin 1s linear infinite' }} />
+                                    <span>Loading...</span>
+                                </div>
+                            )}
+
+                            {/* ── MEMO MODAL ── */}
+                            {modalType === 'memo' && memoData && !modalLoading && (
+                                <div className="wbm-body">
+                                    <div className="wbm-kpis">
+                                        <div className="wbm-kpi">
+                                            <span className="wbm-kpi-val">{memoData.summary.total_claims}</span>
+                                            <span className="wbm-kpi-label">Claims</span>
+                                        </div>
+                                        <div className="wbm-kpi">
+                                            <span className="wbm-kpi-val">{fmt(memoData.summary.total_amount)}</span>
+                                            <span className="wbm-kpi-label">Total Loss</span>
+                                        </div>
+                                        <div className="wbm-kpi">
+                                            <span className="wbm-kpi-val">{memoData.summary.loss_ratio.toFixed(1)}%</span>
+                                            <span className="wbm-kpi-label">Loss Ratio</span>
+                                        </div>
+                                        <div className="wbm-kpi">
+                                            <span className={`wbm-kpi-val wbm-risk--${memoData.summary.risk_level}`}>{memoData.summary.risk_level.toUpperCase()}</span>
+                                            <span className="wbm-kpi-label">Risk Level</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="wbm-section">
+                                        <h4>Recommendation</h4>
+                                        <p className="wbm-highlight">{memoData.recommendation}</p>
+                                        <p className="wbm-sub">{memoData.pricing_action}</p>
+                                    </div>
+
+                                    <div className="wbm-section">
+                                        <h4>Risk Drivers</h4>
+                                        <ul className="wbm-list">
+                                            {memoData.reasons.map((r, i) => <li key={i}>{r}</li>)}
+                                        </ul>
+                                    </div>
+
+                                    {memoData.guideline_references.length > 0 && (
+                                        <div className="wbm-section">
+                                            <h4>Guideline Alignment</h4>
+                                            <div className="wbm-guidelines">
+                                                {memoData.guideline_references.map((g, i) => (
+                                                    <div key={i} className="wbm-guideline">
+                                                        <span className="wbm-guideline-code">{g.section}</span>
+                                                        <span>{g.text}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <details className="wbm-full-memo">
+                                        <summary>Full Memo Text</summary>
+                                        <pre className="wbm-memo-pre">{memoData.memo_text}</pre>
+                                    </details>
+                                </div>
+                            )}
+
+                            {/* ── DECISION MODAL ── */}
+                            {modalType === 'decision' && !modalLoading && policy && (
+                                <div className="wbm-body">
+                                    {decisionRecorded ? (
+                                        <div className="wbm-decision-confirmed">
+                                            <CheckCircle size={32} />
+                                            <h3>Decision Recorded: {decisionRecorded}</h3>
+                                            <p>{modalPolicy} - {policy.policyholder_name}</p>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="wbm-kpis">
+                                                <div className="wbm-kpi">
+                                                    <span className="wbm-kpi-val">{fmt(policy.premium)}</span>
+                                                    <span className="wbm-kpi-label">Premium</span>
+                                                </div>
+                                                <div className="wbm-kpi">
+                                                    <span className="wbm-kpi-val">{policy.claim_count}</span>
+                                                    <span className="wbm-kpi-label">Claims</span>
+                                                </div>
+                                                <div className="wbm-kpi">
+                                                    <span className="wbm-kpi-val">{fmt(policy.total_claims)}</span>
+                                                    <span className="wbm-kpi-label">Total Loss</span>
+                                                </div>
+                                                <div className="wbm-kpi">
+                                                    <span className={`wbm-kpi-val ${lrColor(policy.loss_ratio)}`}>{policy.loss_ratio.toFixed(1)}%</span>
+                                                    <span className="wbm-kpi-label">Loss Ratio</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="wbm-section">
+                                                <h4>AI Recommendation</h4>
+                                                <p className="wbm-highlight">
+                                                    {policy.loss_ratio > 65
+                                                        ? `Guideline 5.1.3: Adverse loss ratio (${policy.loss_ratio.toFixed(0)}%). Recommend ${fmt(suggestPremium(policy))} premium (+${((suggestPremium(policy) - policy.premium) / policy.premium * 100).toFixed(0)}%). Refer for senior review.`
+                                                        : policy.loss_ratio > 50
+                                                            ? `Guideline 5.1.2: Moderate loss ratio (${policy.loss_ratio.toFixed(0)}%). Recommend ${fmt(suggestPremium(policy))} premium with enhanced loss controls.`
+                                                            : `Guideline 5.1.1: Favorable loss ratio (${policy.loss_ratio.toFixed(0)}%). Renew at ${fmt(suggestPremium(policy))} — standard terms.`}
+                                                    {policy.claim_count >= 5 ? ` Guideline 3.1.1: ${policy.claim_count} claims — 15% surcharge applied.` : ''}
+                                                </p>
+                                            </div>
+
+                                            <div className="wbm-section">
+                                                <h4>Decision Notes</h4>
+                                                <textarea
+                                                    className="wbm-notes"
+                                                    placeholder="Add notes for this decision..."
+                                                    value={decisionNotes}
+                                                    onChange={(e) => setDecisionNotes(e.target.value)}
+                                                    rows={3}
+                                                />
+                                            </div>
+
+                                            <div className="wbm-decision-btns">
+                                                <button className="wbm-dec-btn wbm-dec-btn--accept" onClick={() => handleDecisionAction('accept')}>
+                                                    <ThumbsUp size={16} /> Accept
+                                                </button>
+                                                <button className="wbm-dec-btn wbm-dec-btn--refer" onClick={() => handleDecisionAction('refer')}>
+                                                    <ShieldCheck size={16} /> Refer
+                                                </button>
+                                                <button className="wbm-dec-btn wbm-dec-btn--decline" onClick={() => handleDecisionAction('decline')}>
+                                                    <ThumbsDown size={16} /> Decline
+                                                </button>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* ── INTEL MODAL ── */}
+                            {modalType === 'intel' && !modalLoading && policy && (
+                                <div className="wbm-body">
+                                    <div className="wbm-kpis">
+                                        <div className="wbm-kpi">
+                                            <span className="wbm-kpi-val">{fmt(policy.premium)}</span>
+                                            <span className="wbm-kpi-label">Premium</span>
+                                        </div>
+                                        <div className="wbm-kpi">
+                                            <span className="wbm-kpi-val">{policy.claim_count}</span>
+                                            <span className="wbm-kpi-label">Claims</span>
+                                        </div>
+                                        <div className="wbm-kpi">
+                                            <span className="wbm-kpi-val">{fmt(policy.total_claims)}</span>
+                                            <span className="wbm-kpi-label">Total Loss</span>
+                                        </div>
+                                        <div className="wbm-kpi">
+                                            <span className={`wbm-kpi-val ${lrColor(policy.loss_ratio)}`}>{policy.loss_ratio.toFixed(1)}%</span>
+                                            <span className="wbm-kpi-label">Loss Ratio</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="wbm-section">
+                                        <h4>Risk Assessment</h4>
+                                        <p className="wbm-highlight">
+                                            <span className={`wb-risk-badge wb-risk-badge--${policy.risk_level}`} style={{ marginRight: '0.5rem' }}>{policy.risk_level}</span>
+                                            {policy.risk_level === 'high'
+                                                ? `High-risk policy with ${policy.claim_count} claims and loss ratio of ${policy.loss_ratio.toFixed(1)}%. Requires immediate review.`
+                                                : policy.risk_level === 'medium'
+                                                    ? `Moderate risk profile. ${policy.claim_count} claims with ${policy.loss_ratio.toFixed(1)}% loss ratio. Monitor closely.`
+                                                    : `Low risk. ${policy.claim_count} claim(s) with favorable ${policy.loss_ratio.toFixed(1)}% loss ratio.`}
+                                        </p>
+                                    </div>
+
+                                    <div className="wbm-section">
+                                        <h4>Policy Details</h4>
+                                        <div className="wbm-details-grid">
+                                            <div><span className="wbm-detail-label">Industry</span><span>{policy.industry_type}</span></div>
+                                            <div><span className="wbm-detail-label">Period</span><span>{policy.effective_date} to {policy.expiration_date}</span></div>
+                                            <div><span className="wbm-detail-label">Premium</span><span>{fmt(policy.premium)}</span></div>
+                                            <div><span className="wbm-detail-label">Decision</span><span>{(decisionMap[policy.policy_number] || [])[0]?.decision?.toUpperCase() || 'Pending'}</span></div>
+                                        </div>
+                                    </div>
+
+                                    {/* Evidence Files */}
+                                    <div className="wbm-section">
+                                        <h4>Evidence & Documentation</h4>
+                                        {(() => {
+                                            const allEvidence: { claim: string; type: string; url: string; description: string }[] = []
+                                            ;(policy.claims || []).forEach((c: Claim) => {
+                                                if (c.evidence_files && c.evidence_files !== '[]') {
+                                                    try {
+                                                        const files = JSON.parse(c.evidence_files)
+                                                        if (Array.isArray(files)) {
+                                                            files.forEach((f: any) => {
+                                                                allEvidence.push({
+                                                                    claim: c.claim_number,
+                                                                    type: f.type || 'file',
+                                                                    url: f.url || f.local_path || '',
+                                                                    description: f.description || c.description || 'Evidence file',
+                                                                })
+                                                            })
+                                                        }
+                                                    } catch { /* ignore parse errors */ }
+                                                }
+                                            })
+
+                                            if (allEvidence.length > 0) {
+                                                return (
+                                                    <div className="wbm-evidence-list">
+                                                        {allEvidence.map((ev, i) => (
+                                                            <a key={i} href={ev.url} target="_blank" rel="noopener noreferrer" className="wbm-evidence-item">
+                                                                <span className="wbm-evidence-type">
+                                                                    {ev.type === 'image' ? '🖼' : ev.type === 'pdf' ? '📄' : '📎'}
+                                                                </span>
+                                                                <div className="wbm-evidence-info">
+                                                                    <span className="wbm-evidence-name">{ev.description}</span>
+                                                                    <span className="wbm-evidence-claim">{ev.claim}</span>
+                                                                </div>
+                                                                <ArrowUpRight size={14} className="wbm-evidence-link" />
+                                                            </a>
+                                                        ))}
+                                                    </div>
+                                                )
+                                            }
+
+                                            return (
+                                                <div className="wbm-evidence-empty">
+                                                    <XCircle size={16} />
+                                                    <span>No evidence files uploaded for {policy.claim_count} claim(s). Upload via Claims &gt; Evidence to complete the record.</span>
+                                                </div>
+                                            )
+                                        })()}
+                                    </div>
+
+                                    <div className="wbm-section">
+                                        <h4>Key Drivers</h4>
+                                        <ul className="wbm-list">
+                                            {policy.loss_ratio > 80 && <li>Loss ratio exceeds 80% threshold - decline consideration</li>}
+                                            {policy.loss_ratio > 60 && policy.loss_ratio <= 80 && <li>Loss ratio in refer zone (60-80%)</li>}
+                                            {policy.claim_count >= 5 && <li>High claims frequency ({policy.claim_count} claims)</li>}
+                                            {policy.total_claims >= 100000 && <li>Total incurred exceeds $100K ({fmt(policy.total_claims)})</li>}
+                                            {policy.loss_ratio <= 60 && <li>Loss ratio within acceptable bounds ({policy.loss_ratio.toFixed(1)}%)</li>}
+                                            {policy.claim_count < 3 && <li>Low claims frequency ({policy.claim_count} claims)</li>}
+                                        </ul>
+                                    </div>
+
+                                    <div className="wbm-intel-cta">
+                                        <button className="wb-action-btn wb-action-btn--accent" onClick={() => { closeModal(); navigate(`/?policy=${modalPolicy}&output=analysis`) }}>
+                                            <Sparkles size={13} /> Deep Analyze in RiskMind
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )
+            })()}
         </div>
     )
 }

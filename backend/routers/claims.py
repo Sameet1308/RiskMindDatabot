@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 import httpx
 
 from database.connection import get_db
-from models.schemas import ClaimRecord, Policy, ClaimResponse, PolicyResponse
+from models.schemas import ClaimRecord, Policy, ClaimResponse, PolicyResponse, Document
 from routers.chat import _analyze_video, _analyze_image, _analyze_pdf
 
 router = APIRouter()
@@ -314,7 +314,32 @@ async def upload_claim_evidence(
     existing.append(evidence_item)
     claim.evidence_files = json.dumps(existing)
     db.add(claim)
+
+    # Also create a Document row (single source of truth for all uploads)
+    policy_num = None
+    if claim.policy_id:
+        pol_result = await db.execute(select(Policy).where(Policy.id == claim.policy_id))
+        pol = pol_result.scalar_one_or_none()
+        if pol:
+            policy_num = pol.policy_number
+    doc = Document(
+        filename=file.filename, file_path=file_path, file_type=file_type,
+        file_size=len(content), uploaded_by="demo_user",
+        analysis_summary=analysis,
+        policy_number=policy_num,
+        claim_number=claim.claim_number,
+    )
+    db.add(doc)
     await db.commit()
+
+    # Index analysis into ChromaDB so RAG can find it
+    if analysis and not analysis.startswith("Analysis error"):
+        try:
+            from services.vector_store import index_document
+            index_document(doc.id, file.filename, file_type, analysis,
+                           policy_number=policy_num or "", claim_number=claim.claim_number)
+        except Exception as e:
+            print(f"[Vector Store] document indexing skipped: {e}")
 
     return EvidenceUploadResponse(
         file_url=file_url,

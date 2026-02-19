@@ -22,6 +22,7 @@ class Policy(Base):
     premium = Column(Float)
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
+    policy_status = Column(String(20), default="active")  # active, expired, cancelled
     assigned_to = Column(String(255), nullable=True, index=True)  # user email
     created_at = Column(DateTime, default=datetime.utcnow)
     # Third-party enrichment columns
@@ -66,7 +67,6 @@ class ClaimRecord(Base):
     claim_date = Column(DateTime)
     claim_amount = Column(Float)
     claim_type = Column(String(100))
-    status = Column(String(50))
     status = Column(String(50))
     description = Column(Text)
     evidence_files = Column(Text, nullable=True)  # JSON string: [{"type": "image", "url": "...", "description": "..."}]
@@ -197,6 +197,9 @@ class Document(Base):
     file_size = Column(Integer, default=0)
     uploaded_by = Column(String(255), default="demo_user")
     analysis_summary = Column(Text, nullable=True)
+    policy_number = Column(String(50), nullable=True, index=True)
+    claim_number = Column(String(50), nullable=True, index=True)
+    session_id = Column(Integer, nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -206,7 +209,6 @@ class ClaimBase(BaseModel):
     claim_date: datetime
     claim_amount: float
     claim_type: str
-    status: str
     status: str
     description: Optional[str] = None
     evidence_files: Optional[str] = None

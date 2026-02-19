@@ -19,6 +19,7 @@ class PolicyListItem(BaseModel):
     premium: float
     effective_date: Optional[str] = None
     expiration_date: Optional[str] = None
+    policy_status: str = "active"
     claim_count: int = 0
     total_claims: float = 0
     loss_ratio: float = 0
@@ -42,6 +43,7 @@ async def list_policies(user_email: Optional[str] = None, db: AsyncSession = Dep
             p.premium,
             p.effective_date,
             p.expiration_date,
+            p.policy_status,
             p.latitude,
             p.longitude,
             COUNT(c.id) as claim_count,
@@ -60,7 +62,7 @@ async def list_policies(user_email: Optional[str] = None, db: AsyncSession = Dep
 
     policies = []
     for row in rows:
-        policy_num, holder, industry, premium, eff, exp, lat, lon, claim_count, total_claims, max_claim = row
+        policy_num, holder, industry, premium, eff, exp, pol_status, lat, lon, claim_count, total_claims, max_claim = row
         loss_ratio = (total_claims / premium * 100) if premium and premium > 0 else 0
 
         if max_claim >= 100000 or claim_count >= 5:
@@ -77,6 +79,7 @@ async def list_policies(user_email: Optional[str] = None, db: AsyncSession = Dep
             premium=premium,
             effective_date=str(eff) if eff else None,
             expiration_date=str(exp) if exp else None,
+            policy_status=pol_status or "active",
             claim_count=claim_count,
             total_claims=round(total_claims, 2),
             loss_ratio=round(loss_ratio, 2),
@@ -92,11 +95,14 @@ async def list_policies(user_email: Optional[str] = None, db: AsyncSession = Dep
 async def get_policy(policy_number: str, db: AsyncSession = Depends(get_db)):
     """Get detailed policy information including all claims."""
     # Get policy
-    result = await db.execute(text(f"""
-        SELECT p.policy_number, p.policyholder_name, p.industry_type, p.premium,
-               p.effective_date, p.expiration_date
-        FROM policies p WHERE p.policy_number = '{policy_number}'
-    """))
+    result = await db.execute(
+        text("""
+            SELECT p.policy_number, p.policyholder_name, p.industry_type, p.premium,
+                   p.effective_date, p.expiration_date
+            FROM policies p WHERE p.policy_number = :pn
+        """),
+        {"pn": policy_number},
+    )
     policy = result.fetchone()
 
     if not policy:
@@ -105,13 +111,16 @@ async def get_policy(policy_number: str, db: AsyncSession = Depends(get_db)):
     pol_num, holder, industry, premium, eff, exp = policy
 
     # Get claims
-    result = await db.execute(text(f"""
-        SELECT c.claim_number, c.claim_date, c.claim_amount, c.claim_type, c.status, c.description
-        FROM claims c
-        JOIN policies p ON c.policy_id = p.id
-        WHERE p.policy_number = '{policy_number}'
-        ORDER BY c.claim_date DESC
-    """))
+    result = await db.execute(
+        text("""
+            SELECT c.claim_number, c.claim_date, c.claim_amount, c.claim_type, c.status, c.description
+            FROM claims c
+            JOIN policies p ON c.policy_id = p.id
+            WHERE p.policy_number = :pn
+            ORDER BY c.claim_date DESC
+        """),
+        {"pn": policy_number},
+    )
     claims_rows = result.fetchall()
 
     claims = [
