@@ -21,6 +21,8 @@ from services.intent_engine import (
     _should_analyze_evidence,
     _auto_analyze_evidence,
     _build_citations,
+    POLICY_REGEX,
+    CLAIM_REGEX,
 )
 from services.vector_store import search_similar, search_knowledge
 from services.llm_providers import get_all_available, build_messages, build_mock_response
@@ -39,6 +41,7 @@ class AgentState(TypedDict, total=False):
     entities: dict
     canonical_intent: str
     output_type: str
+    out_of_scope: bool
     # after fetch_data
     data_context: str
     analysis_object: dict
@@ -63,18 +66,94 @@ class AgentState(TypedDict, total=False):
     final_response: dict
 
 
+# ── Out-of-Scope Detection ────────────────────────────────────
+
+_OFF_TOPIC_PATTERNS = {
+    # General knowledge / chitchat
+    "weather", "forecast", "temperature today",
+    "recipe", "cooking", "ingredients",
+    "sports", "football", "basketball", "soccer", "cricket", "baseball",
+    "movie", "film", "netflix", "tv show", "music", "song",
+    "stock market", "crypto", "bitcoin", "forex", "trading",
+    "travel", "vacation", "hotel", "flight",
+    "game", "gaming", "video game",
+    "joke", "tell me a joke", "funny",
+    "write a poem", "write a story", "write code",
+    "translate", "what language",
+    "math problem", "solve this equation", "calculate",
+    "who is the president", "capital of", "population of",
+    "define ", "what is a ",
+    "news today", "latest news",
+    "homework", "assignment",
+    "personal advice", "relationship",
+    "health advice", "medical", "diagnosis", "symptoms",
+}
+
+def _is_out_of_scope(message: str) -> bool:
+    """Detect questions clearly outside insurance/underwriting domain."""
+    lower = message.lower().strip()
+    # Check against off-topic patterns
+    if any(pat in lower for pat in _OFF_TOPIC_PATTERNS):
+        # But allow insurance-adjacent uses of these words
+        _INSURANCE_CONTEXT = {
+            "policy", "claim", "premium", "underwriting", "risk",
+            "insurance", "portfolio", "loss", "coverage", "renewal",
+            "guideline", "evidence", "decision", "broker", "insured",
+        }
+        if any(ctx in lower for ctx in _INSURANCE_CONTEXT):
+            return False  # Has insurance context — allow it
+        return True
+    return False
+
+
 # ══════════════════════════════════════════════════════════════
 # NODE  1 — Route Intent
 # ══════════════════════════════════════════════════════════════
 
+def _resolve_entity_from_history(history: list, payload: dict) -> dict:
+    """If the current message has no policy/claim entity, scan recent history
+    messages to carry forward the last mentioned entity (conversational context)."""
+    entities = payload["entities"]
+    if entities.get("policy_number") or entities.get("claim_number"):
+        return payload  # already resolved
+
+    # Scan last 6 messages (newest first) for COMM-* or CLM-* patterns
+    for msg in reversed(history[-6:]):
+        content = msg.get("content", "")
+        policy_match = POLICY_REGEX.search(content)
+        claim_match = CLAIM_REGEX.search(content)
+        if policy_match or claim_match:
+            if policy_match:
+                entities["policy_number"] = policy_match.group(1).upper()
+                entities["entity"] = "policy"
+            if claim_match:
+                entities["claim_number"] = claim_match.group(1).upper()
+                if not policy_match:
+                    entities["entity"] = "claim"
+            # Update intent to match the resolved entity
+            if entities.get("policy_number"):
+                payload["intent"] = "policy_risk_summary"
+            elif entities.get("claim_number"):
+                payload["intent"] = "claim_summary"
+            payload["entities"] = entities
+            break
+
+    return payload
+
+
 def route_intent_node(state: AgentState) -> dict:
-    """Keyword-based intent classification (no LLM)."""
+    """Keyword-based intent classification (no LLM).
+    Resolves entity from conversation history when current message has none.
+    Detects out-of-scope questions before they reach the LLM."""
     payload = _route_intent(state["message"])
+    payload = _resolve_entity_from_history(state.get("history", []), payload)
+    out_of_scope = _is_out_of_scope(state["message"])
     return {
         "intent_payload": payload,
         "entities": payload["entities"],
         "canonical_intent": payload["canonical_intent"],
         "output_type": payload["output_type"],
+        "out_of_scope": out_of_scope,
     }
 
 
@@ -204,6 +283,31 @@ def check_confidence_node(state: AgentState) -> dict:
     message = state["message"]
     entities = state["entities"]
 
+    # Out-of-scope → immediate rejection (no LLM call)
+    if state.get("out_of_scope"):
+        provenance = dict(analysis_object.get("provenance", {}))
+        provenance["confidence"] = 0
+        provenance["confidence_reason_codes"] = ["out_of_scope"]
+        analysis_object["provenance"] = provenance
+        return {
+            "confidence": 0,
+            "clarification_needed": True,
+            "suggested_intents": [
+                {"label": "Portfolio overview", "intent": "portfolio_summary", "icon": "chart",
+                 "example": "Show me the portfolio overview"},
+                {"label": "High risk policies", "intent": "policy_risk_summary", "icon": "alert",
+                 "example": "Which policies are high risk?"},
+                {"label": "Claims analysis", "intent": "claim_summary", "icon": "file",
+                 "example": "Show the claims breakdown by type"},
+            ],
+            "show_canvas_summary": False,
+            "suggest_canvas_view": False,
+            "show_evidence": False,
+            "analysis_object": analysis_object,
+            "output_type": "analysis",
+            "out_of_scope": True,
+        }
+
     confidence, reason_codes = _estimate_confidence(intent, analysis_object, message, entities)
 
     provenance = dict(analysis_object.get("provenance", {}))
@@ -259,10 +363,10 @@ def check_confidence_node(state: AgentState) -> dict:
     msg_lower = message.lower()
     show_evidence = any(kw in msg_lower for kw in _EVIDENCE_KEYWORDS)
 
-    # If user typed ONLY "evidence" (1-2 words, no context) with no entity → clarify
-    # Phrases like "show evidence for high risk" should NOT be penalized
+    # If user asked for evidence but no entity resolved (even after history scan) → clarify
+    # Phrases like "show evidence for high risk" (5+ words) proceed; short vague ones get clarified
     word_count = len(message.split())
-    if show_evidence and not entities.get("policy_number") and not entities.get("claim_number") and word_count <= 2:
+    if show_evidence and not entities.get("policy_number") and not entities.get("claim_number") and word_count <= 5:
         evidence_items = analysis_object.get("evidence", [])
         if not evidence_items or all(
             (e.get("type") == "evidence" and not e.get("url")) for e in evidence_items
@@ -311,6 +415,15 @@ def check_confidence_node(state: AgentState) -> dict:
 # ══════════════════════════════════════════════════════════════
 
 def clarify_node(state: AgentState) -> dict:
+    if state.get("out_of_scope"):
+        return {
+            "response_text": (
+                "I'm **RiskMind**, your underwriting co-pilot. "
+                "I'm designed to help with **insurance risk assessment, claims analysis, and portfolio management**.\n\n"
+                "I can't assist with that topic. Here's what I can help with:"
+            ),
+            "provider": "guardrail",
+        }
     return {
         "response_text": (
             "I'm not entirely sure what you're looking for. "
@@ -519,6 +632,7 @@ async def run_agent_pipeline(
         "entities": {},
         "canonical_intent": "Understand",
         "output_type": "analysis",
+        "out_of_scope": False,
         "data_context": "",
         "analysis_object": {},
         "guideline_context": "",
