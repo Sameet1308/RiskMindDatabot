@@ -13,23 +13,23 @@
   --danger-light: #fee2e2;
   --purple: #7c3aed;
   --purple-light: #f3f0ff;
-  --background: #f6f4f5;
+  --background: #f8f9fa;
   --surface: #ffffff;
-  --surface-alt: #faf8f9;
-  --surface-warm: #fdf9fa;
-  --border: #e8e2e4;
-  --border-dark: #d4cdd0;
+  --surface-alt: #fafbfc;
+  --surface-warm: #fdfdfe;
+  --border: #e9ecef;
+  --border-dark: #dee2e6;
   --bg-card: #ffffff;
-  --bg-secondary: #faf8f9;
-  --bg-hover: #f5f1f3;
-  --bg: #faf8f9;
-  --bg-light: #f6f3f4;
-  --bg-muted: #f5f2f3;
+  --bg-secondary: #f8f9fa;
+  --bg-hover: #f1f3f5;
+  --bg: #f8f9fa;
+  --bg-light: #f5f6f8;
+  --bg-muted: #f1f3f5;
   --card: #ffffff;
-  --text: #1a1520;
-  --text-secondary: #4a4252;
-  --text-muted: #6b6074;
-  --text-light: #9a8fa3;
+  --text: #1a1a2e;
+  --text-secondary: #495057;
+  --text-muted: #6c757d;
+  --text-light: #adb5bd;
 }
 
 * {
@@ -52,7 +52,7 @@ body,
 
 body {
   font-family: "Inter", "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: linear-gradient(160deg, #f6f3f5 0%, #f4f1f6 40%, #f5f2f4 100%);
+  background: #f8f9fa;
   color: var(--text);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -73,6 +73,7 @@ body {
   width: 100%;
   padding: 0.75rem;
   overflow: hidden;
+  background: #ffffff;
 }
 
 @media (min-width: 1280px) {
@@ -84,9 +85,9 @@ body {
 
 /* ==================== HEADER ==================== */
 .app-header {
-  background: linear-gradient(135deg, #ffffff 0%, #fdfbfc 35%, #faf7f8 70%, #ffffff 100%);
+  background: #ffffff;
   border-bottom: 1px solid var(--border);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04), 0 0 16px rgba(255, 90, 95, 0.03);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -322,13 +323,13 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  background: linear-gradient(135deg, #fafbff 0%, #f5f0f8 40%, #f8f5fa 70%, #fafbff 100%);
+  background: #ffffff;
   flex-shrink: 0;
 }
 
 .panel-header.chat-header {
   padding: 0.75rem 1rem;
-  background: linear-gradient(135deg, #ffffff 0%, #fdfbfc 40%, #faf7f9 70%, #ffffff 100%);
+  background: #ffffff;
   border-bottom: 1px solid var(--border);
   border-radius: 0.85rem 0.85rem 0 0;
 }
@@ -597,7 +598,7 @@ body {
   gap: 0.75rem;
   flex: 1;
   overflow-y: auto;
-  background: linear-gradient(180deg, var(--surface-warm) 0%, var(--bg-light) 100%);
+  background: #ffffff;
 }
 
 .panel-footer {
@@ -784,9 +785,9 @@ button.send-button svg {
 /* ── Glass Box Panel ── */
 .gb-panel {
   margin-top: 1rem;
-  border: 1px solid rgba(255, 90, 95, 0.12);
+  border: 1px solid var(--border);
   border-radius: 0.75rem;
-  background: linear-gradient(135deg, #fdf9fa 0%, #faf5f8 50%, #f8f4f9 100%);
+  background: #ffffff;
   overflow: hidden;
 }
 .gb-header {
@@ -794,8 +795,8 @@ button.send-button svg {
   align-items: center;
   justify-content: space-between;
   padding: 0.75rem 1rem;
-  background: linear-gradient(135deg, rgba(255,90,95,0.05), rgba(168,85,247,0.04));
-  border-bottom: 1px solid rgba(255, 90, 95, 0.08);
+  background: linear-gradient(135deg, #fafbfc, #f5f6f8);
+  border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
   gap: 0.5rem;
 }
@@ -2072,7 +2073,7 @@ button.send-button svg {
   color: var(--text-muted);
   display: grid;
   gap: 0.75rem;
-  background: linear-gradient(135deg, rgba(255, 90, 95, 0.02), rgba(168, 85, 247, 0.02));
+  background: #fafbfc;
 }
 
 .canvas-empty h3 {
@@ -2156,7 +2157,7 @@ button.send-button svg {
 .focus-drawer {
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
   padding: 0.6rem 0.75rem;
-  background: linear-gradient(135deg, #fff9f5 0%, #fef5f0 50%, #fff8f5 100%);
+  background: linear-gradient(135deg, #ffffff 0%, #fafbfc 50%, #f8f9fa 100%);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -2210,7 +2211,7 @@ button.send-button svg {
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  background: linear-gradient(135deg, #fdfafa 0%, #f9f5f7 50%, #f7f3f8 100%);
+  background: linear-gradient(135deg, #fefefe 0%, #fafbfc 50%, #f8f9fb 100%);
 }
 
 .canvas-card-header h3 {
