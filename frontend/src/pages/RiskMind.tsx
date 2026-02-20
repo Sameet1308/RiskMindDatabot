@@ -136,12 +136,20 @@ const suggestedPromptGroups = [
 const policyRegex = /(COMM-\d{4}-\d{3}|P-\d{4})/i
 const claimRegex = /(CLM-\d{4}-\d{3})/i
 
-const inferOutputType = (text: string): CanvasMode => {
+const inferOutputType = (text: string): CanvasMode | null => {
     const lower = text.toLowerCase()
-    if (['map', 'geo', 'geography', 'spatial', 'geospatial', 'region'].some(kw => lower.includes(kw))) return 'geo_map'
-    if (lower.includes('memo') || lower.includes('draft') || lower.includes('document')) return 'memo'
-    if (lower.includes('decision') || lower.includes('renew') || lower.includes('accept') || lower.includes('decline') || lower.includes('refer')) return 'decision'
-    return 'analysis'
+    const words = lower.split(/\s+/)
+    // Only infer geo_map if geo keywords appear as clear intent (not incidental mentions)
+    if (['map', 'geospatial', 'geography'].some(kw => words.includes(kw)) ||
+        (lower.includes('geo') && lower.includes('risk'))) return 'geo_map'
+    // Only infer memo if it's clearly a request to draft/generate one
+    if ((lower.includes('memo') || lower.includes('draft memo')) &&
+        (lower.includes('draft') || lower.includes('generate') || lower.includes('write') || lower.includes('create'))) return 'memo'
+    // Only infer decision if the user is clearly asking for a decision/recommendation
+    if ((lower.includes('decision') || lower.includes('should we')) &&
+        (lower.includes('renew') || lower.includes('accept') || lower.includes('decline'))) return 'decision'
+    // Don't guess — let the backend decide
+    return null
 }
 
 const mapOutputType = (type: string): CanvasMode => {
@@ -161,7 +169,12 @@ const saveItem = (item: SavedItem) => {
 export default function RiskMind() {
     const navigate = useNavigate()
     const [searchParams] = useSearchParams()
-    const _restored = loadChatState()
+    // Only restore chat state if it belongs to the current user
+    const _rawRestored = loadChatState()
+    const _currentEmail = (() => { try { return JSON.parse(localStorage.getItem('riskmind_user') || '{}').email } catch { return null } })()
+    const _restored = (_rawRestored && _rawRestored.userEmail === _currentEmail) ? _rawRestored : null
+    // Clear stale state from a different user
+    if (_rawRestored && !_restored) sessionStorage.removeItem('riskmind_chat_state')
     const [messages, setMessages] = useState<Message[]>(_restored?.messages || [])
     const [input, setInput] = useState('')
     const [loading, setLoading] = useState(false)
@@ -224,6 +237,7 @@ export default function RiskMind() {
             activeSessionId,
             showCanvasSummary,
             memo,
+            userEmail: _currentEmail || null,
         })
     }, [messages, canvasMode, canvasNarrative, activePolicy, activeClaim, activeSubmission,
         analysisObject, inferredIntent, inferredOutputType, provenance, intentConfidence,
@@ -449,8 +463,12 @@ export default function RiskMind() {
         if (claimMatch) setActiveClaim(claimMatch[1].toUpperCase())
 
         const inferredType = inferOutputType(userMessage)
-        setCanvasMode(inferredType)
-        setInferredOutputType(inferredType)
+        // Only set canvas eagerly if we have a strong signal (geo_map, memo, decision)
+        // Otherwise keep current canvas and let backend decide
+        if (inferredType) {
+            setCanvasMode(inferredType)
+            setInferredOutputType(inferredType)
+        }
         setCanvasNarrative('RiskMind is processing your request...')
         setMessages(prev => [...prev, { id: Date.now(), role: 'user', content: userMessage, timestamp: new Date() }])
         setInput('')
@@ -463,7 +481,7 @@ export default function RiskMind() {
             const artifactData = response.artifact?.data || response.analysis_object
             if (artifactData) setAnalysisObject(artifactData)
 
-            const responseOutput = mapOutputType(response.output_type || inferredType)
+            const responseOutput = mapOutputType(response.output_type || inferredType || 'analysis')
             const responseIntent = response.inferred_intent || response.analysis_object?.context?.intent || ''
             setInferredIntent(responseIntent)
 

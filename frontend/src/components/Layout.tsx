@@ -9,6 +9,7 @@ export default function Layout() {
 
     const handleLogout = () => {
         localStorage.removeItem('riskmind_user')
+        sessionStorage.removeItem('riskmind_chat_state')
         navigate('/login')
     }
 
