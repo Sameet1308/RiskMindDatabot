@@ -1,0 +1,1224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RiskMind Test Playbook</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0f172a;--card:#1e293b;--accent:#ff5a5f;--blue:#60a5fa;--purple:#a78bfa;--green:#34d399;--amber:#fbbf24;--text:#e2e8f0;--muted:#94a3b8;--border:rgba(148,163,184,0.15);--pass:#22c55e;--fail:#ef4444}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;overflow-x:hidden}
+
+/* ── Top Bar ── */
+.topbar{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(15,23,42,0.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0.6rem 1.5rem;display:flex;align-items:center;justify-content:space-between}
+.topbar h1{font-size:1rem;font-weight:700;background:linear-gradient(135deg,var(--accent),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.topbar-right{display:flex;align-items:center;gap:1rem}
+.score{font-family:'Courier New',monospace;font-size:1rem;font-weight:700}
+.score-pass{color:var(--pass)}
+.score-fail{color:var(--fail)}
+.score-total{color:var(--blue)}
+.btn-reset{background:none;border:1px solid var(--border);color:var(--muted);padding:0.25rem 0.7rem;border-radius:6px;cursor:pointer;font-size:0.75rem}
+.btn-reset:hover{color:var(--text);border-color:var(--accent)}
+.progress-bar{position:fixed;top:52px;left:0;right:0;height:3px;background:var(--border);z-index:99}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--pass),var(--blue));transition:width 0.4s ease;width:0%}
+
+/* ── Navigation ── */
+.nav{position:fixed;left:0;top:55px;bottom:0;width:240px;background:rgba(15,23,42,0.98);border-right:1px solid var(--border);overflow-y:auto;padding:1rem 0;z-index:50}
+.nav-phase{padding:0.6rem 1rem 0.25rem;font-size:0.6rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--accent);font-weight:700;margin-top:0.5rem}
+.nav-phase:first-child{margin-top:0}
+.nav-item{display:flex;align-items:center;gap:0.5rem;padding:0.4rem 1rem;font-size:0.78rem;color:var(--muted);cursor:pointer;border-left:3px solid transparent;transition:all 0.2s}
+.nav-item:hover{color:var(--text);background:rgba(96,165,250,0.05)}
+.nav-item.active{color:var(--blue);border-left-color:var(--blue);background:rgba(96,165,250,0.08)}
+.nav-item .nav-count{margin-left:auto;font-size:0.65rem;opacity:0.6}
+.nav-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:var(--border)}
+.nav-dot.done{background:var(--pass)}
+.nav-dot.partial{background:var(--amber)}
+
+/* ── Main ── */
+.main{margin-left:240px;margin-top:55px;padding:2rem 2.5rem 4rem}
+
+/* ── Phase Header ── */
+.phase{margin-bottom:2.5rem;scroll-margin-top:70px}
+.phase-header{display:flex;align-items:center;gap:0.75rem;margin-bottom:1.25rem}
+.phase-num{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--purple));display:flex;align-items:center;justify-content:center;font-size:0.85rem;font-weight:800;flex-shrink:0}
+.phase-title{font-size:1.25rem;font-weight:700}
+.phase-badge{margin-left:auto;font-size:0.7rem;background:var(--card);padding:0.2rem 0.6rem;border-radius:999px;color:var(--muted)}
+
+/* ── Test Card ── */
+.test{background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:0.75rem;overflow:hidden;transition:border-color 0.3s}
+.test.pass{border-color:rgba(34,197,94,0.4)}
+.test.fail{border-color:rgba(239,68,68,0.4)}
+.test-header{padding:0.7rem 1rem;display:flex;align-items:center;gap:0.6rem;cursor:pointer;user-select:none}
+.test-header:hover{background:rgba(96,165,250,0.04)}
+.test-id{font-size:0.65rem;font-weight:700;text-transform:uppercase;padding:0.15rem 0.45rem;border-radius:4px;letter-spacing:0.05em;background:rgba(96,165,250,0.15);color:var(--blue);white-space:nowrap}
+.test-label{font-size:0.88rem;font-weight:600;flex:1}
+.test-actions{display:flex;gap:0.35rem;margin-left:auto}
+.btn-pass,.btn-fail{width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:none;cursor:pointer;font-size:0.85rem;display:flex;align-items:center;justify-content:center;transition:all 0.2s}
+.btn-pass:hover{background:rgba(34,197,94,0.15);border-color:var(--pass)}
+.btn-fail:hover{background:rgba(239,68,68,0.15);border-color:var(--fail)}
+.btn-pass.active{background:rgba(34,197,94,0.25);border-color:var(--pass);color:var(--pass)}
+.btn-fail.active{background:rgba(239,68,68,0.25);border-color:var(--fail);color:var(--fail)}
+.test-chevron{transition:transform 0.2s;color:var(--muted);font-size:0.75rem}
+.test.open .test-chevron{transform:rotate(90deg)}
+.test-body{display:none;padding:0 1rem 1rem;border-top:1px solid var(--border)}
+.test.open .test-body{display:block}
+
+/* ── Content Blocks ── */
+.action-block{background:rgba(96,165,250,0.06);border-left:3px solid var(--blue);padding:0.6rem 1rem;border-radius:0 8px 8px 0;margin:0.6rem 0;font-size:0.85rem}
+.action-block strong{color:var(--blue)}
+.cmd-block{background:rgba(167,139,250,0.08);border-left:3px solid var(--purple);padding:0.6rem 1rem;border-radius:0 8px 8px 0;margin:0.6rem 0;font-size:0.85rem}
+.cmd-block code{background:rgba(167,139,250,0.15);padding:0.15rem 0.5rem;border-radius:4px;font-size:0.82rem;color:var(--purple);font-family:'Courier New',monospace}
+.expect-block{background:rgba(52,211,153,0.06);border-left:3px solid var(--green);padding:0.6rem 1rem;border-radius:0 8px 8px 0;margin:0.6rem 0;font-size:0.83rem;line-height:1.7}
+.expect-block .check{display:flex;align-items:flex-start;gap:0.5rem;margin:0.2rem 0}
+.expect-block .check input[type=checkbox]{margin-top:0.3rem;accent-color:var(--pass);width:14px;height:14px;flex-shrink:0}
+.api-tag{display:inline-block;font-size:0.7rem;font-weight:600;padding:0.12rem 0.5rem;border-radius:4px;background:rgba(255,90,95,0.12);color:var(--accent);font-family:'Courier New',monospace;margin-top:0.4rem}
+.intent-tag{display:inline-block;font-size:0.7rem;font-weight:600;padding:0.12rem 0.5rem;border-radius:4px;background:rgba(167,139,250,0.12);color:var(--purple);margin-top:0.2rem}
+.tip{display:inline-block;background:rgba(251,191,36,0.12);color:var(--amber);font-size:0.75rem;padding:0.15rem 0.5rem;border-radius:4px;font-weight:600;margin:0.4rem 0}
+
+/* ── Pre-Flight ── */
+.preflight{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1rem 1.25rem;margin-bottom:2rem}
+.preflight h3{font-size:0.9rem;color:var(--accent);margin-bottom:0.6rem;font-weight:700}
+.preflight table{width:100%;border-collapse:collapse;font-size:0.8rem}
+.preflight th{text-align:left;padding:0.4rem 0.6rem;color:var(--muted);border-bottom:1px solid var(--border);font-weight:600}
+.preflight td{padding:0.4rem 0.6rem;border-bottom:1px solid rgba(148,163,184,0.08)}
+.preflight code{background:rgba(96,165,250,0.1);padding:0.1rem 0.35rem;border-radius:3px;font-size:0.75rem;color:var(--blue)}
+
+/* ── Scoring Table ── */
+.scoring{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.25rem;margin-top:2rem}
+.scoring h3{font-size:1rem;color:var(--accent);margin-bottom:0.8rem;font-weight:700}
+.scoring table{width:100%;border-collapse:collapse;font-size:0.85rem}
+.scoring th{text-align:left;padding:0.5rem 0.75rem;color:var(--muted);border-bottom:1px solid var(--border);font-weight:600}
+.scoring td{padding:0.5rem 0.75rem;border-bottom:1px solid rgba(148,163,184,0.08)}
+.scoring .s-pass{color:var(--pass);font-weight:700;font-family:'Courier New',monospace}
+.scoring .s-fail{color:var(--fail);font-weight:700;font-family:'Courier New',monospace}
+.scoring tr:last-child{font-weight:700;border-top:2px solid var(--border)}
+.scoring tr:last-child td{padding-top:0.75rem}
+
+/* ── Curl Section ── */
+.curl-section{background:var(--card);border:1px solid var(--border);border-radius:12px;margin-top:2rem;overflow:hidden}
+.curl-header{padding:0.7rem 1rem;cursor:pointer;display:flex;align-items:center;gap:0.5rem;user-select:none}
+.curl-header:hover{background:rgba(96,165,250,0.04)}
+.curl-header h3{font-size:0.9rem;color:var(--blue);font-weight:700}
+.curl-header .chevron{margin-left:auto;color:var(--muted);transition:transform 0.2s;font-size:0.75rem}
+.curl-section.open .curl-header .chevron{transform:rotate(90deg)}
+.curl-body{display:none;padding:0 1rem 1rem;border-top:1px solid var(--border)}
+.curl-section.open .curl-body{display:block}
+.curl-body pre{background:#0c1222;border:1px solid var(--border);border-radius:8px;padding:1rem;font-size:0.78rem;line-height:1.6;overflow-x:auto;color:var(--muted)}
+.curl-body pre .hl{color:var(--green)}
+.curl-body pre .cm{color:#555}
+
+/* ── Capabilities Table ── */
+.caps{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.25rem;margin-top:2rem}
+.caps h3{font-size:1rem;color:var(--accent);margin-bottom:0.8rem;font-weight:700}
+.caps table{width:100%;border-collapse:collapse;font-size:0.82rem}
+.caps th{text-align:left;padding:0.5rem 0.6rem;color:var(--muted);border-bottom:1px solid var(--border);font-weight:600}
+.caps td{padding:0.5rem 0.6rem;border-bottom:1px solid rgba(148,163,184,0.08)}
+.caps td:first-child{color:var(--blue);font-weight:700;width:30px}
+.caps td:nth-child(2){color:var(--text);font-weight:600}
+
+/* ── Responsive ── */
+@media(max-width:768px){
+  .nav{display:none}
+  .main{margin-left:0;padding:1.5rem 1rem}
+}
+</style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<div class="topbar">
+  <h1>RiskMind Test Playbook</h1>
+  <div class="topbar-right">
+    <span class="score"><span class="score-pass" id="passCount">0</span> / <span class="score-fail" id="failCount">0</span> / <span class="score-total" id="totalCount">38</span></span>
+    <button class="btn-reset" onclick="resetAll()">Reset All</button>
+  </div>
+</div>
+<div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+
+<!-- Side Nav -->
+<nav class="nav" id="sideNav">
+  <div class="nav-phase">Pre-Flight</div>
+  <div class="nav-item" data-phase="preflight"><span class="nav-dot" id="dot-preflight"></span>Pre-Flight Checklist<span class="nav-count">3</span></div>
+  <div class="nav-phase">Product Tests</div>
+  <div class="nav-item" data-phase="p1"><span class="nav-dot" id="dot-p1"></span>Auth & Connector<span class="nav-count">3</span></div>
+  <div class="nav-item" data-phase="p2"><span class="nav-dot" id="dot-p2"></span>Welcome Canvas<span class="nav-count">2</span></div>
+  <div class="nav-item" data-phase="p3"><span class="nav-dot" id="dot-p3"></span>Core Intents<span class="nav-count">8</span></div>
+  <div class="nav-item" data-phase="p4"><span class="nav-dot" id="dot-p4"></span>Conversational Intel<span class="nav-count">3</span></div>
+  <div class="nav-item" data-phase="p5"><span class="nav-dot" id="dot-p5"></span>Glass Box<span class="nav-count">3</span></div>
+  <div class="nav-item" data-phase="p6"><span class="nav-dot" id="dot-p6"></span>Document Upload<span class="nav-count">2</span></div>
+  <div class="nav-item" data-phase="p7"><span class="nav-dot" id="dot-p7"></span>Save & Export<span class="nav-count">3</span></div>
+  <div class="nav-item" data-phase="p8"><span class="nav-dot" id="dot-p8"></span>Workbench<span class="nav-count">5</span></div>
+  <div class="nav-item" data-phase="p9"><span class="nav-dot" id="dot-p9"></span>Analytics<span class="nav-count">5</span></div>
+  <div class="nav-item" data-phase="p10"><span class="nav-dot" id="dot-p10"></span>Session & Guardrails<span class="nav-count">3</span></div>
+  <div class="nav-item" data-phase="p11"><span class="nav-dot" id="dot-p11"></span>RBAC<span class="nav-count">1</span></div>
+  <div class="nav-phase">Reference</div>
+  <div class="nav-item" data-phase="scoring"><span class="nav-dot"></span>Scoring<span class="nav-count"></span></div>
+  <div class="nav-item" data-phase="curl"><span class="nav-dot"></span>API Smoke Tests<span class="nav-count"></span></div>
+  <div class="nav-item" data-phase="caps"><span class="nav-dot"></span>Capabilities<span class="nav-count">13</span></div>
+</nav>
+
+<!-- Main Content -->
+<div class="main" id="mainContent">
+
+<!-- ══════════════════════════════════ -->
+<!-- PRE-FLIGHT                         -->
+<!-- ══════════════════════════════════ -->
+<div class="phase" id="preflight">
+  <div class="phase-header">
+    <div class="phase-num">0</div>
+    <div class="phase-title">Pre-Flight Checklist</div>
+    <div class="phase-badge">Before demo</div>
+  </div>
+  <div class="preflight">
+    <h3>Environment Checks</h3>
+    <table>
+      <tr><th>#</th><th>Check</th><th>Command</th><th>Expected</th></tr>
+      <tr><td>0a</td><td>Backend running</td><td><code>curl .../health</code></td><td><code>{"status":"healthy","llm_active":true}</code></td></tr>
+      <tr><td>0b</td><td>Data status</td><td><code>curl .../api/data/status</code></td><td>6 tables, 145+ records, 122+ vectors</td></tr>
+      <tr><td>0c</td><td>Frontend loads</td><td>Open <code>riskmind.onrender.com</code></td><td>Redirects to <code>/login</code></td></tr>
+    </table>
+    <div class="tip" style="margin-top:0.75rem">Re-seed on Render: Shell tab &rarr; cd /app && python seed_data.py</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ -->
+<!-- PHASE 1: AUTH & CONNECTOR          -->
+<!-- ══════════════════════════════════ -->
+<div class="phase" id="p1">
+  <div class="phase-header">
+    <div class="phase-num">1</div>
+    <div class="phase-title">Authentication & Data Connector</div>
+    <div class="phase-badge">3 tests</div>
+  </div>
+
+  <div class="test" data-test="1">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 1</span>
+      <span class="test-label">User Login</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(1,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(1,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="action-block"><strong>Action:</strong> Open <code>/login</code></div>
+      <div class="cmd-block"><strong>Steps:</strong> Click "Sarah Mitchell" tile &rarr; type <code>sarah123</code> &rarr; click "Sign in"</div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> Login screen shows 2 user tiles (Sarah, James)</div>
+        <div class="check"><input type="checkbox"> Email field auto-fills on tile click</div>
+        <div class="check"><input type="checkbox"> Successful login redirects to Data Connector screen</div>
+      </div>
+      <div class="api-tag">POST /api/auth/login &rarr; {email, full_name, role, assigned_policies}</div>
+    </div>
+  </div>
+
+  <div class="test" data-test="2">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 2</span>
+      <span class="test-label">Data Connector Splash</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(2,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(2,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="action-block"><strong>Action:</strong> Observe the Data Connector after login</div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> 4-step animated progress: Connecting &rarr; Schema &rarr; Indexing &rarr; Context</div>
+        <div class="check"><input type="checkbox"> Each step shows green checkmark when done</div>
+        <div class="check"><input type="checkbox"> Step metadata: db name, "6 tables found", vector count, record count</div>
+        <div class="check"><input type="checkbox"> Database selector: SQLite (active), PostgreSQL/Snowflake/Oracle (disabled)</div>
+        <div class="check"><input type="checkbox"> "Continue to RiskMind" button appears when all steps complete</div>
+      </div>
+      <div class="api-tag">GET /api/data/status &rarr; table counts + ChromaDB status</div>
+    </div>
+  </div>
+
+  <div class="test" data-test="3">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 3</span>
+      <span class="test-label">Schema Preview</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(3,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(3,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="action-block"><strong>Action:</strong> Click the "Schema discovered" expander on the Data Connector</div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> Expandable grid shows all 6 tables: Policies, Claims, Decisions, Guidelines, Documents, Users</div>
+        <div class="check"><input type="checkbox"> Each row shows: table name, description, row count, column count</div>
+        <div class="check"><input type="checkbox"> Summary strip: "145 Records | 6 Tables | 122 AI Indexed"</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ -->
+<!-- PHASE 2: WELCOME CANVAS            -->
+<!-- ══════════════════════════════════ -->
+<div class="phase" id="p2">
+  <div class="phase-header">
+    <div class="phase-num">2</div>
+    <div class="phase-title">Welcome Canvas & Quick Actions</div>
+    <div class="phase-badge">2 tests</div>
+  </div>
+
+  <div class="test" data-test="4">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 4</span>
+      <span class="test-label">Empty Canvas (Welcome State)</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(4,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(4,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="action-block"><strong>Action:</strong> Observe the main RiskMind page after Data Connector</div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> Left panel: Chat input with composer</div>
+        <div class="check"><input type="checkbox"> Right panel: Welcome hero text</div>
+        <div class="check"><input type="checkbox"> 5 quick-action prompt groups: Understand, Analyze, Decide, Document, Explore</div>
+        <div class="check"><input type="checkbox"> Each group has clickable prompt buttons</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="test" data-test="5">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 5</span>
+      <span class="test-label">Prompt Library</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(5,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(5,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="action-block"><strong>Action:</strong> Click the "Prompt Library" toggle in the chat panel</div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> Collapsible section expands with pre-built prompts</div>
+        <div class="check"><input type="checkbox"> Groups: Understand, Analyze, Decide, Document, Explore</div>
+        <div class="check"><input type="checkbox"> Clicking any prompt populates the chat input field</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ -->
+<!-- PHASE 3: CORE INTENTS              -->
+<!-- ══════════════════════════════════ -->
+<div class="phase" id="p3">
+  <div class="phase-header">
+    <div class="phase-num">3</div>
+    <div class="phase-title">Chat Intelligence &mdash; Core Intents</div>
+    <div class="phase-badge">8 tests</div>
+  </div>
+
+  <div class="test" data-test="6">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 6</span>
+      <span class="test-label">UNDERSTAND Intent (Policy Risk)</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(6,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(6,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="cmd-block">Type: <code>Why is COMM-2024-016 considered high risk?</code></div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> Canvas switches to <code>analysis</code> mode</div>
+        <div class="check"><input type="checkbox"> 4 KPI tiles: Policy Number, Claims Count, Total Loss, Loss Ratio</div>
+        <div class="check"><input type="checkbox"> Key Drivers bullet list (claim severity, frequency, etc.)</div>
+        <div class="check"><input type="checkbox"> AI narrative in chat (markdown formatted)</div>
+        <div class="check"><input type="checkbox"> Sources shown below chat message (guideline section codes)</div>
+      </div>
+      <div class="intent-tag">policy_risk_summary &rarr; Understand &rarr; analysis</div>
+    </div>
+  </div>
+
+  <div class="test" data-test="7">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 7</span>
+      <span class="test-label">UNDERSTAND Intent (Portfolio)</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(7,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(7,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="cmd-block">Type: <code>Give me a portfolio risk overview</code></div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> Canvas shows portfolio-level narrative (no KPI cards)</div>
+        <div class="check"><input type="checkbox"> AI narrative covers: risk distribution, top industries, high-risk policies</div>
+        <div class="check"><input type="checkbox"> Data scoped to Sarah's 10 assigned policies (RBAC)</div>
+      </div>
+      <div class="intent-tag">portfolio_summary &rarr; Understand &rarr; analysis</div>
+    </div>
+  </div>
+
+  <div class="test" data-test="8">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 8</span>
+      <span class="test-label">ANALYZE Intent (Ad-hoc Query)</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(8,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(8,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="cmd-block">Type: <code>What are the top 5 claims by amount?</code></div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> Canvas shows analysis with markdown narrative</div>
+        <div class="check"><input type="checkbox"> Response lists specific claim numbers with amounts</div>
+        <div class="check"><input type="checkbox"> Data pulled from pre-computed snapshot</div>
+      </div>
+      <div class="intent-tag">ad_hoc_query &rarr; Analyze &rarr; analysis</div>
+    </div>
+  </div>
+
+  <div class="test" data-test="9">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 9</span>
+      <span class="test-label">DECIDE Intent (Renewal Decision)</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(9,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(9,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="cmd-block">Type: <code>Should we renew COMM-2024-016? Give me a decision-ready card.</code></div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> Canvas switches to <code>decision</code> mode</div>
+        <div class="check"><input type="checkbox"> AI recommendation shown (based on loss ratio thresholds)</div>
+        <div class="check"><input type="checkbox"> 3 action buttons: Accept (green), Refer (amber), Decline (red)</div>
+        <div class="check"><input type="checkbox"> Optional notes text field</div>
+      </div>
+      <div class="intent-tag">policy_risk_summary &rarr; Decide &rarr; decision</div>
+    </div>
+  </div>
+
+  <div class="test" data-test="10">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 10</span>
+      <span class="test-label">Record a Decision</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(10,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(10,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="action-block"><strong>Action:</strong> On the decision card from TEST 9, type a note and click "Accept"</div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> "Decision recorded: ACCEPT" confirmation toast</div>
+        <div class="check"><input type="checkbox"> Decision saved to database</div>
+      </div>
+      <div class="api-tag">POST /api/decisions/ &rarr; {policy_number, decision, reason, risk_level}</div>
+    </div>
+  </div>
+
+  <div class="test" data-test="11">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 11</span>
+      <span class="test-label">DOCUMENT Intent (Underwriting Memo)</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(11,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(11,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="cmd-block">Type: <code>Draft an underwriting memo for COMM-2024-016 with guideline alignment</code></div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> Canvas switches to <code>memo</code> mode</div>
+        <div class="check"><input type="checkbox"> Executive Summary narrative</div>
+        <div class="check"><input type="checkbox"> 4 KPI grid: Total Claims, Total Loss, Loss Ratio, Risk Level</div>
+        <div class="check"><input type="checkbox"> Recommendation + Pricing Action section</div>
+        <div class="check"><input type="checkbox"> Guideline Alignment section (section codes + citations)</div>
+      </div>
+      <div class="intent-tag">policy_risk_summary &rarr; Document &rarr; memo</div>
+      <div class="api-tag">GET /api/memo/COMM-2024-016</div>
+    </div>
+  </div>
+
+  <div class="test" data-test="12">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 12</span>
+      <span class="test-label">GEO MAP Intent</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(12,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(12,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="cmd-block">Type: <code>Show me a geographic risk map of my portfolio</code></div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> Canvas switches to <code>geo_map</code> mode</div>
+        <div class="check"><input type="checkbox"> Leaflet map with colored markers (red/gold/green)</div>
+        <div class="check"><input type="checkbox"> Click marker &rarr; popup: policyholder, industry, premium, claims, loss ratio</div>
+        <div class="check"><input type="checkbox"> Intelligence sidebar with 3 tabs: Top Risk, Industry, Hotspots</div>
+        <div class="check"><input type="checkbox"> AI insights narrative below the map</div>
+      </div>
+      <div class="api-tag">GET /api/chat/geo/policies?user_email=sarah@apexuw.com</div>
+    </div>
+  </div>
+
+  <div class="test" data-test="13">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 13</span>
+      <span class="test-label">Analytics Playground Link</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(13,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(13,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="cmd-block">Type: <code>Open the self-service analytics playground</code></div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> Chat response contains clickable link: "Open Analytics Playground"</div>
+        <div class="check"><input type="checkbox"> Clicking link navigates to <code>/analytics</code> (SPA, no reload)</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ -->
+<!-- PHASE 4: CONVERSATIONAL INTEL      -->
+<!-- ══════════════════════════════════ -->
+<div class="phase" id="p4">
+  <div class="phase-header">
+    <div class="phase-num">4</div>
+    <div class="phase-title">Conversational Intelligence</div>
+    <div class="phase-badge">3 tests</div>
+  </div>
+
+  <div class="test" data-test="14">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 14</span>
+      <span class="test-label">Follow-Up Context Resolution</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(14,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(14,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="cmd-block">First: <code>Analyze COMM-2024-003</code> &rarr; Then: <code>Show me the evidence trail</code></div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> System resolves COMM-2024-003 from history (no policy # in follow-up)</div>
+        <div class="check"><input type="checkbox"> Canvas shows evidence for SafeBuild, NOT generic portfolio</div>
+        <div class="check"><input type="checkbox"> Evidence panel shows crane collapse photo + inspection report PDF</div>
+      </div>
+      <div class="tip">Entity carried forward via _resolve_entity_from_history() scanning last 6 messages</div>
+    </div>
+  </div>
+
+  <div class="test" data-test="15">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 15</span>
+      <span class="test-label">Proactive Clarification</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(15,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(15,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="cmd-block">Type (fresh session): <code>evidence</code></div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> Confidence drops below 50 &rarr; clarification flow triggered</div>
+        <div class="check"><input type="checkbox"> 3 clickable suggestion chips appear in chat</div>
+        <div class="check"><input type="checkbox"> Clicking a chip sends that prompt to chat</div>
+        <div class="check"><input type="checkbox"> NO LLM call made (saves API cost)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="test" data-test="16">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 16</span>
+      <span class="test-label">Out-of-Scope Guardrail</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(16,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(16,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="cmd-block">Type: <code>What's the weather like today?</code></div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> Response: "I'm RiskMind... I can't assist with that topic."</div>
+        <div class="check"><input type="checkbox"> 3 suggested action chips shown</div>
+        <div class="check"><input type="checkbox"> NO canvas rendered, NO LLM call</div>
+        <div class="check"><input type="checkbox"> Provider shows "guardrail" not "gemini"</div>
+      </div>
+      <div class="tip">Counter-test: "What's the weather risk for COMM-2024-003?" &rarr; should PASS (insurance context)</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ -->
+<!-- PHASE 5: GLASS BOX                 -->
+<!-- ══════════════════════════════════ -->
+<div class="phase" id="p5">
+  <div class="phase-header">
+    <div class="phase-num">5</div>
+    <div class="phase-title">Glass Box Explainability</div>
+    <div class="phase-badge">3 tests</div>
+  </div>
+
+  <div class="test" data-test="17">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 17</span>
+      <span class="test-label">Rich Evidence Panel</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(17,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(17,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="cmd-block">Type: <code>Analyze COMM-2024-003</code> then <code>show evidence</code></div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> Glass Box panel: Data Lineage, Citations, Evidence Items</div>
+        <div class="check"><input type="checkbox"> Image thumbnail (80x60px) of crane collapse scene</div>
+        <div class="check"><input type="checkbox"> PDF icon (red badge) for inspection report</div>
+        <div class="check"><input type="checkbox"> AI analysis quote (coral blockquote) under each evidence item</div>
+        <div class="check"><input type="checkbox"> Claim reference badge (CLM-2024-009) on each item</div>
+      </div>
+      <div class="tip">Demo point: "The AI isn't making this up. It shows the actual photo and quotes the inspection report."</div>
+    </div>
+  </div>
+
+  <div class="test" data-test="18">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 18</span>
+      <span class="test-label">Confidence Scoring Display</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(18,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(18,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="cmd-block">Type: <code>Summarize portfolio risk</code></div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> Confidence pill shown (e.g., "78% &mdash; Good Confidence")</div>
+        <div class="check"><input type="checkbox"> Color-coded: green &ge;80, blue &ge;60, amber &ge;50, red &lt;50</div>
+        <div class="check"><input type="checkbox"> Response executes immediately (confidence &ge; 60)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="test" data-test="19">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 19</span>
+      <span class="test-label">Guideline Citations</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(19,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(19,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="cmd-block">Type: <code>Why is COMM-2024-016 high risk? Show evidence</code></div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> Citations card shows guideline section codes with purple badges</div>
+        <div class="check"><input type="checkbox"> Each citation has: section code, title, snippet</div>
+        <div class="check"><input type="checkbox"> Data Lineage card shows: policies, claims, decisions</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ -->
+<!-- PHASE 6: DOCUMENT UPLOAD           -->
+<!-- ══════════════════════════════════ -->
+<div class="phase" id="p6">
+  <div class="phase-header">
+    <div class="phase-num">6</div>
+    <div class="phase-title">Document Upload & Analysis</div>
+    <div class="phase-badge">2 tests</div>
+  </div>
+
+  <div class="test" data-test="20">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 20</span>
+      <span class="test-label">Upload via Chat (Paperclip)</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(20,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(20,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="action-block"><strong>Action:</strong> Click paperclip icon, select a PDF or image</div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> File uploads to <code>/api/chat/upload</code></div>
+        <div class="check"><input type="checkbox"> AI analyzes the document</div>
+        <div class="check"><input type="checkbox"> Analysis summary appears in chat response</div>
+        <div class="check"><input type="checkbox"> Document indexed into ChromaDB for future RAG</div>
+      </div>
+      <div class="tip">Supported: PDF, PNG, JPG, WEBP, GIF, MP4, MOV</div>
+    </div>
+  </div>
+
+  <div class="test" data-test="21">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 21</span>
+      <span class="test-label">Upload Referenced in Follow-Up</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(21,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(21,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="cmd-block">After uploading, type: <code>What risks did you find in that document?</code></div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> LLM references uploaded document from session context</div>
+        <div class="check"><input type="checkbox"> Session documents injected via <code>session_documents</code> key</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ -->
+<!-- PHASE 7: SAVE & EXPORT             -->
+<!-- ══════════════════════════════════ -->
+<div class="phase" id="p7">
+  <div class="phase-header">
+    <div class="phase-num">7</div>
+    <div class="phase-title">Save & Export</div>
+    <div class="phase-badge">3 tests</div>
+  </div>
+
+  <div class="test" data-test="22">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 22</span>
+      <span class="test-label">Save Intelligence</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(22,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(22,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="action-block"><strong>Action:</strong> On any analysis/memo/decision canvas, click "Save"</div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> "Saved!" confirmation</div>
+        <div class="check"><input type="checkbox"> Item stored to localStorage</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="test" data-test="23">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 23</span>
+      <span class="test-label">Saved Intelligence Page (Grouped Tiles)</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(23,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(23,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="action-block"><strong>Action:</strong> Navigate to <code>/saved</code> via sidebar</div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> Items grouped by category: Risk Analysis, Memos, Decisions, Analytics, etc.</div>
+        <div class="check"><input type="checkbox"> Each group has collapse/expand toggle with item count</div>
+        <div class="check"><input type="checkbox"> Cover tile: type badge, title, timestamp, content preview</div>
+        <div class="check"><input type="checkbox"> Tag chips: policy number, claim number, policyholder, industry, underwriter</div>
+        <div class="check"><input type="checkbox"> Tag filter bar at top &mdash; click any tag to filter across groups</div>
+        <div class="check"><input type="checkbox"> Per-item: PDF Export + Delete buttons</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="test" data-test="24">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 24</span>
+      <span class="test-label">PDF Export</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(24,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(24,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="action-block"><strong>Action:</strong> Click "Export PDF" on any canvas card or Saved page</div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> Browser downloads a PDF file</div>
+        <div class="check"><input type="checkbox"> PDF contains rendered canvas content (html2canvas-pro + jspdf)</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ -->
+<!-- PHASE 8: WORKBENCH                 -->
+<!-- ══════════════════════════════════ -->
+<div class="phase" id="p8">
+  <div class="phase-header">
+    <div class="phase-num">8</div>
+    <div class="phase-title">Workbench</div>
+    <div class="phase-badge">5 tests</div>
+  </div>
+
+  <div class="test" data-test="25">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 25</span>
+      <span class="test-label">Overview Tab</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(25,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(25,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="action-block"><strong>Action:</strong> Navigate to <code>/workbench</code></div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> KPI strip: Total Premium, Needs Review, Pending Decisions, Avg Loss Ratio</div>
+        <div class="check"><input type="checkbox"> Portfolio Risk Distribution bar (High/Medium/Low)</div>
+        <div class="check"><input type="checkbox"> Policy table with search bar + Analyze/Intel action buttons</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="test" data-test="26">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 26</span>
+      <span class="test-label">Submissions Tab</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(26,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(26,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="action-block"><strong>Action:</strong> Click "Submissions" tab</div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> AI Submission Triage banner</div>
+        <div class="check"><input type="checkbox"> Table with AI Score computed per submission</div>
+        <div class="check"><input type="checkbox"> "Review" button navigates to analysis canvas</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="test" data-test="27">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 27</span>
+      <span class="test-label">Renewals Tab</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(27,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(27,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="action-block"><strong>Action:</strong> Click "Renewals" tab</div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> Renewal cards: Days to expiry, Current vs Suggested premium, Change%</div>
+        <div class="check"><input type="checkbox"> AI recommendation per policy</div>
+        <div class="check"><input type="checkbox"> 3 buttons: Decide, Memo, AI Review</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="test" data-test="28">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 28</span>
+      <span class="test-label">Quote Decisions Tab</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(28,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(28,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="action-block"><strong>Action:</strong> Click "Quote Decisions" tab</div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> Table: Policy#, Premium, AI Suggested Price, Change%, Risk, Decision</div>
+        <div class="check"><input type="checkbox"> AI pricing: High +30%, Medium +12%, Low 0%</div>
+        <div class="check"><input type="checkbox"> "Quote" button navigates to decision canvas</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="test" data-test="29">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 29</span>
+      <span class="test-label">Broker Communications Tab</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(29,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(29,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="action-block"><strong>Action:</strong> Click "Broker Communications" tab</div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> Communication cards with Broker, Subject, Status, Priority</div>
+        <div class="check"><input type="checkbox"> AI-drafted responses shown per communication</div>
+        <div class="check"><input type="checkbox"> Reply / Use AI Draft buttons visible</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ -->
+<!-- PHASE 9: ANALYTICS                 -->
+<!-- ══════════════════════════════════ -->
+<div class="phase" id="p9">
+  <div class="phase-header">
+    <div class="phase-num">9</div>
+    <div class="phase-title">Analytics Playground</div>
+    <div class="phase-badge">5 tests</div>
+  </div>
+
+  <div class="test" data-test="30">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 30</span>
+      <span class="test-label">Analytics Query Builder</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(30,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(30,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="action-block"><strong>Action:</strong> Navigate to <code>/analytics</code></div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> Sidebar: Dimensions, Measures, Filters</div>
+        <div class="check"><input type="checkbox"> Dimensions loaded from <code>GET /api/analytics/meta</code></div>
+        <div class="check"><input type="checkbox"> Empty results pane ready for queries</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="test" data-test="31">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 31</span>
+      <span class="test-label">Run Analytics Query</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(31,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(31,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="action-block"><strong>Action:</strong> Select Industry + Claim Amount + Claim Count &rarr; Run</div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> Totals KPI strip above results</div>
+        <div class="check"><input type="checkbox"> Grid view with Industry, Claim Amount, Claim Count columns</div>
+        <div class="check"><input type="checkbox"> Dynamic grid title: "Claim Amount, Claim Count by Industry"</div>
+        <div class="check"><input type="checkbox"> Data scoped to Sarah's policies (RBAC)</div>
+      </div>
+      <div class="api-tag">POST /api/analytics/query</div>
+    </div>
+  </div>
+
+  <div class="test" data-test="32">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 32</span>
+      <span class="test-label">Visualization Toggle (5 types)</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(32,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(32,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="action-block"><strong>Action:</strong> Toggle through: Grid &rarr; Bar &rarr; Line &rarr; Pie &rarr; Area</div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> Bar chart: coral/purple colored bars</div>
+        <div class="check"><input type="checkbox"> Line chart: multi-line per metric</div>
+        <div class="check"><input type="checkbox"> Pie chart: color-coded slices with legend</div>
+        <div class="check"><input type="checkbox"> Area chart: gradient fill</div>
+        <div class="check"><input type="checkbox"> Active toggle highlighted</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="test" data-test="33">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 33</span>
+      <span class="test-label">Analytics AI Summary</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(33,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(33,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="action-block"><strong>Action:</strong> Click sparkle icon on grid panel header</div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> Loading spinner while LLM processes</div>
+        <div class="check"><input type="checkbox"> AI insight panel below grid with narrative analysis</div>
+        <div class="check"><input type="checkbox"> Insight references actual data (dimensions, metrics, values)</div>
+        <div class="check"><input type="checkbox"> Dismissible via X button</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="test" data-test="34">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 34</span>
+      <span class="test-label">Analytics Save to Intelligence</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(34,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(34,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="action-block"><strong>Action:</strong> Click bookmark icon on grid panel header</div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> Button changes to filled bookmark + "Saved!" confirmation</div>
+        <div class="check"><input type="checkbox"> Navigate to <code>/saved</code> &mdash; item under "Analytics" category</div>
+        <div class="check"><input type="checkbox"> Tile shows grid title, dimensions, metrics, timestamp</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ -->
+<!-- PHASE 10: SESSION & GUARDRAILS     -->
+<!-- ══════════════════════════════════ -->
+<div class="phase" id="p10">
+  <div class="phase-header">
+    <div class="phase-num">10</div>
+    <div class="phase-title">Session & Guardrails</div>
+    <div class="phase-badge">3 tests</div>
+  </div>
+
+  <div class="test" data-test="35">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 35</span>
+      <span class="test-label">Greeting Citation Suppression</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(35,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(35,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="cmd-block">Type: <code>Hello</code> or <code>Hi</code> or <code>Good morning</code></div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> Friendly greeting response from RiskMind</div>
+        <div class="check"><input type="checkbox"> NO citation codes below chat bubble</div>
+        <div class="check"><input type="checkbox"> NO canvas rendered</div>
+        <div class="check"><input type="checkbox"> RAG retrieval skipped (saves latency + cost)</div>
+      </div>
+      <div class="tip">Counter-test: "Why is COMM-2024-016 high risk?" &rarr; SHOULD show citations</div>
+    </div>
+  </div>
+
+  <div class="test" data-test="36">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 36</span>
+      <span class="test-label">Login/Logout Fresh Chat</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(36,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(36,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="action-block"><strong>Action:</strong> Have an active chat &rarr; Logout &rarr; Login again</div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> Chat window is completely fresh (no previous messages)</div>
+        <div class="check"><input type="checkbox"> Previous session preserved in history</div>
+        <div class="check"><input type="checkbox"> Different user login shows only their sessions</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="test" data-test="37">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 37</span>
+      <span class="test-label">Document Session Context</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(37,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(37,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="action-block"><strong>Action:</strong> Upload PDF via paperclip &rarr; ask <code>Can you summarize that document?</code></div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> Upload response includes document analysis</div>
+        <div class="check"><input type="checkbox"> Follow-up references the document (not generic portfolio)</div>
+        <div class="check"><input type="checkbox"> Session ID links upload to chat conversation</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ -->
+<!-- PHASE 11: RBAC                     -->
+<!-- ══════════════════════════════════ -->
+<div class="phase" id="p11">
+  <div class="phase-header">
+    <div class="phase-num">11</div>
+    <div class="phase-title">RBAC & Edge Cases</div>
+    <div class="phase-badge">1 test</div>
+  </div>
+
+  <div class="test" data-test="38">
+    <div class="test-header" onclick="toggleTest(this)">
+      <span class="test-id">TEST 38</span>
+      <span class="test-label">User Data Scoping (RBAC)</span>
+      <div class="test-actions"><button class="btn-pass" onclick="e(event);mark(38,'pass')">&#10003;</button><button class="btn-fail" onclick="e(event);mark(38,'fail')">&#10007;</button></div>
+      <span class="test-chevron">&#9654;</span>
+    </div>
+    <div class="test-body">
+      <div class="action-block"><strong>Action:</strong> Logout &rarr; Login as James Chen (<code>james123</code>) &rarr; Workbench</div>
+      <div class="expect-block">
+        <div class="check"><input type="checkbox"> James sees DIFFERENT policies than Sarah (his 11 vs her 10)</div>
+        <div class="check"><input type="checkbox"> Policy table, analytics, geo map all scoped to James</div>
+        <div class="check"><input type="checkbox"> Chat responses reference James's portfolio</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ -->
+<!-- SCORING TABLE                      -->
+<!-- ══════════════════════════════════ -->
+<div class="phase" id="scoring">
+  <div class="scoring">
+    <h3>Scoring Summary</h3>
+    <table>
+      <tr><th>Phase</th><th>Tests</th><th>Pass</th><th>Fail</th></tr>
+      <tr><td>1. Auth & Connector</td><td>3</td><td class="s-pass" id="sp1">-</td><td class="s-fail" id="sf1">-</td></tr>
+      <tr><td>2. Welcome Canvas</td><td>2</td><td class="s-pass" id="sp2">-</td><td class="s-fail" id="sf2">-</td></tr>
+      <tr><td>3. Core Intents</td><td>8</td><td class="s-pass" id="sp3">-</td><td class="s-fail" id="sf3">-</td></tr>
+      <tr><td>4. Conversational Intelligence</td><td>3</td><td class="s-pass" id="sp4">-</td><td class="s-fail" id="sf4">-</td></tr>
+      <tr><td>5. Glass Box</td><td>3</td><td class="s-pass" id="sp5">-</td><td class="s-fail" id="sf5">-</td></tr>
+      <tr><td>6. Document Upload</td><td>2</td><td class="s-pass" id="sp6">-</td><td class="s-fail" id="sf6">-</td></tr>
+      <tr><td>7. Save & Export</td><td>3</td><td class="s-pass" id="sp7">-</td><td class="s-fail" id="sf7">-</td></tr>
+      <tr><td>8. Workbench</td><td>5</td><td class="s-pass" id="sp8">-</td><td class="s-fail" id="sf8">-</td></tr>
+      <tr><td>9. Analytics</td><td>5</td><td class="s-pass" id="sp9">-</td><td class="s-fail" id="sf9">-</td></tr>
+      <tr><td>10. Session & Guardrails</td><td>3</td><td class="s-pass" id="sp10">-</td><td class="s-fail" id="sf10">-</td></tr>
+      <tr><td>11. RBAC</td><td>1</td><td class="s-pass" id="sp11">-</td><td class="s-fail" id="sf11">-</td></tr>
+      <tr><td><strong>TOTAL</strong></td><td><strong>38</strong></td><td class="s-pass" id="spTotal">0</td><td class="s-fail" id="sfTotal">0</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ -->
+<!-- CURL SMOKE TESTS                   -->
+<!-- ══════════════════════════════════ -->
+<div class="phase" id="curl">
+  <div class="curl-section" id="curlSection">
+    <div class="curl-header" onclick="this.parentElement.classList.toggle('open')">
+      <h3>Quick API Smoke Tests (curl)</h3>
+      <span class="chevron">&#9654;</span>
+    </div>
+    <div class="curl-body">
+      <pre><span class="cm"># Health</span>
+curl <span class="hl">https://riskmind.onrender.com/health</span>
+
+<span class="cm"># Auth</span>
+curl -X POST <span class="hl">https://riskmind.onrender.com/api/auth/login</span> \
+  -H "Content-Type: application/json" \
+  -d '{"email":"sarah@apexuw.com","password":"sarah123"}'
+
+<span class="cm"># Data Status</span>
+curl <span class="hl">https://riskmind.onrender.com/api/data/status</span>
+
+<span class="cm"># Chat</span>
+curl -X POST <span class="hl">https://riskmind.onrender.com/api/chat/</span> \
+  -H "Content-Type: application/json" \
+  -d '{"message":"Give me a portfolio risk overview","user_email":"sarah@apexuw.com"}'
+
+<span class="cm"># Geo Policies</span>
+curl "<span class="hl">https://riskmind.onrender.com/api/chat/geo/policies?user_email=sarah@apexuw.com</span>"
+
+<span class="cm"># Analytics Meta</span>
+curl <span class="hl">https://riskmind.onrender.com/api/analytics/meta</span>
+
+<span class="cm"># Analytics Query</span>
+curl -X POST <span class="hl">https://riskmind.onrender.com/api/analytics/query</span> \
+  -H "Content-Type: application/json" \
+  -d '{"dimensions":["industry_type"],"metrics":["claim_amount","claim_count"],"user_email":"sarah@apexuw.com"}'
+
+<span class="cm"># Memo</span>
+curl <span class="hl">https://riskmind.onrender.com/api/memo/COMM-2024-016</span>
+
+<span class="cm"># Policies (RBAC)</span>
+curl "<span class="hl">https://riskmind.onrender.com/api/policies/?user_email=sarah@apexuw.com</span>"
+
+<span class="cm"># Decisions</span>
+curl "<span class="hl">https://riskmind.onrender.com/api/decisions/COMM-2024-016</span>"
+
+<span class="cm"># Sessions</span>
+curl "<span class="hl">https://riskmind.onrender.com/api/chat/sessions?user_email=sarah@apexuw.com</span>"</pre>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ -->
+<!-- CAPABILITIES TABLE                 -->
+<!-- ══════════════════════════════════ -->
+<div class="phase" id="caps">
+  <div class="caps">
+    <h3>Key Capabilities Summary (13)</h3>
+    <table>
+      <tr><th>#</th><th>Capability</th><th>How We Prove It</th></tr>
+      <tr><td>1</td><td>RAG Pipeline</td><td>ChromaDB indexes guidelines + claims + uploaded docs &rarr; cited in substantive responses</td></tr>
+      <tr><td>2</td><td>Glass Box</td><td>Data lineage, confidence scoring, guideline citations, evidence thumbnails + quotes</td></tr>
+      <tr><td>3</td><td>Human-in-the-Loop</td><td>Decision canvas: AI recommends, human clicks Accept/Refer/Decline</td></tr>
+      <tr><td>4</td><td>Guardrails</td><td>Out-of-scope rejection, greeting detection, hallucination detection, entity redaction</td></tr>
+      <tr><td>5</td><td>Conversational Memory</td><td>Follow-up questions resolve entities from chat history + document session context</td></tr>
+      <tr><td>6</td><td>Multi-modal</td><td>PDF analysis (Bedrock), image vision (Bedrock), video (Gemini)</td></tr>
+      <tr><td>7</td><td>RBAC</td><td>Each user sees only their assigned policies across all features</td></tr>
+      <tr><td>8</td><td>Evidence Citing</td><td>Image thumbnails + PDF icons + AI-extracted quotes in evidence panel</td></tr>
+      <tr><td>9</td><td>Agentic Pipeline</td><td>LangGraph 8-node state machine: intent &rarr; data &rarr; RAG &rarr; confidence &rarr; LLM &rarr; guardrails</td></tr>
+      <tr><td>10</td><td>LLM Fallback</td><td>Bedrock &rarr; Gemini &rarr; Claude &rarr; OpenAI &rarr; Mock (never fails)</td></tr>
+      <tr><td>11</td><td>Smart Citations</td><td>RAG skipped for greetings/off-topic &mdash; citations only for data-driven answers</td></tr>
+      <tr><td>12</td><td>Saved Intelligence</td><td>Categorized tiles with tag chips, filter bar, PDF export, grouped by analysis type</td></tr>
+      <tr><td>13</td><td>Analytics AI</td><td>Per-grid AI summary, 5 viz types (grid/bar/line/pie/area), save to intelligence</td></tr>
+    </table>
+  </div>
+
+  <div class="caps" style="margin-top:1rem">
+    <h3>Claims with Rich Evidence (for demo)</h3>
+    <table>
+      <tr><th>Claim</th><th>Policy</th><th>What to Show</th></tr>
+      <tr><td>CLM-2024-009</td><td>COMM-2024-003 (SafeBuild)</td><td>Crane collapse photo + inspection PDF</td></tr>
+      <tr><td>CLM-2024-010</td><td>COMM-2024-003 (SafeBuild)</td><td>Scaffolding OSHA violation photo</td></tr>
+      <tr><td>CLM-2024-005</td><td>COMM-2024-002 (XYZ Restaurant)</td><td>Kitchen fire photo + fire marshal report</td></tr>
+      <tr><td>CLM-2024-030</td><td>COMM-2024-011 (BuildRight)</td><td>Structural failure photo + engineer assessment</td></tr>
+      <tr><td>CLM-2024-040</td><td>COMM-2024-016 (Eagle Transport)</td><td>Truck rollover photo + police report</td></tr>
+      <tr><td>CLM-2024-047</td><td>COMM-2024-019 (SteelEdge)</td><td>Safety guard removal + OSHA citation</td></tr>
+    </table>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<script>
+// ── State ──
+const TOTAL = 38;
+const results = {}; // { testId: 'pass'|'fail' }
+const phaseRanges = {
+  p1:[1,3], p2:[4,5], p3:[6,13], p4:[14,16], p5:[17,19],
+  p6:[20,21], p7:[22,24], p8:[25,29], p9:[30,34], p10:[35,37], p11:[38,38]
+};
+
+// Load from localStorage
+try {
+  const saved = JSON.parse(localStorage.getItem('riskmind_playbook') || '{}');
+  Object.assign(results, saved);
+  Object.keys(results).forEach(id => applyMark(+id, results[id]));
+  updateScores();
+} catch(e){}
+
+function e(ev) { ev.stopPropagation(); }
+
+function toggleTest(header) {
+  header.closest('.test').classList.toggle('open');
+}
+
+function mark(id, status) {
+  if (results[id] === status) {
+    delete results[id];
+  } else {
+    results[id] = status;
+  }
+  applyMark(id, results[id]);
+  updateScores();
+  localStorage.setItem('riskmind_playbook', JSON.stringify(results));
+}
+
+function applyMark(id, status) {
+  const card = document.querySelector(`.test[data-test="${id}"]`);
+  if (!card) return;
+  card.classList.remove('pass', 'fail');
+  card.querySelectorAll('.btn-pass,.btn-fail').forEach(b => b.classList.remove('active'));
+  if (status === 'pass') {
+    card.classList.add('pass');
+    card.querySelector('.btn-pass').classList.add('active');
+  } else if (status === 'fail') {
+    card.classList.add('fail');
+    card.querySelector('.btn-fail').classList.add('active');
+  }
+}
+
+function updateScores() {
+  let pass = 0, fail = 0;
+  Object.values(results).forEach(s => { if(s==='pass') pass++; else if(s==='fail') fail++; });
+  document.getElementById('passCount').textContent = pass;
+  document.getElementById('failCount').textContent = fail;
+  document.getElementById('progressFill').style.width = ((pass + fail) / TOTAL * 100) + '%';
+
+  // Phase scores
+  Object.entries(phaseRanges).forEach(([phase, [start, end]]) => {
+    let pp = 0, ff = 0;
+    for (let i = start; i <= end; i++) {
+      if (results[i] === 'pass') pp++;
+      else if (results[i] === 'fail') ff++;
+    }
+    const num = phase.replace('p','');
+    const spEl = document.getElementById('sp' + num);
+    const sfEl = document.getElementById('sf' + num);
+    if (spEl) spEl.textContent = pp || '-';
+    if (sfEl) sfEl.textContent = ff || '-';
+
+    // Nav dot
+    const dot = document.getElementById('dot-' + phase);
+    if (dot) {
+      dot.classList.remove('done', 'partial');
+      const total = end - start + 1;
+      if (pp === total) dot.classList.add('done');
+      else if (pp > 0 || ff > 0) dot.classList.add('partial');
+    }
+  });
+
+  document.getElementById('spTotal').textContent = pass;
+  document.getElementById('sfTotal').textContent = fail;
+}
+
+function resetAll() {
+  if (!confirm('Reset all test results?')) return;
+  Object.keys(results).forEach(k => delete results[k]);
+  document.querySelectorAll('.test').forEach(c => {
+    c.classList.remove('pass','fail');
+    c.querySelectorAll('.btn-pass,.btn-fail').forEach(b => b.classList.remove('active'));
+    c.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = false);
+  });
+  updateScores();
+  localStorage.removeItem('riskmind_playbook');
+}
+
+// ── Nav clicks ──
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', () => {
+    const target = item.dataset.phase;
+    const el = document.getElementById(target);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      item.classList.add('active');
+    }
+  });
+});
+
+// ── Scroll spy ──
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      const id = entry.target.id;
+      document.querySelectorAll('.nav-item').forEach(n => {
+        n.classList.toggle('active', n.dataset.phase === id);
+      });
+    }
+  });
+}, { rootMargin: '-60px 0px -70% 0px' });
+
+document.querySelectorAll('.phase').forEach(s => observer.observe(s));
+</script>
+</body>
+</html>
