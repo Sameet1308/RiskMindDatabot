@@ -1360,8 +1360,8 @@ export default function RiskMind() {
 
             <section className="panel canvas">
                 <div className="panel-header">
-                    <div className="panel-title">
-                        <Sparkles /> Intelligence Canvas
+                    <div className="panel-title canvas-title">
+                        <Sparkles /> <span>Intelligence</span> <span className="canvas-title-accent">Canvas</span>
                     </div>
                     <div className="canvas-status">
                         <div>
