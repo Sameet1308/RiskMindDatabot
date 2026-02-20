@@ -594,85 +594,98 @@ export default function RiskMind() {
 
     const renderEvidencePanel = () => {
         const tables = provenance?.tables_used || analysisObject?.provenance?.tables_used || []
-        const joinPaths = provenance?.join_paths || analysisObject?.provenance?.join_paths || []
-        const queryIds = provenance?.query_ids || analysisObject?.provenance?.query_ids || []
-        const sqlPlan = provenance?.sql_plan || analysisObject?.glass_box?.sql_plan || []
         const citations = provenance?.citations || []
         const confidence = provenance?.confidence
-        const generatedAt = provenance?.generated_at
         const reasonCodes = provenance?.confidence_reason_codes || intentReasonCodes
         const evidenceList = (analysisEvidence.length ? analysisEvidence : evidenceItems).slice(0, 6)
 
+        const confLabel = confidence !== undefined && confidence !== null
+            ? confidence >= 80 ? 'High' : confidence >= 60 ? 'Good' : confidence >= 50 ? 'Fair' : 'Low'
+            : null
+        const confColor = confidence !== undefined && confidence !== null
+            ? confidence >= 80 ? '#34d399' : confidence >= 60 ? '#60a5fa' : confidence >= 50 ? '#fbbf24' : '#ff6b6b'
+            : '#94a3b8'
+
         return (
-            <details className="evidence-panel" open>
-                <summary>Evidence and Provenance</summary>
-                <div className="evidence-panel-body">
-                    <div className="evidence-header">
-                        <div>
-                            <h4>Evidence and Provenance</h4>
-                            <p>Lineage, citations, and traceability for this output.</p>
-                        </div>
-                        <div className="evidence-meta">
-                            <span>{confidence !== undefined && confidence !== null ? `${confidence}% confidence` : 'Confidence: Not available'}</span>
-                            <span>{generatedAt ? `Generated ${generatedAt}` : 'Generated: Not available'}</span>
-                        </div>
+            <div className="gb-panel">
+                <div className="gb-header">
+                    <div className="gb-title">
+                        <span className="gb-icon">&#x1f50d;</span>
+                        Glass Box &mdash; Evidence &amp; Provenance
                     </div>
-                    <div className="evidence-grid">
-                        <div className="evidence-block">
-                            <h5>Data lineage</h5>
-                            <div><strong>Tables:</strong> {tables.length ? tables.join(', ') : 'Not available'}</div>
-                            <div><strong>Join paths:</strong> {joinPaths.length ? joinPaths.join(' | ') : 'Not available'}</div>
-                            <div><strong>Query IDs:</strong> {queryIds.length ? queryIds.join(', ') : 'Not available'}</div>
-                            <div><strong>Reason codes:</strong> {reasonCodes.length ? reasonCodes.join(', ') : 'Not available'}</div>
+                    {confLabel && (
+                        <div className="gb-confidence" style={{ borderColor: confColor, color: confColor }}>
+                            <span className="gb-conf-dot" style={{ background: confColor }}></span>
+                            {confidence}% &mdash; {confLabel} Confidence
                         </div>
-                        <div className="evidence-block">
-                            <h5>Citations</h5>
-                            {citations.length === 0 ? (
-                                <p className="canvas-muted">Not available</p>
-                            ) : (
-                                <ul>
-                                    {citations.slice(0, 6).map((cite: any, idx: number) => (
-                                        <li key={`${cite.title}-${idx}`}>
-                                            <strong>{cite.title}</strong>
-                                            <span>{cite.type}</span>
-                                            {cite.ref && <em>{cite.ref}</em>}
-                                            {cite.snippet && <p>{cite.snippet}</p>}
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </div>
+                    )}
+                </div>
+
+                {/* Reason codes */}
+                {reasonCodes.length > 0 && (
+                    <div className="gb-tags">
+                        {reasonCodes.map((rc: string, i: number) => (
+                            <span key={i} className="gb-tag">{rc.replace(/_/g, ' ')}</span>
+                        ))}
                     </div>
-                    <div className="evidence-block">
-                        <h5>Evidence items</h5>
-                        {evidenceList.length === 0 ? (
-                            <p className="canvas-muted">Not available</p>
-                        ) : (
-                            <ul>
-                                {evidenceList.map((ev: any, idx: number) => (
-                                    <li key={`${ev.url || ev.filename}-${idx}`}>
-                                        <strong>{ev.description || ev.title || ev.filename || ev.type || 'Evidence'}</strong>
-                                        <span>{ev.claim_number || ev.section || ev.file_path || 'Not available'}</span>
-                                    </li>
+                )}
+
+                <div className="gb-grid">
+                    {/* Data Lineage */}
+                    <div className="gb-card">
+                        <h5 className="gb-card-title">Data Lineage</h5>
+                        {tables.length > 0 ? (
+                            <div className="gb-table-tags">
+                                {tables.map((t: string, i: number) => (
+                                    <span key={i} className="gb-table-tag">{t}</span>
                                 ))}
-                            </ul>
+                            </div>
+                        ) : (
+                            <p className="gb-empty">No tables referenced</p>
                         )}
                     </div>
-                    <div className="evidence-block">
-                        <h5>SQL</h5>
-                        {sqlPlan.length > 0 ? (
-                            <details className="canvas-details">
-                                <summary>View SQL plan</summary>
-                                {(sqlPlan as Array<{ id: string; sql: string; params?: Record<string, any> }>).map((item) => (
-                                    <pre key={item.id}>{item.sql}</pre>
-                                ))}
-                            </details>
+
+                    {/* Citations */}
+                    <div className="gb-card">
+                        <h5 className="gb-card-title">Guideline Citations</h5>
+                        {citations.length === 0 ? (
+                            <p className="gb-empty">No citations available</p>
                         ) : (
-                            <p className="canvas-muted">Not available</p>
+                            <div className="gb-citations">
+                                {citations.slice(0, 6).map((cite: any, idx: number) => (
+                                    <div key={idx} className="gb-cite">
+                                        <span className="gb-cite-badge">{cite.ref || cite.type || 'REF'}</span>
+                                        <span className="gb-cite-title">{cite.title}</span>
+                                        {cite.snippet && <span className="gb-cite-snippet">{cite.snippet}</span>}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Evidence Items */}
+                    <div className="gb-card">
+                        <h5 className="gb-card-title">Evidence Items</h5>
+                        {evidenceList.length === 0 ? (
+                            <p className="gb-empty">No evidence attached</p>
+                        ) : (
+                            <div className="gb-evidence-list">
+                                {evidenceList.map((ev: any, idx: number) => (
+                                    <div key={idx} className="gb-ev">
+                                        <span className="gb-ev-type">{ev.type || 'doc'}</span>
+                                        <div className="gb-ev-info">
+                                            <strong>{ev.description || ev.title || ev.filename || 'Evidence'}</strong>
+                                            {(ev.claim_number || ev.section) && (
+                                                <span>{ev.claim_number || ev.section}</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         )}
                     </div>
                 </div>
-            </details>
+            </div>
         )
     }
 
