@@ -457,7 +457,8 @@ export default function RiskMind() {
         setLoading(true)
 
         try {
-            const response = await apiService.chat(userMessage)
+            const response = await apiService.chat(userMessage, activeSessionId || undefined, currentUser.email || 'demo@apexuw.com')
+            if (response.session_id && !activeSessionId) setActiveSessionId(response.session_id)
             setCanvasNarrative(response.response)
             const artifactData = response.artifact?.data || response.analysis_object
             if (artifactData) setAnalysisObject(artifactData)
@@ -520,7 +521,8 @@ export default function RiskMind() {
         setInferredIntent(inferredIntent || 'Understand')
         setMessages(prev => [...prev, { id: Date.now(), role: 'user', content: `Uploaded: ${file.name}`, timestamp: new Date() }])
         try {
-            const result = await apiService.uploadFile(file, '', 0)
+            const result = await apiService.uploadFile(file, '', activeSessionId || 0, currentUser.email || 'demo@apexuw.com')
+            if (result.session_id && !activeSessionId) setActiveSessionId(result.session_id)
             setMessages(prev => [...prev, { id: Date.now() + 1, role: 'assistant', content: result.analysis || 'Upload complete.', timestamp: new Date() }])
             setCanvasNarrative(result.analysis || 'Evidence analyzed and linked to your session.')
             setUploadStatus({ state: 'success', message: `Uploaded ${file.name}` })

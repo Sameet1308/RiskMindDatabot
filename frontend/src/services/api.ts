@@ -190,6 +190,7 @@ export interface UploadResponse {
     filename: string
     file_type: string
     analysis: string | null
+    session_id: number | null
 }
 
 export interface EvidenceAnalyzeResponse {
@@ -346,11 +347,12 @@ export const apiService = {
     },
 
     // File Upload
-    async uploadFile(file: File, userPrompt: string = '', sessionId: number = 0): Promise<UploadResponse> {
+    async uploadFile(file: File, userPrompt: string = '', sessionId: number = 0, userEmail: string = 'demo@apexuw.com'): Promise<UploadResponse> {
         const formData = new FormData()
         formData.append('file', file)
         formData.append('user_prompt', userPrompt)
         formData.append('session_id', sessionId.toString())
+        formData.append('user_email', userEmail)
         const response = await api.post('/chat/upload', formData, {
             headers: { 'Content-Type': 'multipart/form-data' }
         })

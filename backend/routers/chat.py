@@ -74,6 +74,7 @@ class UploadResponse(BaseModel):
     filename: str
     file_type: str
     analysis: Optional[str] = None
+    session_id: Optional[int] = None
 
 class VisionRequest(BaseModel):
     image_base64: str
@@ -580,6 +581,7 @@ async def upload_file(
     file: UploadFile = File(...),
     user_prompt: str = Form(""),
     session_id: int = Form(0),
+    user_email: str = Form("demo@apexuw.com"),
     db: AsyncSession = Depends(get_db)
 ):
     """Upload PDF or image for AI analysis."""
@@ -587,6 +589,9 @@ async def upload_file(
     allowed = {".pdf", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tiff", ".mp4", ".mov", ".avi", ".mkv"}
     if ext not in allowed:
         raise HTTPException(400, f"Unsupported type: {ext}")
+
+    # Ensure a session exists so the document is linked to the chat
+    sid = await _get_or_create_session(session_id if session_id else None, user_email, db)
 
     unique_name = f"{uuid.uuid4().hex}{ext}"
     file_path = os.path.join(UPLOAD_DIR, unique_name)
@@ -611,8 +616,8 @@ async def upload_file(
 
     doc = Document(
         filename=file.filename, file_path=file_path, file_type=file_type,
-        file_size=len(content), uploaded_by="demo_user", analysis_summary=analysis,
-        session_id=session_id if session_id else None,
+        file_size=len(content), uploaded_by=user_email, analysis_summary=analysis,
+        session_id=sid,
     )
     db.add(doc)
     await db.commit()
@@ -627,7 +632,7 @@ async def upload_file(
 
     return UploadResponse(
         file_url=f"/api/uploads/{unique_name}", filename=file.filename,
-        file_type=file_type, analysis=analysis
+        file_type=file_type, analysis=analysis, session_id=sid
     )
 
 
