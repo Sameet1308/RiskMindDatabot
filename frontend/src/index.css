@@ -4,6 +4,7 @@
   --primary: #FF5A5F;
   --primary-dark: #E5484D;
   --primary-light: #FF7A7E;
+  --primary-wash: rgba(255, 90, 95, 0.04);
   --success: #059669;
   --success-light: #d1fae5;
   --warning: #d97706;
@@ -11,23 +12,24 @@
   --danger: #dc2626;
   --danger-light: #fee2e2;
   --purple: #7c3aed;
-  --purple-light: #ede9fe;
-  --background: #f1f5f9;
+  --purple-light: #f3f0ff;
+  --background: #f6f4f5;
   --surface: #ffffff;
-  --surface-alt: #f8fafc;
-  --border: #e2e8f0;
-  --border-dark: #cbd5e1;
+  --surface-alt: #faf8f9;
+  --surface-warm: #fdf9fa;
+  --border: #e8e2e4;
+  --border-dark: #d4cdd0;
   --bg-card: #ffffff;
-  --bg-secondary: #f8fafc;
-  --bg-hover: #f1f5f9;
-  --bg: #f8fafc;
-  --bg-light: #f1f5f9;
-  --bg-muted: #f1f5f9;
+  --bg-secondary: #faf8f9;
+  --bg-hover: #f5f1f3;
+  --bg: #faf8f9;
+  --bg-light: #f6f3f4;
+  --bg-muted: #f5f2f3;
   --card: #ffffff;
-  --text: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #64748b;
-  --text-light: #94a3b8;
+  --text: #1a1520;
+  --text-secondary: #4a4252;
+  --text-muted: #6b6074;
+  --text-light: #9a8fa3;
 }
 
 * {
@@ -50,7 +52,7 @@ body,
 
 body {
   font-family: "Inter", "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: var(--background);
+  background: linear-gradient(160deg, #f6f3f5 0%, #f4f1f6 40%, #f5f2f4 100%);
   color: var(--text);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -128,10 +130,10 @@ body {
 .brand-icon svg { width: 1rem; height: 1rem; }
 
 .brand-title {
-  font-size: 0.95rem;
-  font-weight: 700;
+  font-size: 1.15rem;
+  font-weight: 800;
   line-height: 1.1;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
   background: linear-gradient(135deg, #FF7A7E, #FF5A5F, #ff8a6b);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -139,10 +141,10 @@ body {
 }
 
 .brand-subtitle {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   color: rgba(255, 255, 255, 0.55);
-  margin-top: -1px;
-  letter-spacing: 0.04em;
+  margin-top: 0;
+  letter-spacing: 0.05em;
   font-weight: 500;
 }
 
@@ -595,7 +597,7 @@ body {
   gap: 0.75rem;
   flex: 1;
   overflow-y: auto;
-  background: linear-gradient(180deg, #fafbfd 0%, #f8f9fb 100%);
+  background: linear-gradient(180deg, var(--surface-warm) 0%, var(--bg-light) 100%);
 }
 
 .panel-footer {
@@ -620,8 +622,8 @@ body {
 }
 
 .composer:focus-within {
-  border-color: var(--purple);
-  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.08);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(255, 90, 95, 0.08);
 }
 
 .composer-input {
@@ -782,9 +784,9 @@ button.send-button svg {
 /* ── Glass Box Panel ── */
 .gb-panel {
   margin-top: 1rem;
-  border: 1px solid rgba(96, 165, 250, 0.2);
+  border: 1px solid rgba(255, 90, 95, 0.12);
   border-radius: 0.75rem;
-  background: linear-gradient(135deg, #f0f9ff 0%, #f5f3ff 50%, #faf5ff 100%);
+  background: linear-gradient(135deg, #fdf9fa 0%, #faf5f8 50%, #f8f4f9 100%);
   overflow: hidden;
 }
 .gb-header {
@@ -792,15 +794,15 @@ button.send-button svg {
   align-items: center;
   justify-content: space-between;
   padding: 0.75rem 1rem;
-  background: linear-gradient(135deg, rgba(96,165,250,0.08), rgba(124,58,237,0.06));
-  border-bottom: 1px solid rgba(96, 165, 250, 0.12);
+  background: linear-gradient(135deg, rgba(255,90,95,0.05), rgba(168,85,247,0.04));
+  border-bottom: 1px solid rgba(255, 90, 95, 0.08);
   flex-wrap: wrap;
   gap: 0.5rem;
 }
 .gb-title {
   font-weight: 700;
   font-size: 0.85rem;
-  color: #334155;
+  color: var(--text);
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -855,7 +857,7 @@ button.send-button svg {
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #64748b;
+  color: var(--text-muted);
   font-weight: 600;
 }
 .gb-empty {
@@ -873,10 +875,10 @@ button.send-button svg {
   font-size: 0.72rem;
   font-family: 'SF Mono', 'Cascadia Code', monospace;
   padding: 0.2rem 0.5rem;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
+  background: var(--bg-light);
+  border: 1px solid var(--border);
   border-radius: 4px;
-  color: #475569;
+  color: var(--text-secondary);
 }
 .gb-citations {
   display: grid;
@@ -892,20 +894,20 @@ button.send-button svg {
   font-size: 0.65rem;
   font-weight: 700;
   padding: 0.12rem 0.4rem;
-  background: rgba(124, 58, 237, 0.1);
-  color: #7c3aed;
+  background: rgba(255, 90, 95, 0.1);
+  color: var(--primary);
   border-radius: 4px;
   white-space: nowrap;
   flex-shrink: 0;
 }
 .gb-cite-title {
-  color: #334155;
+  color: var(--text-secondary);
   font-weight: 500;
 }
 .gb-cite-snippet {
   display: block;
   font-size: 0.72rem;
-  color: #64748b;
+  color: var(--text-muted);
   margin-top: 0.15rem;
 }
 .gb-evidence-list {
@@ -917,8 +919,8 @@ button.send-button svg {
   align-items: center;
   gap: 0.5rem;
   padding: 0.35rem 0.5rem;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--surface-warm);
+  border: 1px solid var(--border);
   border-radius: 6px;
 }
 .gb-ev-type {
@@ -940,7 +942,7 @@ button.send-button svg {
   min-width: 0;
 }
 .gb-ev-info strong {
-  color: #334155;
+  color: var(--text);
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -948,7 +950,7 @@ button.send-button svg {
 }
 .gb-ev-info span {
   font-size: 0.7rem;
-  color: #64748b;
+  color: var(--text-muted);
 }
 
 /* ── Evidence: Full-width card when rich content ── */
@@ -971,7 +973,7 @@ button.send-button svg {
   height: 60px;
   border-radius: 6px;
   overflow: hidden;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border);
   display: block;
   transition: transform 0.15s;
 }
@@ -1012,8 +1014,8 @@ button.send-button svg {
 .gb-ev-ref {
   display: inline-block;
   font-size: 0.68rem;
-  color: #64748b;
-  background: #f1f5f9;
+  color: var(--text-muted);
+  background: var(--bg-light);
   padding: 0.1rem 0.35rem;
   border-radius: 3px;
   font-family: monospace;
@@ -1026,7 +1028,7 @@ button.send-button svg {
   background: rgba(255, 90, 95, 0.04);
   font-size: 0.72rem;
   line-height: 1.45;
-  color: #475569;
+  color: var(--text-secondary);
   font-style: italic;
   border-radius: 0 4px 4px 0;
 }
@@ -1084,8 +1086,8 @@ button.send-button svg {
 }
 
 .summary-kpis div:nth-child(1) {
-  background: linear-gradient(135deg, #eff6ff, #dbeafe);
-  border-left: 3px solid #3b82f6;
+  background: linear-gradient(135deg, #fff5f5, #ffe8e8);
+  border-left: 3px solid var(--primary);
 }
 
 .summary-kpis div:nth-child(2) {
@@ -1094,13 +1096,13 @@ button.send-button svg {
 }
 
 .summary-kpis div:nth-child(3) {
-  background: linear-gradient(135deg, #fffbeb, #fef3c7);
-  border-left: 3px solid #f59e0b;
+  background: linear-gradient(135deg, #fff8f0, #fff0e0);
+  border-left: 3px solid #f97316;
 }
 
 .summary-kpis div:nth-child(4) {
-  background: linear-gradient(135deg, #faf5ff, #ede9fe);
-  border-left: 3px solid #8b5cf6;
+  background: linear-gradient(135deg, #fdf5ff, #f5edfe);
+  border-left: 3px solid #a855f7;
 }
 
 .summary-kpis div span {
@@ -1595,8 +1597,8 @@ button.send-button svg {
 }
 
 .conversation-bubble.assistant .bubble-avatar {
-  background: linear-gradient(135deg, #ede9fe, #ddd6fe);
-  color: var(--purple);
+  background: linear-gradient(135deg, #fde8e8, #f5e0f0);
+  color: var(--primary);
 }
 
 .conversation-bubble.user .bubble-avatar {
@@ -1781,7 +1783,7 @@ button.send-button svg {
 .conversation-bubble.user .bubble-content strong { color: #ffffff; }
 
 .conversation-bubble.assistant .bubble-body {
-  background: var(--surface);
+  background: var(--surface-warm);
   color: var(--text);
   border-radius: 0.75rem 0.75rem 0.75rem 0.15rem;
   border: 1px solid var(--border);
@@ -2063,14 +2065,14 @@ button.send-button svg {
 }
 
 .canvas-empty {
-  border: 2px dashed rgba(124, 58, 237, 0.2);
+  border: 2px dashed rgba(255, 90, 95, 0.15);
   border-radius: 0.85rem;
   padding: 2.5rem 2rem;
   text-align: center;
   color: var(--text-muted);
   display: grid;
   gap: 0.75rem;
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.03), rgba(255, 90, 95, 0.03));
+  background: linear-gradient(135deg, rgba(255, 90, 95, 0.02), rgba(168, 85, 247, 0.02));
 }
 
 .canvas-empty h3 {
@@ -2154,13 +2156,13 @@ button.send-button svg {
 .focus-drawer {
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
   padding: 0.6rem 0.75rem;
-  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  background: linear-gradient(135deg, #fff9f5 0%, #fef5f0 50%, #fff8f5 100%);
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 0.5rem;
   flex-shrink: 0;
-  border-left: 3px solid #f59e0b;
+  border-left: 3px solid var(--primary);
 }
 
 .focus-drawer > div {
@@ -2203,12 +2205,12 @@ button.send-button svg {
 
 .canvas-card-header {
   padding: 1rem 1.25rem;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  border-bottom: 1px solid var(--border);
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  background: linear-gradient(135deg, #fdfafa 0%, #f9f5f7 50%, #f7f3f8 100%);
 }
 
 .canvas-card-header h3 {
