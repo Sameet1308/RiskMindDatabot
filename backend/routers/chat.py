@@ -201,6 +201,61 @@ def _has_gemini():
 def _has_openai():
     return bool(OPENAI_API_KEY and OPENAI_API_KEY != "your-openai-api-key-here")
 
+AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY_ID", "")
+def _has_bedrock():
+    return bool(AWS_ACCESS_KEY)
+
+
+# ──── Bedrock Vision / PDF Analysis ────
+
+async def _analyze_image_bedrock(image_base64: str, prompt: str) -> str:
+    """Analyze image with Claude on AWS Bedrock."""
+    import boto3
+    session = boto3.Session(
+        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+        region_name=os.getenv("AWS_DEFAULT_REGION", "us-east-1"),
+    )
+    client = session.client("bedrock-runtime")
+    response = client.converse(
+        modelId="us.anthropic.claude-sonnet-4-20250514",
+        messages=[{
+            "role": "user",
+            "content": [
+                {"text": f"{SYSTEM_PROMPT}\n\n{prompt}"},
+                {"image": {"format": "jpeg", "source": {"bytes": base64.b64decode(image_base64)}}},
+            ],
+        }],
+        inferenceConfig={"maxTokens": 1024},
+    )
+    return response["output"]["message"]["content"][0]["text"]
+
+
+async def _analyze_pdf_bedrock(file_path: str) -> str:
+    """Analyze PDF with Claude on AWS Bedrock (native PDF support)."""
+    import boto3
+    with open(file_path, "rb") as f:
+        pdf_bytes = f.read()
+
+    session = boto3.Session(
+        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+        region_name=os.getenv("AWS_DEFAULT_REGION", "us-east-1"),
+    )
+    client = session.client("bedrock-runtime")
+    response = client.converse(
+        modelId="us.anthropic.claude-sonnet-4-20250514",
+        messages=[{
+            "role": "user",
+            "content": [
+                {"text": f"{SYSTEM_PROMPT}\n\nAnalyze this insurance document. Summarize key findings, risks, and relevant data."},
+                {"document": {"format": "pdf", "name": "upload", "source": {"bytes": pdf_bytes}}},
+            ],
+        }],
+        inferenceConfig={"maxTokens": 1024},
+    )
+    return response["output"]["message"]["content"][0]["text"]
+
 
 # ──── Vision Analysis ────
 
@@ -250,6 +305,12 @@ async def _analyze_image(image_base64_or_path: str, prompt: str, is_file: bool =
     else:
         b64 = image_base64_or_path
 
+    if _has_bedrock():
+        try:
+            return await _analyze_image_bedrock(b64, prompt)
+        except Exception as e:
+            print(f"Bedrock vision error: {e}")
+
     if _has_gemini():
         try:
             return await _analyze_image_gemini(b64, prompt)
@@ -262,7 +323,7 @@ async def _analyze_image(image_base64_or_path: str, prompt: str, is_file: bool =
         except Exception as e:
             print(f"OpenAI vision error: {e}")
 
-    return "Image analysis requires a Google API key (free) or OpenAI API key. Please configure one in backend/.env"
+    return "Image analysis requires AWS Bedrock, Google API key, or OpenAI API key. Please configure one in backend/.env"
 
 
 # ──── Video Analysis ────
@@ -307,7 +368,15 @@ async def _analyze_video(file_path: str, prompt: str) -> str:
 
 
 async def _analyze_pdf(file_path: str) -> str:
-    """Extract and analyze PDF text."""
+    """Analyze PDF — Bedrock (native) → Gemini → OpenAI (text extract fallback)."""
+    # Try Bedrock first — native PDF support, no text extraction needed
+    if _has_bedrock():
+        try:
+            return await _analyze_pdf_bedrock(file_path)
+        except Exception as e:
+            print(f"Bedrock PDF error: {e}")
+
+    # Fallback: extract text and send to Gemini/OpenAI
     from pypdf import PdfReader
     reader = PdfReader(file_path)
     full_text = ""
