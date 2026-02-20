@@ -319,7 +319,7 @@ def _format_data_snapshot(dashboard_data: dict, intent_payload: dict) -> str:
             lines.append(f"- Premium: ${pol_premium:,.0f} | Period: {pol.get('effective_date', '?')} to {pol.get('expiration_date', '?')}")
             lines.append(f"- Claims: {len(pol_claims)} total ({pol_open} open, {len(pol_claims) - pol_open} closed)")
             lines.append(f"- Total Loss: ${pol_total:,.0f} | Loss Ratio: {pol_lr}% | Risk: {risk.upper()}")
-            pol_status = pol.get("policy_status", "active")
+            pol_status = pol.get("policy_status") or "active"
             lines.append(f"- Status: {pol_status.upper()}")
 
             # Third-party enrichment data (if available)
@@ -380,7 +380,7 @@ def _format_data_snapshot(dashboard_data: dict, intent_payload: dict) -> str:
             if pol_decisions:
                 lines.append(f"DECISIONS FOR {pol['policy_number']}:")
                 for d in pol_decisions:
-                    lines.append(f"  - {d.get('decision', '?').upper()} (Risk: {d.get('risk_level', '?')}) by {d.get('decided_by', '?')} on {d.get('created_at', '?')[:10]}")
+                    lines.append(f"  - {(d.get('decision') or '?').upper()} (Risk: {d.get('risk_level') or '?'}) by {d.get('decided_by') or '?'} on {(d.get('created_at') or '?')[:10]}")
                     if d.get("reason"):
                         lines.append(f"    Reason: {d['reason'][:120]}")
             lines.append("")
@@ -519,7 +519,7 @@ def _format_data_snapshot(dashboard_data: dict, intent_payload: dict) -> str:
             for b in breaches[:10]:
                 lines.append(
                     f"  - {b['zone']}: {b['metric']} = {b['actual']:,.0f} "
-                    f"(limit: {b['limit']:,.0f}) -> Action: {b['action'].upper()}"
+                    f"(limit: {b['limit']:,.0f}) -> Action: {(b.get('action') or 'review').upper()}"
                 )
             lines.append("")
 
@@ -528,7 +528,7 @@ def _format_data_snapshot(dashboard_data: dict, intent_payload: dict) -> str:
     if recent_dec:
         lines.append("RECENT DECISIONS:")
         for d in recent_dec:
-            lines.append(f"  - {d.get('policy_number', '?')}: {d.get('decision', '?').upper()} by {d.get('decided_by', '?')} ({d.get('created_at', '?')[:10]})")
+            lines.append(f"  - {d.get('policy_number') or '?'}: {(d.get('decision') or '?').upper()} by {d.get('decided_by') or '?'} ({(d.get('created_at') or '?')[:10]})")
         lines.append("")
 
     # ── Session documents (uploaded files with AI analysis in this chat session)
