@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RiskMind Demo Script</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0f172a;--card:#1e293b;--accent:#ff5a5f;--blue:#60a5fa;--purple:#a78bfa;--green:#34d399;--amber:#fbbf24;--text:#e2e8f0;--muted:#94a3b8;--border:rgba(148,163,184,0.15)}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;overflow-x:hidden}
+
+/* ── Top Bar ── */
+.topbar{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(15,23,42,0.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0.6rem 1.5rem;display:flex;align-items:center;justify-content:space-between}
+.topbar h1{font-size:1rem;font-weight:700;background:linear-gradient(135deg,var(--accent),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.topbar-right{display:flex;align-items:center;gap:1rem}
+.timer{font-family:'Courier New',monospace;font-size:1.1rem;color:var(--blue);font-weight:700;min-width:60px}
+.timer-btn{background:none;border:1px solid var(--border);color:var(--muted);padding:0.25rem 0.6rem;border-radius:6px;cursor:pointer;font-size:0.75rem}
+.timer-btn:hover{color:var(--text);border-color:var(--blue)}
+.progress-bar{position:fixed;top:52px;left:0;right:0;height:3px;background:var(--border);z-index:99}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--purple),var(--blue));transition:width 0.4s ease;width:0%}
+
+/* ── Navigation ── */
+.nav{position:fixed;left:0;top:55px;bottom:0;width:220px;background:rgba(15,23,42,0.98);border-right:1px solid var(--border);overflow-y:auto;padding:1rem 0;z-index:50}
+.nav-item{display:block;padding:0.45rem 1rem;font-size:0.78rem;color:var(--muted);cursor:pointer;border-left:3px solid transparent;transition:all 0.2s}
+.nav-item:hover{color:var(--text);background:rgba(96,165,250,0.05)}
+.nav-item.active{color:var(--blue);border-left-color:var(--blue);background:rgba(96,165,250,0.08)}
+.nav-item .nav-time{float:right;font-size:0.65rem;opacity:0.6}
+.nav-phase{padding:0.6rem 1rem 0.25rem;font-size:0.6rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--accent);font-weight:700;margin-top:0.5rem}
+.nav-phase:first-child{margin-top:0}
+
+/* ── Main Content ── */
+.main{margin-left:220px;margin-top:55px;padding:2rem 2.5rem 4rem}
+.section{margin-bottom:3rem;scroll-margin-top:70px}
+.section-header{display:flex;align-items:center;gap:0.75rem;margin-bottom:1.25rem}
+.section-num{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--purple));display:flex;align-items:center;justify-content:center;font-size:0.85rem;font-weight:800;flex-shrink:0}
+.section-title{font-size:1.3rem;font-weight:700}
+.section-time{font-size:0.75rem;color:var(--muted);margin-left:auto;background:var(--card);padding:0.2rem 0.6rem;border-radius:999px}
+
+/* ── Script Cards ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:1rem;overflow:hidden}
+.card-header{padding:0.75rem 1rem;display:flex;align-items:center;gap:0.6rem;cursor:pointer;user-select:none}
+.card-header:hover{background:rgba(96,165,250,0.04)}
+.card-step{font-size:0.65rem;font-weight:700;text-transform:uppercase;padding:0.15rem 0.45rem;border-radius:4px;letter-spacing:0.05em}
+.card-step.say{background:rgba(96,165,250,0.15);color:var(--blue)}
+.card-step.do{background:rgba(52,211,153,0.15);color:var(--green)}
+.card-step.show{background:rgba(255,90,95,0.15);color:var(--accent)}
+.card-step.arch{background:rgba(167,139,250,0.15);color:var(--purple)}
+.card-label{font-size:0.9rem;font-weight:600}
+.card-chevron{margin-left:auto;transition:transform 0.2s;color:var(--muted)}
+.card.open .card-chevron{transform:rotate(90deg)}
+.card-body{display:none;padding:0 1rem 1rem;border-top:1px solid var(--border)}
+.card.open .card-body{display:block}
+
+/* ── Say / Do blocks ── */
+.say-block{background:rgba(96,165,250,0.06);border-left:3px solid var(--blue);padding:0.75rem 1rem;border-radius:0 8px 8px 0;margin:0.75rem 0;font-size:0.9rem;line-height:1.7}
+.say-block em{color:var(--blue);font-style:normal;font-weight:600}
+.do-block{background:rgba(52,211,153,0.06);border-left:3px solid var(--green);padding:0.75rem 1rem;border-radius:0 8px 8px 0;margin:0.75rem 0;font-size:0.85rem}
+.do-block code{background:rgba(52,211,153,0.12);padding:0.15rem 0.4rem;border-radius:4px;font-size:0.82rem;color:var(--green)}
+.show-block{background:rgba(255,90,95,0.06);border-left:3px solid var(--accent);padding:0.75rem 1rem;border-radius:0 8px 8px 0;margin:0.75rem 0;font-size:0.85rem}
+.tip{display:inline-block;background:rgba(251,191,36,0.12);color:var(--amber);font-size:0.75rem;padding:0.15rem 0.5rem;border-radius:4px;font-weight:600;margin:0.25rem 0}
+
+/* ── Architecture Diagrams ── */
+.arch-box{background:#0c1222;border:1px solid var(--border);border-radius:10px;padding:1.25rem;margin:1rem 0;font-family:'Courier New',monospace;font-size:0.78rem;line-height:1.5;overflow-x:auto;white-space:pre;color:var(--muted)}
+.arch-box .hl{color:var(--accent);font-weight:700}
+.arch-box .bl{color:var(--blue)}
+.arch-box .gr{color:var(--green)}
+.arch-box .pr{color:var(--purple)}
+.arch-box .am{color:var(--amber)}
+
+/* ── Flow Diagram ── */
+.flow{display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin:1rem 0}
+.flow-node{padding:0.4rem 0.75rem;border-radius:8px;font-size:0.75rem;font-weight:600;white-space:nowrap}
+.flow-arrow{color:var(--muted);font-size:0.8rem}
+.fn-blue{background:rgba(96,165,250,0.15);color:var(--blue);border:1px solid rgba(96,165,250,0.3)}
+.fn-green{background:rgba(52,211,153,0.15);color:var(--green);border:1px solid rgba(52,211,153,0.3)}
+.fn-purple{background:rgba(167,139,250,0.15);color:var(--purple);border:1px solid rgba(167,139,250,0.3)}
+.fn-coral{background:rgba(255,90,95,0.15);color:var(--accent);border:1px solid rgba(255,90,95,0.3)}
+.fn-amber{background:rgba(251,191,36,0.15);color:var(--amber);border:1px solid rgba(251,191,36,0.3)}
+
+/* ── Responsive ── */
+@media(max-width:768px){
+  .nav{display:none}
+  .main{margin-left:0;padding:1.5rem 1rem}
+}
+</style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<div class="topbar">
+  <h1>RiskMind Demo Script</h1>
+  <div class="topbar-right">
+    <button class="timer-btn" onclick="toggleTimer()">Start Timer</button>
+    <div class="timer" id="timer">0:00</div>
+  </div>
+</div>
+<div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+
+<!-- Side Nav -->
+<nav class="nav" id="sideNav">
+  <div class="nav-phase">Opening</div>
+  <div class="nav-item" data-section="s0">Pre-Demo Checklist</div>
+  <div class="nav-item" data-section="s1">Opening &amp; Hook <span class="nav-time">2 min</span></div>
+  <div class="nav-phase">Product Demo</div>
+  <div class="nav-item" data-section="s2">Login &amp; Data Connect <span class="nav-time">2 min</span></div>
+  <div class="nav-item" data-section="s3">Risk Intelligence <span class="nav-time">3 min</span></div>
+  <div class="nav-item" data-section="s4">Glass Box Evidence <span class="nav-time">3 min</span></div>
+  <div class="nav-item" data-section="s5">Decision Support <span class="nav-time">3 min</span></div>
+  <div class="nav-item" data-section="s6">Guardrails <span class="nav-time">2 min</span></div>
+  <div class="nav-item" data-section="s7">Geo, Workbench, Analytics &amp; Saved <span class="nav-time">5 min</span></div>
+  <div class="nav-phase">Architecture</div>
+  <div class="nav-item" data-section="s8">System Architecture <span class="nav-time">3 min</span></div>
+  <div class="nav-item" data-section="s9">Agent Pipeline <span class="nav-time">3 min</span></div>
+  <div class="nav-item" data-section="s10">RAG &amp; Vector Store <span class="nav-time">2 min</span></div>
+  <div class="nav-phase">Close</div>
+  <div class="nav-item" data-section="s11">Summary &amp; Q&amp;A <span class="nav-time">2 min</span></div>
+</nav>
+
+<!-- Main Content -->
+<div class="main" id="mainContent">
+
+<!-- ══════════════════════════════════════════ -->
+<!-- SECTION 0: PRE-DEMO CHECKLIST             -->
+<!-- ══════════════════════════════════════════ -->
+<div class="section" id="s0">
+  <div class="section-header">
+    <div class="section-num">0</div>
+    <div class="section-title">Pre-Demo Checklist</div>
+    <div class="section-time">Before call</div>
+  </div>
+
+  <div class="card open">
+    <div class="card-header" onclick="toggle(this)">
+      <span class="card-step do">CHECK</span>
+      <span class="card-label">Setup Verification</span>
+      <span class="card-chevron">&#9654;</span>
+    </div>
+    <div class="card-body">
+      <div class="do-block">
+        <strong>5 minutes before the call:</strong><br>
+        1. Open <code>https://riskmind.onrender.com</code> &mdash; verify it loads<br>
+        2. Open a second browser tab with <code>/health</code> &mdash; confirm <code>"llm_active": true</code><br>
+        3. Clear browser cache / use incognito so login screen shows fresh<br>
+        4. Close Slack, email, notifications &mdash; no popups during demo<br>
+        5. Have this script open on a second screen or half-screen<br>
+        6. Test screen share &mdash; share the browser tab, not full screen
+      </div>
+      <div class="tip">Render free tier may sleep after 15 min &mdash; hit /health 2 min before to wake it</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- SECTION 1: OPENING                        -->
+<!-- ══════════════════════════════════════════ -->
+<div class="section" id="s1">
+  <div class="section-header">
+    <div class="section-num">1</div>
+    <div class="section-title">Opening &amp; Hook</div>
+    <div class="section-time">~2 min</div>
+  </div>
+
+  <div class="card open">
+    <div class="card-header" onclick="toggle(this)">
+      <span class="card-step say">SAY</span>
+      <span class="card-label">Welcome &amp; Problem Statement</span>
+      <span class="card-chevron">&#9654;</span>
+    </div>
+    <div class="card-body">
+      <div class="say-block">
+        "Good [morning/afternoon], everyone. Thank you for your time today.<br><br>
+        I'm [Name], and I'm going to show you <em>RiskMind</em> &mdash; an AI-powered underwriting co-pilot we've built for commercial insurance.<br><br>
+        Here's the problem we're solving: underwriters today spend <em>60-70% of their time</em> gathering data, cross-referencing guidelines, and writing memos. The actual risk judgment &mdash; the part that requires human expertise &mdash; gets squeezed into the remaining time.<br><br>
+        Most AI tools in insurance are black boxes. They give you a number &mdash; 'risk score 78' &mdash; but can't tell you <em>why</em>. Underwriters don't trust what they can't verify.<br><br>
+        RiskMind takes a different approach. We call it the <em>Glass Box</em>. Every answer shows you exactly where the data came from, which guidelines were cited, and what evidence the AI analyzed. The AI assists &mdash; the underwriter decides."
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header" onclick="toggle(this)">
+      <span class="card-step say">SAY</span>
+      <span class="card-label">What I'll Show You</span>
+      <span class="card-chevron">&#9654;</span>
+    </div>
+    <div class="card-body">
+      <div class="say-block">
+        "In the next 20 minutes, I'll walk you through three things:<br><br>
+        <em>First</em> &mdash; the product. Live demo of how an underwriter actually uses RiskMind day-to-day.<br><br>
+        <em>Second</em> &mdash; the Glass Box. How we ensure transparency, guardrails, and human-in-the-loop decisions.<br><br>
+        <em>Third</em> &mdash; the architecture. The engineering behind it &mdash; our agentic AI pipeline, RAG system, and how we keep LLM costs near zero for most queries.<br><br>
+        Let's jump in."
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- SECTION 2: LOGIN & DATA CONNECTOR         -->
+<!-- ══════════════════════════════════════════ -->
+<div class="section" id="s2">
+  <div class="section-header">
+    <div class="section-num">2</div>
+    <div class="section-title">Login &amp; Data Connector</div>
+    <div class="section-time">~2 min</div>
+  </div>
+
+  <div class="card open">
+    <div class="card-header" onclick="toggle(this)">
+      <span class="card-step do">DO</span>
+      <span class="card-label">Login as Sarah Mitchell</span>
+      <span class="card-chevron">&#9654;</span>
+    </div>
+    <div class="card-body">
+      <div class="do-block">
+        1. Open the app &mdash; login screen with two user tiles<br>
+        2. Click <code>Sarah Mitchell</code> tile &rarr; type <code>sarah123</code> &rarr; click Sign In<br>
+        3. Data Connector screen appears with animated 4-step progress
+      </div>
+      <div class="say-block">
+        "When Sarah logs in, RiskMind connects to her organization's data sources. Watch this &mdash; it discovers the database schema, finds 6 tables, indexes the knowledge base into vector embeddings, and builds the context.<br><br>
+        This isn't a static dashboard. The AI now understands the <em>structure</em> of the data &mdash; policies, claims, decisions, underwriting guidelines &mdash; and can reason across all of it."
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header" onclick="toggle(this)">
+      <span class="card-step say">SAY</span>
+      <span class="card-label">RBAC Point</span>
+      <span class="card-chevron">&#9654;</span>
+    </div>
+    <div class="card-body">
+      <div class="say-block">
+        "Notice Sarah sees her 10 assigned policies. If James logs in, he sees his 11. Every query, every chart, every AI response is scoped to the user's portfolio. This is role-based access control built into the AI layer, not just the UI."
+      </div>
+      <div class="do-block">Click "Continue to RiskMind" to proceed</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- SECTION 3: RISK INTELLIGENCE              -->
+<!-- ══════════════════════════════════════════ -->
+<div class="section" id="s3">
+  <div class="section-header">
+    <div class="section-num">3</div>
+    <div class="section-title">Risk Intelligence</div>
+    <div class="section-time">~3 min</div>
+  </div>
+
+  <div class="card open">
+    <div class="card-header" onclick="toggle(this)">
+      <span class="card-step do">DO</span>
+      <span class="card-label">Portfolio Overview</span>
+      <span class="card-chevron">&#9654;</span>
+    </div>
+    <div class="card-body">
+      <div class="do-block">Type: <code>Give me a portfolio risk overview</code></div>
+      <div class="say-block">
+        "I start my day by asking for a portfolio overview. RiskMind instantly analyzes all my assigned policies, their claims history, and surfaces the key risks.<br><br>
+        Look at the response &mdash; it's not generic. It tells me the <em>specific industries</em> driving my loss ratio, which policies need attention, and what actions I should take. Every number comes from the actual database."
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header" onclick="toggle(this)">
+      <span class="card-step do">DO</span>
+      <span class="card-label">Specific Policy Analysis</span>
+      <span class="card-chevron">&#9654;</span>
+    </div>
+    <div class="card-body">
+      <div class="do-block">Type: <code>Why is COMM-2024-003 considered high risk?</code></div>
+      <div class="say-block">
+        "Now let me drill into a specific policy &mdash; SafeBuild Construction. Watch the Intelligence Canvas on the right.<br><br>
+        <em>[Point to canvas]</em> We get KPI tiles &mdash; 3 claims, $215,000 total loss, 287% loss ratio. That's nearly 3x their premium in claims. The AI identifies the key drivers: a $175,000 crane collapse, scaffolding falls, OSHA violations.<br><br>
+        This isn't just data retrieval. The AI is <em>reasoning</em> across claims data, underwriting guidelines, and past decisions to tell me why this matters and what to do about it."
+      </div>
+      <div class="tip">Pause here and let the canvas fully render before speaking about it</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header" onclick="toggle(this)">
+      <span class="card-step do">DO</span>
+      <span class="card-label">Follow-Up Context (Conversational Memory)</span>
+      <span class="card-chevron">&#9654;</span>
+    </div>
+    <div class="card-body">
+      <div class="do-block">Type: <code>Show me the evidence trail</code></div>
+      <div class="say-block">
+        "Here's something important. I just said 'show me the evidence trail' &mdash; I didn't repeat the policy number. <em>RiskMind remembers the context.</em> It knows I'm still talking about SafeBuild Construction, COMM-2024-003.<br><br>
+        This is conversational memory. The system scans recent chat history and resolves the entity automatically. If it can't figure out what you're referring to, it asks &mdash; it doesn't guess."
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- SECTION 4: GLASS BOX EVIDENCE             -->
+<!-- ══════════════════════════════════════════ -->
+<div class="section" id="s4">
+  <div class="section-header">
+    <div class="section-num">4</div>
+    <div class="section-title">Glass Box &mdash; Evidence Deep-Dive</div>
+    <div class="section-time">~3 min</div>
+  </div>
+
+  <div class="card open">
+    <div class="card-header" onclick="toggle(this)">
+      <span class="card-step show">SHOW</span>
+      <span class="card-label">Evidence Panel Walkthrough</span>
+      <span class="card-chevron">&#9654;</span>
+    </div>
+    <div class="card-body">
+      <div class="show-block">
+        <strong>Point to each section of the Glass Box panel:</strong><br>
+        1. <strong>Confidence Score</strong> (top-right pill) &mdash; e.g., "82% &mdash; High Confidence"<br>
+        2. <strong>Data Lineage</strong> card &mdash; which database tables were used<br>
+        3. <strong>Guideline Citations</strong> card &mdash; purple badges with section codes<br>
+        4. <strong>Evidence Items</strong> card &mdash; image thumbnails + PDF icons + AI quotes
+      </div>
+      <div class="say-block">
+        "This is the Glass Box. Three columns of transparency.<br><br>
+        <em>[Point to Data Lineage]</em> Data Lineage tells you exactly which tables were queried &mdash; policies, claims, decisions. No mystery about where the data came from.<br><br>
+        <em>[Point to Citations]</em> Guideline Citations &mdash; the AI cites specific sections of our underwriting manual. Section 4.1, high-risk threshold. Section 6.2, construction class rating. You can verify each one.<br><br>
+        <em>[Point to Evidence]</em> And here's the real differentiator. <em>Evidence Items.</em> This is an actual photo from the crane collapse claim. Click it &mdash; full resolution. And below it, the AI's analysis: 'Aerial imagery confirms complete structural failure of the 40-ton tower crane. Jib section separated at the slewing ring.'<br><br>
+        And this PDF &mdash; the pre-incident inspection report. The AI quotes directly: 'Report flagged wear on slewing ring bearings and recommended replacement within 60 days. Recommendation was NOT actioned.'<br><br>
+        This is not a hallucination. The AI is showing you the <em>actual document</em> and quoting what it found. That's the Glass Box."
+      </div>
+      <div class="tip">This is the money moment. Slow down here. Let the audience read the quotes.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header" onclick="toggle(this)">
+      <span class="card-step say">SAY</span>
+      <span class="card-label">Why Glass Box Matters</span>
+      <span class="card-chevron">&#9654;</span>
+    </div>
+    <div class="card-body">
+      <div class="say-block">
+        "Why does this matter? Because in insurance, you can't make a $250,000 decision based on 'the AI said so.' Regulators want audit trails. Underwriters want to verify. The Glass Box gives you both &mdash; <em>every insight is traceable back to its source.</em>"
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- SECTION 5: DECISION SUPPORT               -->
+<!-- ══════════════════════════════════════════ -->
+<div class="section" id="s5">
+  <div class="section-header">
+    <div class="section-num">5</div>
+    <div class="section-title">Decision Support &amp; Human-in-the-Loop</div>
+    <div class="section-time">~3 min</div>
+  </div>
+
+  <div class="card open">
+    <div class="card-header" onclick="toggle(this)">
+      <span class="card-step do">DO</span>
+      <span class="card-label">Decision Card</span>
+      <span class="card-chevron">&#9654;</span>
+    </div>
+    <div class="card-body">
+      <div class="do-block">Type: <code>Should we renew COMM-2024-016?</code></div>
+      <div class="say-block">
+        "Now the critical question &mdash; should we renew this policy? Watch what happens.<br><br>
+        <em>[Point to Decision Canvas]</em> RiskMind gives me a decision-ready card. It shows the recommendation &mdash; in this case, likely 'Refer' or 'Decline' based on the loss ratio. But notice: the AI <em>recommends</em>. It doesn't decide.<br><br>
+        I see three buttons: Accept, Refer, Decline. I can add my own notes. When I click, the decision is recorded with my name, timestamp, and reasoning &mdash; a full audit trail.<br><br>
+        This is <em>human-in-the-loop</em>. The AI accelerates my analysis from 45 minutes to 45 seconds. But the judgment call is always mine."
+      </div>
+      <div class="do-block">Click <code>Refer</code> with a note like "Requires manager review due to loss ratio" &mdash; show the confirmation toast</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header" onclick="toggle(this)">
+      <span class="card-step do">DO</span>
+      <span class="card-label">Underwriting Memo</span>
+      <span class="card-chevron">&#9654;</span>
+    </div>
+    <div class="card-body">
+      <div class="do-block">Type: <code>Draft an underwriting memo for COMM-2024-016</code></div>
+      <div class="say-block">
+        "Need a formal document? One prompt. RiskMind generates a complete underwriting memo &mdash; executive summary, risk assessment, pricing recommendation, guideline alignment. This used to take an underwriter an hour. Now it's 10 seconds.<br><br>
+        And I can save it, export it as PDF, send it to my manager or the broker. Every memo is backed by the same Glass Box evidence."
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- SECTION 6: GUARDRAILS                     -->
+<!-- ══════════════════════════════════════════ -->
+<div class="section" id="s6">
+  <div class="section-header">
+    <div class="section-num">6</div>
+    <div class="section-title">AI Guardrails</div>
+    <div class="section-time">~2 min</div>
+  </div>
+
+  <div class="card open">
+    <div class="card-header" onclick="toggle(this)">
+      <span class="card-step do">DO</span>
+      <span class="card-label">Out-of-Scope Test</span>
+      <span class="card-chevron">&#9654;</span>
+    </div>
+    <div class="card-body">
+      <div class="do-block">Type: <code>Hello</code></div>
+      <div class="say-block">
+        "First, a simple greeting. Notice &mdash; friendly response, but <em>no citation codes</em>, <em>no data retrieval</em>. The system knows this is just a greeting. It skips RAG entirely &mdash; no wasted API calls, no irrelevant guideline citations."
+      </div>
+      <div class="do-block">Type: <code>What's the weather like today?</code></div>
+      <div class="say-block">
+        "Now an off-topic question. Watch.<br><br>
+        <em>[Point to response]</em> 'I'm RiskMind, your underwriting co-pilot. I can't assist with that topic.' It doesn't try to answer. It doesn't hallucinate. And importantly &mdash; it didn't even call the LLM. This was caught <em>before</em> the AI model, so it costs zero API calls.<br><br>
+        But here's the nuance..."
+      </div>
+      <div class="do-block">Type: <code>What's the weather risk exposure for COMM-2024-003?</code></div>
+      <div class="say-block">
+        "Same word 'weather' &mdash; but now it's in an insurance context. RiskMind understands the difference and provides a full risk analysis. The guardrail is <em>context-aware</em>, not a simple keyword block."
+      </div>
+      <div class="tip">The hello-then-off-topic-then-insurance triple contrast is very effective. The audience will remember this.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header" onclick="toggle(this)">
+      <span class="card-step say">SAY</span>
+      <span class="card-label">Five Layers of Guardrails</span>
+      <span class="card-chevron">&#9654;</span>
+    </div>
+    <div class="card-body">
+      <div class="say-block">
+        "We have six layers of protection:<br><br>
+        <em>One</em> &mdash; Non-substantive detection. Greetings and small talk get clean responses with zero data retrieval &mdash; no wasted citations or API calls.<br>
+        <em>Two</em> &mdash; Out-of-scope detection. Off-topic questions caught before they reach the LLM.<br>
+        <em>Three</em> &mdash; Confidence scoring. If the AI isn't sure, it asks for clarification instead of guessing.<br>
+        <em>Four</em> &mdash; Hallucination detection. We check every policy and claim number the AI mentions against the database. If it invents an ID, we redact it.<br>
+        <em>Five</em> &mdash; Response validation. Empty, too-long, or nonsensical outputs are caught and replaced.<br>
+        <em>Six</em> &mdash; Human-in-the-loop. The decision buttons you just saw. AI recommends, human decides."
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- SECTION 7: GEO & WORKBENCH                -->
+<!-- ══════════════════════════════════════════ -->
+<div class="section" id="s7">
+  <div class="section-header">
+    <div class="section-num">7</div>
+    <div class="section-title">Geo, Workbench, Analytics &amp; Saved Intel</div>
+    <div class="section-time">~5 min</div>
+  </div>
+
+  <div class="card open">
+    <div class="card-header" onclick="toggle(this)">
+      <span class="card-step do">DO</span>
+      <span class="card-label">Geographic Risk Map</span>
+      <span class="card-chevron">&#9654;</span>
+    </div>
+    <div class="card-body">
+      <div class="do-block">Type: <code>Show me a geographic risk map</code></div>
+      <div class="say-block">
+        "Where are my risks concentrated? One question &mdash; and we get an interactive map. Red markers are high risk, amber is medium, green is low.<br><br>
+        <em>[Click a red marker]</em> Click any marker for details &mdash; policyholder, industry, premium, claims, loss ratio. The sidebar shows geographic hotspots, industry concentration, and top risk policies.<br><br>
+        This kind of spatial analysis used to require a GIS specialist. Now any underwriter can do it in 2 seconds."
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header" onclick="toggle(this)">
+      <span class="card-step do">DO</span>
+      <span class="card-label">Workbench Quick Tour</span>
+      <span class="card-chevron">&#9654;</span>
+    </div>
+    <div class="card-body">
+      <div class="do-block">Navigate to <code>/workbench</code> via sidebar</div>
+      <div class="say-block">
+        "The Workbench is Sarah's daily command center. Five tabs:<br><br>
+        <em>Overview</em> &mdash; portfolio KPIs, risk distribution, every policy at a glance.<br>
+        <em>Submissions</em> &mdash; new business triage with AI risk scores.<br>
+        <em>Renewals</em> &mdash; upcoming renewals with AI-suggested pricing. See this? High-risk gets a 30% surcharge recommendation. Low risk stays flat.<br>
+        <em>Quote Decisions</em> &mdash; accept, refer, or decline at scale.<br>
+        <em>Broker Communications</em> &mdash; AI-drafted responses for broker inquiries.<br><br>
+        Each tab has a one-click path back to the Intelligence Canvas for deeper analysis."
+      </div>
+      <div class="do-block">Click through 2-3 tabs quickly. Don't linger &mdash; keep momentum.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header" onclick="toggle(this)">
+      <span class="card-step do">DO</span>
+      <span class="card-label">Analytics Playground</span>
+      <span class="card-chevron">&#9654;</span>
+    </div>
+    <div class="card-body">
+      <div class="do-block">Navigate to <code>/analytics</code> via sidebar</div>
+      <div class="say-block">
+        "For self-service exploration, the Analytics Playground. Pick your dimensions &mdash; Industry, Risk Level. Measures &mdash; Claim Amount, Claim Count. Hit Run.<br><br>
+        <em>[Run query, toggle through viz types]</em> Grid, bar chart, line chart, pie chart, area chart &mdash; five visualization options. The grid title auto-generates based on your selection: 'Claim Amount by Industry.'<br><br>
+        <em>[Click sparkle icon]</em> Now the magic &mdash; AI Summary. Click this sparkle icon and the AI explains what patterns it sees in your data. This isn't a canned report; it's analyzing the specific slice you selected.<br><br>
+        <em>[Click bookmark icon]</em> Save this analysis directly to Saved Intelligence with one click."
+      </div>
+      <div class="tip">The AI Summary + Save combo shows how analytics feeds into the intelligence workflow.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header" onclick="toggle(this)">
+      <span class="card-step do">DO</span>
+      <span class="card-label">Saved Intelligence Hub</span>
+      <span class="card-chevron">&#9654;</span>
+    </div>
+    <div class="card-body">
+      <div class="do-block">Navigate to <code>/saved</code> via sidebar</div>
+      <div class="say-block">
+        "Everything you save &mdash; risk analyses, memos, decisions, analytics &mdash; lands here, automatically organized.<br><br>
+        <em>[Point to category groups]</em> Items are grouped by type: Risk Analysis, Memos, Decisions, Analytics, Geospatial. Each tile has tag chips &mdash; policy number, policyholder, industry, who saved it.<br><br>
+        <em>[Click a tag in the filter bar]</em> Filter by any tag. Need everything related to Eagle Transport? One click. Need all items Sarah saved? One click.<br><br>
+        Export individual items or the entire intelligence report as PDF."
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- SECTION 8: SYSTEM ARCHITECTURE            -->
+<!-- ══════════════════════════════════════════ -->
+<div class="section" id="s8">
+  <div class="section-header">
+    <div class="section-num">8</div>
+    <div class="section-title">System Architecture</div>
+    <div class="section-time">~3 min</div>
+  </div>
+
+  <div class="card open">
+    <div class="card-header" onclick="toggle(this)">
+      <span class="card-step arch">ARCH</span>
+      <span class="card-label">High-Level Architecture</span>
+      <span class="card-chevron">&#9654;</span>
+    </div>
+    <div class="card-body">
+      <div class="say-block">
+        "Let me show you what's under the hood. RiskMind has three layers."
+      </div>
+      <div class="arch-box"><span class="hl">                    RISKMIND ARCHITECTURE</span>
+
+  <span class="am">FRONTEND</span>                    <span class="bl">BACKEND</span>                     <span class="pr">AI LAYER</span>
+  +-----------------+        +-------------------+        +-------------------+
+  | React 19 + TS   |  HTTP  | FastAPI (Python)   |        | LangGraph Agent   |
+  | TailwindCSS     | &lt;----&gt; | Async SQLAlchemy   | &lt;----&gt; | 8-Node Pipeline   |
+  | Recharts        |  REST  | SQLite Database    |        | LangChain LLMs    |
+  | Leaflet Maps    |        | ChromaDB (RAG)     |        | ChromaDB (RAG)    |
+  +-----------------+        +-------------------+        +-------------------+
+         |                          |                           |
+    <span class="am">Vite Dev Server</span>          <span class="bl">Uvicorn ASGI</span>              <span class="pr">Bedrock / Gemini</span>
+    <span class="am">html2canvas+PDF</span>          <span class="bl">RBAC per user</span>              <span class="pr">Claude / OpenAI</span>
+    <span class="am">SPA Routing</span>              <span class="bl">60s Data Cache</span>             <span class="pr">Vision / PDF / Video</span>
+
+  <span class="gr">DEPLOYMENT:</span> Docker multi-stage build &rarr; Render.com (auto-deploy on push)
+  <span class="gr">STORAGE:</span>   1 GB persistent disk (SQLite + ChromaDB + uploads)</div>
+      <div class="say-block">
+        "<em>Frontend</em>: React 19, TypeScript, TailwindCSS. The Intelligence Canvas, maps, charts &mdash; all client-side rendering. PDF export uses html2canvas.<br><br>
+        <em>Backend</em>: FastAPI with async SQLAlchemy. SQLite for structured data, ChromaDB for vector embeddings. Every query is RBAC-scoped to the logged-in user.<br><br>
+        <em>AI Layer</em>: This is where it gets interesting. We use LangGraph &mdash; an agentic framework &mdash; to orchestrate an 8-node state machine. The LLM is the last step, not the first."
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header" onclick="toggle(this)">
+      <span class="card-step arch">ARCH</span>
+      <span class="card-label">LLM Fallback Chain</span>
+      <span class="card-chevron">&#9654;</span>
+    </div>
+    <div class="card-body">
+      <div class="flow">
+        <span class="flow-node fn-coral">AWS Bedrock (Claude)</span>
+        <span class="flow-arrow">&rarr;</span>
+        <span class="flow-node fn-green">Google Gemini (Free)</span>
+        <span class="flow-arrow">&rarr;</span>
+        <span class="flow-node fn-purple">Anthropic Claude</span>
+        <span class="flow-arrow">&rarr;</span>
+        <span class="flow-node fn-blue">OpenAI GPT-4o</span>
+        <span class="flow-arrow">&rarr;</span>
+        <span class="flow-node fn-amber">Smart Mock</span>
+      </div>
+      <div class="say-block">
+        "We built a resilient LLM fallback chain. Primary: AWS Bedrock with Claude. If that's down, we fall to Gemini's free tier. Then Claude direct, then OpenAI. If <em>everything</em> fails, a smart mock surfaces the raw data without AI commentary. The system never goes down."
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- SECTION 9: AGENT PIPELINE                 -->
+<!-- ══════════════════════════════════════════ -->
+<div class="section" id="s9">
+  <div class="section-header">
+    <div class="section-num">9</div>
+    <div class="section-title">LangGraph Agent Pipeline</div>
+    <div class="section-time">~3 min</div>
+  </div>
+
+  <div class="card open">
+    <div class="card-header" onclick="toggle(this)">
+      <span class="card-step arch">ARCH</span>
+      <span class="card-label">8-Node State Machine</span>
+      <span class="card-chevron">&#9654;</span>
+    </div>
+    <div class="card-body">
+      <div class="arch-box"><span class="hl">             LANGGRAPH AGENT PIPELINE</span>
+
+  User Message
+       |
+  <span class="bl">[1] Route Intent</span> ......... Keyword classifier (no LLM)
+       |                       + Entity resolution from history
+       |                       + Out-of-scope detection
+       |
+  <span class="bl">[2] Fetch Data</span> ........... Load cached snapshot (60s TTL)
+       |                       Format as ~4K char text context
+       |
+  <span class="gr">[3] Fetch Guidelines</span> .... ChromaDB semantic search (top 5)
+       |                       + Fallback to full guideline table
+       |
+  <span class="gr">[4] Fetch Knowledge</span> ..... Semantic search: past claims + decisions
+       |
+  <span class="am">[5] Check Confidence</span> .... Score 45-95, reason codes
+       |
+       +-------<span class="hl">&lt; 50?</span>-------+
+       |                  |
+  <span class="pr">[6b] Reason</span>        <span class="hl">[6a] Clarify</span>
+  (LLM call)       (No LLM - ask user)
+       |                  |
+       +------------------+
+       |
+  <span class="am">[7] Validate Output</span> ..... Hallucination check, length cap,
+       |                       entity redaction
+       |
+  <span class="bl">[8] Format Response</span> ..... Assemble final JSON for frontend
+       |
+  Response to User</div>
+      <div class="say-block">
+        "Here's the key insight: the LLM is Node 6 out of 8. That means <em>five steps happen before</em> we ever call the AI model.<br><br>
+        <em>Node 1</em>: Intent routing. Pure keyword matching &mdash; no AI cost. It determines: is this a policy query? A portfolio overview? A decision request? It also resolves entities from conversation history and catches out-of-scope questions.<br><br>
+        <em>Nodes 2-4</em>: Data assembly. We load the relevant data snapshot, search our vector store for matching guidelines and past cases. By the time the LLM sees the prompt, all the evidence is already gathered.<br><br>
+        <em>Node 5</em>: Confidence check. If we're not sure what the user wants, we ask &mdash; no LLM call, no cost. Only when confidence is above 50 do we invoke the model.<br><br>
+        <em>Node 7</em>: Post-LLM guardrails. We check for hallucinated entity IDs, truncate excessive responses, and validate output quality.<br><br>
+        The result: about <em>80% of queries</em> hit the LLM only once, and many don't hit it at all. The pipeline does the heavy lifting."
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- SECTION 10: RAG & VECTOR STORE            -->
+<!-- ══════════════════════════════════════════ -->
+<div class="section" id="s10">
+  <div class="section-header">
+    <div class="section-num">10</div>
+    <div class="section-title">RAG &amp; Vector Store</div>
+    <div class="section-time">~2 min</div>
+  </div>
+
+  <div class="card open">
+    <div class="card-header" onclick="toggle(this)">
+      <span class="card-step arch">ARCH</span>
+      <span class="card-label">RAG Pipeline</span>
+      <span class="card-chevron">&#9654;</span>
+    </div>
+    <div class="card-body">
+      <div class="arch-box"><span class="hl">                RAG (Retrieval-Augmented Generation)</span>
+
+  <span class="bl">INDEXING</span> (at startup):
+  +------------------+     +-----------+     +------------------+
+  | Guidelines (15)  | --&gt; | Embed as  | --&gt; | ChromaDB         |
+  | Claims (55+)     |     | vectors   |     | "guidelines" col |
+  | Decisions (15+)  |     | (1536-dim)|     | "knowledge" col  |
+  | Uploaded Docs    |     +-----------+     +------------------+
+  +------------------+
+
+  <span class="gr">RETRIEVAL</span> (per query):
+  +------------------+     +-----------+     +------------------+
+  | User question    | --&gt; | Embed     | --&gt; | Cosine similarity|
+  | "crane collapse" |     | query     |     | Top 5 matches    |
+  +------------------+     +-----------+     +------------------+
+                                                     |
+                                              <span class="am">Inject into LLM prompt</span>
+                                              as RELEVANT GUIDELINES
+                                              + SIMILAR PAST CASES</div>
+      <div class="say-block">
+        "RAG &mdash; Retrieval-Augmented Generation. Instead of fine-tuning the model on our data, we retrieve relevant context at query time and inject it into the prompt.<br><br>
+        At startup, we index all our guidelines, past claims, and decisions into ChromaDB as vector embeddings. When a user asks about a crane collapse, we search for the most similar guidelines and past cases, then give those to the LLM as context.<br><br>
+        The result: the AI always has access to current data without retraining. Upload a new document today, and the AI can cite it in 10 seconds."
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header" onclick="toggle(this)">
+      <span class="card-step arch">ARCH</span>
+      <span class="card-label">Multi-Modal Document Analysis</span>
+      <span class="card-chevron">&#9654;</span>
+    </div>
+    <div class="card-body">
+      <div class="flow">
+        <span class="flow-node fn-coral">PDF Upload</span>
+        <span class="flow-arrow">&rarr;</span>
+        <span class="flow-node fn-purple">Bedrock Claude (native PDF)</span>
+        <span class="flow-arrow">&rarr;</span>
+        <span class="flow-node fn-green">Analysis Summary</span>
+        <span class="flow-arrow">&rarr;</span>
+        <span class="flow-node fn-blue">ChromaDB Index</span>
+      </div>
+      <div style="height:0.5rem"></div>
+      <div class="flow">
+        <span class="flow-node fn-coral">Image Upload</span>
+        <span class="flow-arrow">&rarr;</span>
+        <span class="flow-node fn-purple">Bedrock Claude Vision</span>
+        <span class="flow-arrow">&rarr;</span>
+        <span class="flow-node fn-green">Analysis Summary</span>
+        <span class="flow-arrow">&rarr;</span>
+        <span class="flow-node fn-blue">ChromaDB Index</span>
+      </div>
+      <div style="height:0.5rem"></div>
+      <div class="flow">
+        <span class="flow-node fn-coral">Video Upload</span>
+        <span class="flow-arrow">&rarr;</span>
+        <span class="flow-node fn-amber">Gemini Video API</span>
+        <span class="flow-arrow">&rarr;</span>
+        <span class="flow-node fn-green">Analysis Summary</span>
+        <span class="flow-arrow">&rarr;</span>
+        <span class="flow-node fn-blue">ChromaDB Index</span>
+      </div>
+      <div class="say-block">
+        "We support multi-modal analysis. PDFs go to Bedrock Claude with native PDF support &mdash; no text extraction needed, it reads the raw bytes. Images use Claude Vision. Videos go to Gemini. Every analysis gets indexed into our knowledge base for future RAG retrieval."
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- SECTION 11: CLOSE & Q&A                   -->
+<!-- ══════════════════════════════════════════ -->
+<div class="section" id="s11">
+  <div class="section-header">
+    <div class="section-num">11</div>
+    <div class="section-title">Summary &amp; Q&amp;A</div>
+    <div class="section-time">~2 min</div>
+  </div>
+
+  <div class="card open">
+    <div class="card-header" onclick="toggle(this)">
+      <span class="card-step say">SAY</span>
+      <span class="card-label">Three Takeaways</span>
+      <span class="card-chevron">&#9654;</span>
+    </div>
+    <div class="card-body">
+      <div class="say-block">
+        "Let me leave you with three takeaways.<br><br>
+        <em>One &mdash; Glass Box, not black box.</em> Every answer is transparent. Data lineage, guideline citations, evidence photos, confidence scores. The underwriter can verify everything the AI says.<br><br>
+        <em>Two &mdash; Human-in-the-loop.</em> The AI accelerates analysis from hours to seconds. But the decision &mdash; accept, refer, decline &mdash; is always the underwriter's. We augment expertise, we don't replace it.<br><br>
+        <em>Three &mdash; Production-ready guardrails.</em> Out-of-scope detection, hallucination checks, confidence-based clarification, LLM fallback chains. This isn't a prototype &mdash; it's built for real-world deployment."
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header" onclick="toggle(this)">
+      <span class="card-step say">SAY</span>
+      <span class="card-label">Close &amp; Open for Questions</span>
+      <span class="card-chevron">&#9654;</span>
+    </div>
+    <div class="card-body">
+      <div class="say-block">
+        "RiskMind: transparent AI that makes underwriters faster without replacing their judgment.<br><br>
+        I'm happy to take questions &mdash; about the product, the architecture, or anything else you'd like to explore."
+      </div>
+      <div class="tip">Common Q&amp;A topics: cost (Gemini free tier), data privacy (on-prem option), scalability, integration with existing systems, regulatory compliance</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header" onclick="toggle(this)">
+      <span class="card-step say">SAY</span>
+      <span class="card-label">Prepared Answers for Likely Questions</span>
+      <span class="card-chevron">&#9654;</span>
+    </div>
+    <div class="card-body">
+      <div class="say-block">
+        <strong>"What does this cost to run?"</strong><br>
+        "Infrastructure: $7/month on Render. LLM costs: near zero for 80% of queries because our pipeline handles them without calling the AI. For the remaining 20%, Gemini's free tier gives us 1,500 requests per day. At scale, Bedrock Claude costs about $0.003-0.015 per query."<br><br>
+
+        <strong>"What about data privacy?"</strong><br>
+        "Data stays within the deployment boundary. We use SQLite locally, ChromaDB for embeddings. LLM calls send context, not raw data. For enterprise deployment, we support AWS Bedrock which keeps everything within your VPC."<br><br>
+
+        <strong>"Can it integrate with our existing systems?"</strong><br>
+        "The architecture is API-first. FastAPI backend exposes REST endpoints. The Data Connector screen you saw is designed for multiple database sources &mdash; PostgreSQL, Snowflake, Oracle. The current demo uses SQLite, but the query layer is database-agnostic."<br><br>
+
+        <strong>"How do you prevent hallucinations?"</strong><br>
+        "Three layers: (1) RAG ensures the AI only reasons over real data, not training knowledge. (2) Post-LLM guardrails check every policy and claim number against the database &mdash; fake IDs get redacted. (3) Confidence scoring routes low-confidence queries to clarification instead of guessing."<br><br>
+
+        <strong>"What LLM models do you use?"</strong><br>
+        "LangChain abstraction layer with a fallback chain: Bedrock Claude for reasoning, Gemini for free-tier demos, Claude Direct API, and OpenAI as last resort. For document analysis: Bedrock Claude Vision for images/PDFs, Gemini for video. The model is swappable without code changes."
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<script>
+// ── Card Toggle ──
+function toggle(el) {
+  el.parentElement.classList.toggle('open');
+}
+
+// ── Timer ──
+let timerRunning = false, timerSeconds = 0, timerInterval;
+function toggleTimer() {
+  const btn = document.querySelector('.timer-btn');
+  if (timerRunning) {
+    clearInterval(timerInterval);
+    btn.textContent = 'Resume';
+  } else {
+    timerInterval = setInterval(() => {
+      timerSeconds++;
+      const m = Math.floor(timerSeconds / 60);
+      const s = (timerSeconds % 60).toString().padStart(2, '0');
+      document.getElementById('timer').textContent = m + ':' + s;
+    }, 1000);
+    btn.textContent = 'Pause';
+  }
+  timerRunning = !timerRunning;
+}
+
+// ── Navigation ──
+const navItems = document.querySelectorAll('.nav-item');
+const sections = document.querySelectorAll('.section');
+
+navItems.forEach(item => {
+  item.addEventListener('click', () => {
+    const target = document.getElementById(item.dataset.section);
+    if (target) target.scrollIntoView({ behavior: 'smooth' });
+  });
+});
+
+// Active section tracking + progress bar
+const mainEl = document.getElementById('mainContent');
+function updateNav() {
+  let activeId = 's0';
+  sections.forEach(s => {
+    const rect = s.getBoundingClientRect();
+    if (rect.top < 150) activeId = s.id;
+  });
+  navItems.forEach(n => {
+    n.classList.toggle('active', n.dataset.section === activeId);
+  });
+  // Progress
+  const scrollTop = window.scrollY;
+  const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+  const pct = docHeight > 0 ? Math.min((scrollTop / docHeight) * 100, 100) : 0;
+  document.getElementById('progressFill').style.width = pct + '%';
+}
+window.addEventListener('scroll', updateNav);
+updateNav();
+</script>
+</body>
+</html>
