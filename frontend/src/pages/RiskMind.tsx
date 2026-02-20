@@ -663,20 +663,34 @@ export default function RiskMind() {
                         )}
                     </div>
 
-                    {/* Evidence Items */}
-                    <div className="gb-card">
+                    {/* Evidence Items — full width when rich evidence exists */}
+                    <div className={`gb-card ${evidenceList.some((e: any) => e.analysis_summary || (e.type === 'image' && e.url?.startsWith('http'))) ? 'gb-card-full' : ''}`}>
                         <h5 className="gb-card-title">Evidence Items</h5>
                         {evidenceList.length === 0 ? (
                             <p className="gb-empty">No evidence attached</p>
                         ) : (
                             <div className="gb-evidence-list">
                                 {evidenceList.map((ev: any, idx: number) => (
-                                    <div key={idx} className="gb-ev">
-                                        <span className="gb-ev-type">{ev.type || 'doc'}</span>
+                                    <div key={idx} className="gb-ev gb-ev-rich">
+                                        {/* Thumbnail for images, icon for PDFs/videos */}
+                                        {ev.type === 'image' && ev.url?.startsWith('http') ? (
+                                            <a href={ev.url} target="_blank" rel="noopener noreferrer" className="gb-ev-thumb">
+                                                <img src={ev.url} alt={ev.description || 'Evidence'} loading="lazy" />
+                                            </a>
+                                        ) : ev.type === 'pdf' ? (
+                                            <div className="gb-ev-file-icon gb-ev-file-pdf">PDF</div>
+                                        ) : ev.type === 'video' ? (
+                                            <div className="gb-ev-file-icon gb-ev-file-vid">VID</div>
+                                        ) : (
+                                            <span className="gb-ev-type">{ev.type || 'doc'}</span>
+                                        )}
                                         <div className="gb-ev-info">
                                             <strong>{ev.description || ev.title || ev.filename || 'Evidence'}</strong>
                                             {(ev.claim_number || ev.section) && (
-                                                <span>{ev.claim_number || ev.section}</span>
+                                                <span className="gb-ev-ref">{ev.claim_number || ev.section}</span>
+                                            )}
+                                            {ev.analysis_summary && (
+                                                <blockquote className="gb-ev-quote">&ldquo;{ev.analysis_summary}&rdquo;</blockquote>
                                             )}
                                         </div>
                                     </div>

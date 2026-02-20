@@ -102,15 +102,17 @@ async def seed():
             # COMM-2024-002: XYZ Restaurant — 6 claims HIGH (Sarah)
             (policy_map["COMM-2024-002"], "CLM-2024-003", "2024-02-10", 3200, "general_liability", "closed", "Customer slip and fall"),
             (policy_map["COMM-2024-002"], "CLM-2024-004", "2024-04-05", 5500, "general_liability", "closed", "Food contamination incident"),
-            (policy_map["COMM-2024-002"], "CLM-2024-005", "2024-05-18", 4800, "property_damage", "closed", "Kitchen fire damage"),
+            (policy_map["COMM-2024-002"], "CLM-2024-005", "2024-05-18", 4800, "property_damage", "closed", "Kitchen fire damage",
+             '[{"type": "image", "url": "https://images.unsplash.com/photo-1486325212027-8081e485255e?w=400&h=300&fit=crop", "description": "Kitchen exhaust fire damage", "analysis_summary": "Fire originated in the commercial exhaust hood above the fryer station. Grease buildup visible in the ductwork. Suppression system activated but delayed. Hood cleaning log shows last cleaning was 4 months prior, exceeding NFPA 96 quarterly requirement."}, {"type": "pdf", "url": "/api/uploads/demo/fire-marshal-report.pdf", "description": "Fire marshal investigation report", "analysis_summary": "Cause: grease accumulation in exhaust plenum. Contributing factor: blocked suppression nozzle #3. Code violation: NFPA 96 Section 11.4 - hood cleaning interval exceeded. Recommendation: mandatory monthly inspections."}]'),
             (policy_map["COMM-2024-002"], "CLM-2024-006", "2024-07-30", 2900, "general_liability", "closed", "Customer injury from broken chair"),
             (policy_map["COMM-2024-002"], "CLM-2024-007", "2024-09-12", 6100, "general_liability", "open", "Delivery driver accident on premises"),
             (policy_map["COMM-2024-002"], "CLM-2024-008", "2024-11-03", 3500, "property_damage", "open", "Refrigeration system failure"),
 
             # COMM-2024-003: SafeBuild Construction — 3 claims HIGH severity (Sarah)
             (policy_map["COMM-2024-003"], "CLM-2024-009", "2024-04-20", 175000, "workers_compensation", "open", "Crane collapse - multiple injuries",
-             '[{"type": "image", "url": "https://images.unsplash.com/photo-1541888946425-d81bb19240f5?q=80&w=600", "description": "Drone view of collapsed crane structure"}, {"type": "video", "url": "https://media.istockphoto.com/id/1154625698/video/aerial-view-of-construction-site.mp4?s=mp4-640x640-is&k=20&c=0s8q9j8w7u5e3r2t1y6u5i4o3p2a1s0d9f8g7h6j5k4l", "description": "Site walkthrough video"}]'),
-            (policy_map["COMM-2024-003"], "CLM-2024-010", "2024-06-15", 22000, "workers_compensation", "closed", "Worker fall from scaffolding", None),
+             '[{"type": "image", "url": "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=400&h=300&fit=crop", "description": "Aerial view of crane collapse site", "analysis_summary": "Aerial imagery confirms complete structural failure of the 40-ton tower crane at the NE corner. Jib section separated at the slewing ring, consistent with overload or mechanical failure. Debris field extends ~50m, impacting the adjacent staging area."}, {"type": "pdf", "url": "/api/uploads/demo/crane-inspection-2024.pdf", "description": "Pre-incident crane inspection report", "analysis_summary": "Last inspection dated March 2024 (30 days before incident). Report flagged wear on slewing ring bearings (page 4) and recommended replacement within 60 days. Recommendation was NOT actioned per maintenance logs."}]'),
+            (policy_map["COMM-2024-003"], "CLM-2024-010", "2024-06-15", 22000, "workers_compensation", "closed", "Worker fall from scaffolding",
+             '[{"type": "image", "url": "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=400&h=300&fit=crop", "description": "Scaffolding collapse area", "analysis_summary": "Scaffolding on levels 3-4 shows improper cross-bracing. Base plates were set on unsecured plywood, not on firm foundation as required by OSHA 1926.451(c)(2). Fall distance approximately 25 feet."}]'),
             (policy_map["COMM-2024-003"], "CLM-2024-011", "2024-09-08", 18500, "property_damage", "closed", "Equipment damage at job site", None),
 
             # COMM-2024-004: MedCare — 3 claims MEDIUM (James)
@@ -146,7 +148,8 @@ async def seed():
             (policy_map["COMM-2024-010"], "CLM-2024-029", "2024-09-30", 8000, "general_liability", "open", "Employee injury during stocking"),
 
             # COMM-2024-011: BuildRight — 2 claims CRITICAL severity (Sarah)
-            (policy_map["COMM-2024-011"], "CLM-2024-030", "2024-05-14", 250000, "workers_compensation", "open", "Building collapse - catastrophic injuries", None),
+            (policy_map["COMM-2024-011"], "CLM-2024-030", "2024-05-14", 250000, "workers_compensation", "open", "Building collapse - catastrophic injuries",
+             '[{"type": "image", "url": "https://images.unsplash.com/photo-1517089596392-fb9a9033e05b?w=400&h=300&fit=crop", "description": "Structural failure at construction site", "analysis_summary": "Complete failure of north load-bearing wall during concrete pour. Temporary shoring was insufficient for the load. Visible bowing and cracking pattern indicates progressive overload failure, not sudden impact."}, {"type": "pdf", "url": "/api/uploads/demo/structural-engineer-report.pdf", "description": "Independent structural engineering assessment", "analysis_summary": "Engineer conclusion: temporary shoring design was rated for 60% of actual load. Shop drawings were not reviewed by a licensed engineer prior to installation. OSHA violation 1926.701(a) applies. Estimated remediation: $380,000-$420,000."}]'),
             (policy_map["COMM-2024-011"], "CLM-2024-031", "2024-08-20", 35000, "property_damage", "closed", "Heavy equipment rollover", None),
 
             # COMM-2024-012: DataShield — 2 claims LOW (James)
@@ -167,7 +170,7 @@ async def seed():
 
             # COMM-2024-016: Eagle Transport — 5 claims HIGH (Sarah)
             (policy_map["COMM-2024-016"], "CLM-2024-040", "2024-02-08", 18000, "auto_accident", "closed", "Truck rollover on highway",
-             '[{"type": "video", "url": "https://media.istockphoto.com/id/1435226158/video/aerial-view-of-traffic-accident-on-highway.mp4?s=mp4-640x640-is&k=20&c=S_G95N_-cK-lG_-k-n-O-O-O-O-O-O-O-O-O-O", "description": "Dashcam Footage: Rollover Event"}, {"type": "image", "url": "https://images.unsplash.com/photo-1626848263360-1e5b10g640a3?q=80&w=600", "description": "On-scene damage assessment"}, {"type": "image", "url": "https://images.unsplash.com/photo-1599839572645-1c39066601-0?q=80&w=600", "description": "Cargo spill containment"}]'),
+             '[{"type": "image", "url": "https://images.unsplash.com/photo-1619642751034-765dfdf7c58e?w=400&h=300&fit=crop", "description": "Truck rollover scene - I-94 exit ramp", "analysis_summary": "Truck overturned on I-94 exit ramp. Visible damage to cab roof and right side panels. Trailer separated from cab, cargo spillage on roadway. Road surface shows no ice or debris - suggests speed as contributing factor."}, {"type": "pdf", "url": "/api/uploads/demo/police-report-040.pdf", "description": "Police accident report #2024-PR-0847", "analysis_summary": "Officer notes: driver exceeded posted speed limit (45 mph) approaching curve. No mechanical defects found. Driver tested negative for substances. Estimated speed at impact: 60+ mph per skid mark analysis."}]'),
             (policy_map["COMM-2024-016"], "CLM-2024-041", "2024-04-15", 12000, "auto_accident", "closed", "Rear-end collision at intersection", None),
             (policy_map["COMM-2024-016"], "CLM-2024-042", "2024-06-28", 9000, "auto_accident", "closed", "Side-swipe on delivery route"),
             (policy_map["COMM-2024-016"], "CLM-2024-043", "2024-09-05", 22000, "auto_accident", "open", "Multi-vehicle highway incident"),
@@ -180,7 +183,8 @@ async def seed():
             (policy_map["COMM-2024-018"], "CLM-2024-046", "2024-10-15", 8000, "property_damage", "open", "Espresso machine explosion"),
 
             # COMM-2024-019: SteelEdge Manufacturing — 3 claims MEDIUM (Sarah)
-            (policy_map["COMM-2024-019"], "CLM-2024-047", "2024-03-22", 32000, "workers_compensation", "closed", "Worker crushed hand in press"),
+            (policy_map["COMM-2024-019"], "CLM-2024-047", "2024-03-22", 32000, "workers_compensation", "closed", "Worker crushed hand in press",
+             '[{"type": "image", "url": "https://images.unsplash.com/photo-1558618666-fcd25c85f82e?w=400&h=300&fit=crop", "description": "Hydraulic press - safety guard removed", "analysis_summary": "Safety interlock guard was removed from the hydraulic press feed mechanism. Tool marks indicate deliberate removal. Light curtain sensor was also bypassed with manual wire bridge across terminals 4-5."}, {"type": "pdf", "url": "/api/uploads/demo/osha-citation-047.pdf", "description": "OSHA citation and proposed penalty", "analysis_summary": "Serious violation of 29 CFR 1910.217(c)(2) - point of operation guarding. Proposed penalty: $15,625. Abatement required within 30 days. Prior 2023 inspection had no violations for this equipment."}]'),
             (policy_map["COMM-2024-019"], "CLM-2024-048", "2024-07-14", 15000, "property_damage", "closed", "Chemical spill in production area"),
             (policy_map["COMM-2024-019"], "CLM-2024-049", "2024-11-02", 45000, "workers_compensation", "open", "Forklift accident with injuries"),
 
