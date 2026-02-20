@@ -15,6 +15,9 @@ import {
     MessageSquare,
     Send,
     Bot,
+    Sparkles,
+    Bookmark,
+    Check,
 } from 'lucide-react'
 import {
     BarChart,
@@ -57,6 +60,9 @@ interface GridPanel {
     viz: Viz
     ran: boolean
     loading: boolean
+    aiSummary: string | null
+    aiLoading: boolean
+    saved: boolean
 }
 
 type ChatMsg = { role: 'user' | 'assistant'; content: string }
@@ -104,12 +110,15 @@ export default function Analytics() {
             viz: 'grid',
             ran: false,
             loading: false,
+            aiSummary: null,
+            aiLoading: false,
+            saved: false,
         }
     }
 
     const [meta, setMeta] = useState<AnalyticsMeta | null>(null)
     const [grids, setGrids] = useState<GridPanel[]>(() => [
-        { id: 'grid-1', label: 'Grid 1', dims: [], metrics: [], filters: [], result: null, viz: 'grid', ran: false, loading: false },
+        { id: 'grid-1', label: 'Grid 1', dims: [], metrics: [], filters: [], result: null, viz: 'grid', ran: false, loading: false, aiSummary: null, aiLoading: false, saved: false },
     ])
     const [activeGridId, setActiveGridId] = useState('grid-1')
     const [filterOptions, setFilterOptions] = useState<Record<string, string[]>>({})
@@ -137,6 +146,15 @@ export default function Analytics() {
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [chatMessages])
+
+    // ── Dynamic grid title ──
+
+    const gridTitle = (grid: GridPanel): string => {
+        if (grid.dims.length === 0 && grid.metrics.length === 0) return grid.label
+        const dimLabels = grid.dims.map(d => labelOf(d))
+        const metLabels = grid.metrics.map(m => labelOf(m))
+        return `${metLabels.join(', ')} by ${dimLabels.join(', ')}`
+    }
 
     // ── Grid CRUD ──
 
@@ -225,7 +243,7 @@ export default function Analytics() {
 
     const runQuery = async () => {
         if (!activeGrid || !canRun) return
-        updateGrid(activeGridId, { loading: true })
+        updateGrid(activeGridId, { loading: true, aiSummary: null, saved: false })
         try {
             const data = await apiService.runAnalyticsQuery({
                 dimensions: activeGrid.dims,
@@ -246,6 +264,58 @@ export default function Analytics() {
         const m = meta?.metrics.find(mt => mt.key === key)
         if (m) return m.label
         return key
+    }
+
+    // ── AI Summary per grid ──
+
+    const requestAiSummary = async (grid: GridPanel) => {
+        if (!grid.result || grid.result.row_count === 0) return
+        updateGrid(grid.id, { aiLoading: true })
+        try {
+            const title = gridTitle(grid)
+            const totalsStr = Object.entries(grid.result.totals)
+                .map(([k, v]) => `${labelOf(k)}: ${fmtNum(v, k)}`)
+                .join(', ')
+            const topRows = grid.result.rows.slice(0, 10).map(row =>
+                grid.result!.columns.map(c => `${labelOf(c)}: ${fmtNum(row[c], c)}`).join(' | ')
+            ).join('\n')
+            const prompt = `Analyze this analytics query "${title}". Totals: ${totalsStr}. ${grid.result.row_count} rows. Top data:\n${topRows}\n\nProvide a concise 3-4 sentence underwriting insight summary highlighting key risk patterns, outliers, and actionable recommendations.`
+            const resp = await apiService.chat(prompt, undefined, currentUser.email || 'demo@apexuw.com')
+            updateGrid(grid.id, { aiSummary: resp.response, aiLoading: false })
+        } catch {
+            updateGrid(grid.id, { aiSummary: 'Unable to generate AI summary. Please try again.', aiLoading: false })
+        }
+    }
+
+    // ── Save to Saved Intelligence ──
+
+    const saveGridToIntelligence = (grid: GridPanel) => {
+        if (!grid.result) return
+        const title = gridTitle(grid)
+        const item = {
+            id: `analytics-${Date.now()}`,
+            type: 'summary',
+            title: `Analytics: ${title}`,
+            output_type: 'analysis',
+            inferred_intent: 'Analyze',
+            context: {},
+            artifact: {
+                metrics: grid.result.totals,
+                bullets: grid.result.rows.slice(0, 5).map(row =>
+                    grid.result!.columns.map(c => `${labelOf(c)}: ${fmtNum(row[c], c)}`).join(' | ')
+                ),
+                dimensions: grid.dims.map(d => labelOf(d)),
+            },
+            content: grid.aiSummary || `Analytics query: ${title}`,
+            provenance: { source: 'analytics_playground', query: { dims: grid.dims, metrics: grid.metrics } },
+            created_at: new Date().toISOString(),
+        }
+        const raw = localStorage.getItem('riskmind_saved')
+        const list = raw ? JSON.parse(raw) : []
+        list.unshift(item)
+        if (list.length > 50) list.length = 50
+        localStorage.setItem('riskmind_saved', JSON.stringify(list))
+        updateGrid(grid.id, { saved: true })
     }
 
     // ── Export ──
@@ -272,7 +342,7 @@ export default function Analytics() {
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = `riskmind-${activeGrid.label.toLowerCase().replace(/\s+/g, '-')}.csv`
+        a.download = `riskmind-${gridTitle(activeGrid).toLowerCase().replace(/[^a-z0-9]+/g, '-')}.csv`
         a.click()
         URL.revokeObjectURL(url)
     }
@@ -287,7 +357,7 @@ export default function Analytics() {
                 const metLabels = g.metrics.map(labelOf).join(', ')
                 const filterCount = g.filters.filter(f => f.values.length > 0).length
                 const totalsStr = Object.entries(g.result.totals).map(([k, v]) => `${labelOf(k)}: ${fmtNum(v, k)}`).join(', ')
-                parts.push(`[${g.label}: Dims: ${dimLabels}. Metrics: ${metLabels}. ${filterCount} filters. ${g.result.row_count} rows. Totals: ${totalsStr}]`)
+                parts.push(`[${gridTitle(g)}: ${filterCount} filters. ${g.result.row_count} rows. Totals: ${totalsStr}]`)
             }
         })
         return parts.join(' ')
@@ -605,7 +675,39 @@ export default function Analytics() {
                         >
                             {/* Panel header */}
                             <div className="ap-gp-header">
-                                <span className="ap-gp-label">{grid.label}</span>
+                                <span className="ap-gp-label">{gridTitle(grid)}</span>
+
+                                {/* Per-grid action buttons */}
+                                <div className="ap-gp-actions">
+                                    {grid.ran && grid.result && grid.result.row_count > 0 && (
+                                        <>
+                                            <button
+                                                className={`ap-gp-action-btn${grid.aiLoading ? ' ap-gp-action-btn--loading' : ''}`}
+                                                onClick={e => { e.stopPropagation(); requestAiSummary(grid) }}
+                                                disabled={grid.aiLoading}
+                                                title="AI Summary"
+                                            >
+                                                {grid.aiLoading ? (
+                                                    <Loader2 style={{ width: '0.8125rem', height: '0.8125rem', animation: 'spin 1s linear infinite' }} />
+                                                ) : (
+                                                    <Sparkles style={{ width: '0.8125rem', height: '0.8125rem' }} />
+                                                )}
+                                            </button>
+                                            <button
+                                                className={`ap-gp-action-btn${grid.saved ? ' ap-gp-action-btn--saved' : ''}`}
+                                                onClick={e => { e.stopPropagation(); saveGridToIntelligence(grid) }}
+                                                disabled={grid.saved}
+                                                title={grid.saved ? 'Saved' : 'Save to Intelligence'}
+                                            >
+                                                {grid.saved ? (
+                                                    <Check style={{ width: '0.8125rem', height: '0.8125rem' }} />
+                                                ) : (
+                                                    <Bookmark style={{ width: '0.8125rem', height: '0.8125rem' }} />
+                                                )}
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
 
                                 {/* Per-grid viz toggle */}
                                 <div className="ap-gp-viz">
@@ -657,6 +759,23 @@ export default function Analytics() {
                                         <span className="ap-gp-total-val">{grid.result.row_count}</span>
                                         <span className="ap-gp-total-lbl">Rows</span>
                                     </div>
+                                </div>
+                            )}
+
+                            {/* AI Summary panel */}
+                            {grid.aiSummary && (
+                                <div className="ap-gp-ai-summary">
+                                    <div className="ap-gp-ai-header">
+                                        <Sparkles style={{ width: '0.75rem', height: '0.75rem' }} />
+                                        <span>AI Insight</span>
+                                        <button
+                                            className="ap-gp-ai-close"
+                                            onClick={e => { e.stopPropagation(); updateGrid(grid.id, { aiSummary: null }) }}
+                                        >
+                                            <X style={{ width: '0.75rem', height: '0.75rem' }} />
+                                        </button>
+                                    </div>
+                                    <p className="ap-gp-ai-text">{grid.aiSummary}</p>
                                 </div>
                             )}
 
