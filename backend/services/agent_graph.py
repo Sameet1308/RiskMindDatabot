@@ -184,12 +184,35 @@ async def fetch_data_node(state: AgentState) -> dict:
 # NODE  3 — Fetch Guidelines (ChromaDB RAG)
 # ══════════════════════════════════════════════════════════════
 
+def _is_non_substantive(state: AgentState) -> bool:
+    """Check if the message is a greeting, out-of-scope, or trivial —
+    no need to run RAG retrieval for these."""
+    if state.get("out_of_scope"):
+        return True
+    msg = state["message"].lower().strip().rstrip("!?.,:;")
+    _GREETINGS = {
+        "hello", "hi", "hey", "good morning", "good afternoon", "good evening",
+        "thanks", "thank you", "ok", "okay", "sure", "bye", "goodbye", "help",
+        "what can you do", "who are you", "how are you", "yo", "sup",
+    }
+    return msg in _GREETINGS
+
+
 def fetch_guidelines_node(state: AgentState) -> dict:
     """Search ChromaDB for relevant underwriting guidelines.
-    Fallback: if RAG returns <2 results, append summary from cached guidelines table."""
+    Fallback: if RAG returns <2 results, append summary from cached guidelines table.
+    Skips retrieval entirely for greetings and out-of-scope messages."""
     message = state["message"]
     analysis_object = dict(state["analysis_object"])           # shallow copy
     evidence = list(analysis_object.get("evidence", []))       # shallow copy
+
+    # Skip RAG for non-substantive messages (greetings, out-of-scope)
+    if _is_non_substantive(state):
+        return {
+            "guideline_context": "",
+            "sources": [],
+            "analysis_object": analysis_object,
+        }
 
     guideline_results = []
     try:
@@ -246,9 +269,14 @@ def fetch_guidelines_node(state: AgentState) -> dict:
 # ══════════════════════════════════════════════════════════════
 
 def fetch_knowledge_node(state: AgentState) -> dict:
-    """Semantic search over past claims and decisions."""
+    """Semantic search over past claims and decisions.
+    Skips retrieval for greetings and out-of-scope messages."""
     message = state["message"]
     sources = list(state.get("sources", []))
+
+    # Skip knowledge search for non-substantive messages
+    if _is_non_substantive(state):
+        return {"knowledge_context": "", "sources": sources}
 
     knowledge_results = search_knowledge(message, k=4)
     knowledge_context = ""
@@ -537,8 +565,9 @@ def format_output_node(state: AgentState) -> dict:
         analysis_object = {k: v for k, v in analysis_object.items()
                           if k not in ("evidence", "provenance")}
 
-    # For greetings, strip entire analysis_object
-    if not show_canvas and not state.get("suggest_canvas_view", False):
+    # For greetings / non-substantive, strip analysis + sources
+    is_trivial = not show_canvas and not state.get("suggest_canvas_view", False)
+    if is_trivial:
         analysis_object = {}
 
     # Inject analytics playground link when intent matches
@@ -547,10 +576,13 @@ def format_output_node(state: AgentState) -> dict:
     if intent_payload.get("intent") == "analytics_playground":
         response_text += "\n\n**[Open Analytics Playground](/analytics)** -- Slice and dice your portfolio data interactively."
 
+    # Clear sources for trivial messages (greetings, out-of-scope)
+    sources = [] if is_trivial else state.get("sources", [])
+
     return {
         "final_response": {
             "response": response_text,
-            "sources": state.get("sources", []),
+            "sources": sources,
             "provider": state.get("provider", "mock"),
             "analysis_object": analysis_object if analysis_object else None,
             "provenance": analysis_object.get("provenance") if show_evidence else None,
