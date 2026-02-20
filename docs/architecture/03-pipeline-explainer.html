@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RiskMind — Pipeline Deep-Dive</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#06080D;--sf:#0C1018;--cd:#111827;--bd:#1E293B;--bl:#334155;
+  --wh:#F1F5F9;--t1:#CBD5E1;--t2:#8896A8;--t3:#4B5563;
+  --blue:#3B82F6;--cyan:#06B6D4;--green:#10B981;--lime:#84CC16;
+  --amber:#F59E0B;--rose:#F43F5E;--violet:#8B5CF6;--orange:#F97316;
+  --pink:#EC4899;--red:#EF4444;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--wh);font-family:'DM Sans',sans-serif;overflow-x:hidden}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:var(--wh)}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:var(--bl);border-radius:4px}
+.mn{font-family:'JetBrains Mono',monospace}
+.cd{padding:20px;border-radius:14px;background:var(--cd);border:1px solid var(--bd)}
+.src{font-size:11px;color:var(--t3);font-style:italic}
+
+/* Layout */
+.wrap{max-width:1320px;margin:0 auto;padding:28px 32px}
+.hdr{text-align:center;margin-bottom:32px}
+.hdr h1{font-size:42px;font-weight:800;letter-spacing:-.04em;background:linear-gradient(135deg,var(--wh),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hdr p{font-size:16px;color:var(--t2);margin-top:8px}
+
+/* Sticky nav */
+.nav{position:sticky;top:0;z-index:99;background:var(--bg)ee;backdrop-filter:blur(12px);border-bottom:1px solid var(--bd);padding:8px 0;margin-bottom:28px}
+.nav-in{max-width:1320px;margin:0 auto;display:flex;gap:4px;padding:0 32px;overflow-x:auto}
+.nav-btn{padding:7px 16px;border-radius:8px;font-size:12px;font-weight:700;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;transition:all .15s}
+.nav-btn:hover{background:#ffffff08}
+.nav-btn.on{color:var(--bg);font-weight:800}
+
+/* Section */
+.sec{margin-bottom:40px;scroll-margin-top:70px}
+.sec-h{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.sec-h .ic{font-size:32px}
+.sec-h .num{font-size:11px;font-weight:800;font-family:'JetBrains Mono',monospace;padding:3px 10px;border-radius:5px;letter-spacing:.1em}
+.sec-h h2{font-size:26px;font-weight:800;letter-spacing:-.02em}
+.sec-h .sub{font-size:14px;color:var(--t2);margin-left:auto}
+
+/* Grid */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.g4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px}
+
+/* Animated flow arrow */
+.flow-arr{display:flex;align-items:center;justify-content:center;padding:6px 0}
+.flow-arr span{display:block;width:2px;height:28px;background:linear-gradient(180deg,transparent,var(--blue),transparent);position:relative}
+.flow-arr span::after{content:'▼';position:absolute;bottom:-10px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--blue)}
+
+/* Pulse dot */
+.pulse{display:inline-block;width:8px;height:8px;border-radius:50%;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 currentColor}50%{opacity:.4;box-shadow:0 0 8px 3px currentColor}}
+
+/* Agent card */
+.agent-card{padding:18px;border-radius:12px;background:var(--cd);border:1px solid var(--bd);transition:all .2s;cursor:pointer}
+.agent-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px #00000040}
+.agent-card.active{border-width:2px}
+
+/* Detail panel */
+.detail{overflow:hidden;transition:max-height .3s ease,opacity .3s ease}
+.detail.closed{max-height:0;opacity:0}
+.detail.open{max-height:2000px;opacity:1}
+
+/* Guardrail bar */
+.grail{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;margin-bottom:6px}
+.grail .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+
+/* Flow step */
+.fstep{position:relative;padding:16px 20px;border-radius:10px;background:var(--cd);border:1px solid var(--bd)}
+.fstep::before{content:'';position:absolute;left:50%;top:-18px;width:2px;height:18px;background:var(--bd)}
+.fstep:first-child::before{display:none}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <div class="nav-in" id="nav"></div>
+</div>
+
+<div class="wrap">
+  <div class="hdr">
+    <div style="display:inline-flex;align-items:center;gap:8px;padding:5px 16px;border-radius:16px;background:#06B6D410;border:1px solid #06B6D420;margin-bottom:14px">
+      <span class="pulse" style="color:var(--cyan);background:var(--cyan)"></span>
+      <span class="mn" style="font-size:12px;font-weight:700;color:var(--cyan);letter-spacing:.1em;text-transform:uppercase">Interactive Pipeline Explainer</span>
+    </div>
+    <h1>🧠 RiskMind AI Pipeline</h1>
+    <p>How a plain English question becomes a Glass Box answer — every agent, every data flow, every guardrail</p>
+  </div>
+  <div id="content"></div>
+</div>
+
+<script>
+const C={bg:'#06080D',sf:'#0C1018',cd:'#111827',bd:'#1E293B',bl:'#334155',
+  wh:'#F1F5F9',t1:'#CBD5E1',t2:'#8896A8',t3:'#4B5563',
+  blue:'#3B82F6',cyan:'#06B6D4',green:'#10B981',lime:'#84CC16',
+  amber:'#F59E0B',rose:'#F43F5E',violet:'#8B5CF6',orange:'#F97316',pink:'#EC4899'};
+
+const SECTIONS=[
+  {id:'overview',n:'Overview',ic:'🔭',c:C.cyan},
+  {id:'question',n:'User Question',ic:'💬',c:C.blue},
+  {id:'cortex',n:'1. RM-Cortex',ic:'🧠',c:C.lime},
+  {id:'orchestrator',n:'2. RM-Orchestrator',ic:'🧬',c:C.blue},
+  {id:'schema',n:'3. RM-SchemaReader',ic:'📐',c:C.cyan},
+  {id:'cache',n:'4. RM-CacheLayer',ic:'💾',c:C.amber},
+  {id:'executor',n:'5. RM-Executor',ic:'⚡',c:C.green},
+  {id:'rag',n:'6. RM-KnowledgeRAG',ic:'📚',c:C.violet},
+  {id:'analyst',n:'7. RM-Analyst',ic:'🔬',c:C.orange},
+  {id:'sentinel',n:'8. RM-Sentinel',ic:'🛡️',c:C.pink},
+  {id:'glassbox',n:'9. RM-GlassBox',ic:'🔍',c:C.rose},
+  {id:'guardrails',n:'Guardrails',ic:'🔒',c:C.green},
+  {id:'output',n:'Final Output',ic:'✅',c:C.cyan},
+];
+
+// Nav
+document.getElementById('nav').innerHTML=SECTIONS.map(s=>`<button class="nav-btn" data-s="${s.id}" style="color:${s.c}" onclick="document.getElementById('${s.id}').scrollIntoView({behavior:'smooth'})">${s.ic} ${s.n}</button>`).join('');
+
+// Track active nav on scroll
+const obs=new IntersectionObserver(entries=>{
+  entries.forEach(e=>{if(e.isIntersecting){
+    document.querySelectorAll('.nav-btn').forEach(b=>{
+      b.classList.toggle('on',b.dataset.s===e.target.id);
+      if(b.dataset.s===e.target.id)b.style.background=b.style.color+'18';
+      else b.style.background='transparent';
+    });
+  }});
+},{threshold:0.3,rootMargin:'-70px 0px -50% 0px'});
+
+function secH(s,sub=''){return`<div class="sec-h"><span class="ic">${s.ic}</span><span class="num" style="background:${s.c}14;color:${s.c}">${s.n.toUpperCase()}</span><h2 style="color:${s.c}">${s.n}</h2>${sub?`<span class="sub">${sub}</span>`:''}</div>`}
+function arrow(c=C.blue){return`<div class="flow-arr"><span style="background:linear-gradient(180deg,transparent,${c},transparent)"></span></div>`}
+function tag(t,c){return`<span class="mn" style="font-size:11px;padding:3px 8px;border-radius:4px;background:${c}12;border:1px solid ${c}18;color:${c};font-weight:600">${t}</span>`}
+
+// Render
+document.getElementById('content').innerHTML=`
+
+<!-- OVERVIEW -->
+<div class="sec" id="overview">
+  ${secH(SECTIONS[0],'The 30,000-foot view')}
+  <div class="cd" style="border-color:${C.cyan}18;padding:24px">
+    <div style="font-size:18px;font-weight:700;margin-bottom:16px">The Pipeline At a Glance</div>
+    <div style="display:flex;align-items:stretch;gap:4px;overflow-x:auto;padding-bottom:8px">
+      ${[
+        {n:'User Question',d:'Plain English',ic:'💬',c:C.blue,t:'INPUT'},
+        {n:'RM-Cortex',d:'Domain intelligence, session memory, behavioral learning',ic:'🧠',c:C.lime,t:'AGENT 1'},
+        {n:'RM-Orchestrator',d:'Intent classification, execution planning',ic:'🧬',c:C.blue,t:'AGENT 2'},
+        {n:'RM-SchemaReader',d:'Database schema introspection',ic:'📐',c:C.cyan,t:'AGENT 3'},
+        {n:'RM-CacheLayer',d:'Behavioral cache check',ic:'💾',c:C.amber,t:'AGENT 4'},
+        {n:'RM-Executor',d:'Deterministic SQL on full dataset',ic:'⚡',c:C.green,t:'AGENT 5'},
+        {n:'RM-KnowledgeRAG',d:'3-source semantic retrieval',ic:'📚',c:C.violet,t:'AGENT 6'},
+        {n:'RM-Analyst',d:'LLM synthesis (ONLY AI call)',ic:'🔬',c:C.orange,t:'AGENT 7'},
+        {n:'RM-Sentinel',d:'5-point validation + fallback',ic:'🛡️',c:C.pink,t:'AGENT 8'},
+        {n:'RM-GlassBox',d:'Evidence formatting + citations',ic:'🔍',c:C.rose,t:'AGENT 9'},
+        {n:'Glass Box Output',d:'Answer + evidence + confidence',ic:'✅',c:C.cyan,t:'OUTPUT'},
+      ].map((a,i)=>`
+        <div style="flex:0 0 auto;width:108px;text-align:center;position:relative">
+          ${i>0?'<div style="position:absolute;left:-4px;top:50%;transform:translateY(-50%);color:'+C.t3+';font-size:9px">→</div>':''}
+          <div style="padding:10px 6px;border-radius:10px;background:${a.c}08;border:1px solid ${a.c}14;height:100%;display:flex;flex-direction:column;align-items:center">
+            <span class="mn" style="font-size:9px;color:${a.c};font-weight:700">${a.t}</span>
+            <span style="font-size:24px;margin:4px 0">${a.ic}</span>
+            <span style="font-size:11px;font-weight:700;color:${a.c}">${a.n}</span>
+            <span style="font-size:9px;color:${C.t2};margin-top:3px;line-height:1.3">${a.d}</span>
+          </div>
+        </div>`).join('')}
+    </div>
+    <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
+      ${tag('Agents 5 + 6 run in PARALLEL',C.green)}
+      ${tag('ONLY Agent 7 calls the LLM',C.orange)}
+      ${tag('Agent 5 is the ONLY one touching the database',C.green)}
+      ${tag('8 guardrail layers throughout',C.pink)}
+      ${tag('~2s cold · ~0.8s cached',C.amber)}
+    </div>
+  </div>
+  <div class="g3" style="margin-top:14px">
+    <div class="cd" style="border-color:${C.green}14;text-align:center">
+      <div style="font-size:40px;font-weight:900;color:${C.green};font-family:'JetBrains Mono',monospace">80%</div>
+      <div style="font-size:13px;color:${C.t1}">of queries cost $0 in AI spend — deterministic code handles computation</div>
+    </div>
+    <div class="cd" style="border-color:${C.violet}14;text-align:center">
+      <div style="font-size:40px;font-weight:900;color:${C.violet};font-family:'JetBrains Mono',monospace">3</div>
+      <div style="font-size:13px;color:${C.t1}">RAG sources searched per query — guidelines, past decisions, regulatory</div>
+    </div>
+    <div class="cd" style="border-color:${C.pink}14;text-align:center">
+      <div style="font-size:40px;font-weight:900;color:${C.pink};font-family:'JetBrains Mono',monospace">5</div>
+      <div style="font-size:13px;color:${C.t1}">validation checks on every response before user sees it</div>
+    </div>
+  </div>
+</div>
+
+<!-- USER QUESTION -->
+<div class="sec" id="question">
+  ${secH(SECTIONS[1],'Where it all begins')}
+  <div class="cd" style="border-color:${C.blue}18">
+    <div style="font-size:15px;font-weight:700;color:${C.blue};margin-bottom:12px">Example: Sarah asks a question</div>
+    <div style="padding:16px 20px;border-radius:10px;background:${C.blue}08;border:1px solid ${C.blue}14;font-size:20px;color:${C.wh};font-weight:600;margin-bottom:14px">
+      💬 "Should I renew Titan Construction's policy?"
+    </div>
+    <div style="font-size:14px;color:${C.t1};line-height:1.7;margin-bottom:14px">This single question requires the system to: check claims history, compute loss ratios, find relevant underwriting guidelines, look at zone concentration, check credit data, recall past decisions on this account, assess catastrophe exposure, and synthesize it all into a recommendation with evidence.</div>
+    <div style="font-size:14px;color:${C.t1};line-height:1.7;margin-bottom:14px">Let's follow it through all 9 agents.</div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <div style="font-size:12px;color:${C.t3}" class="mn">GUARDRAIL:</div>
+      <div class="grail" style="background:${C.green}06;border:1px solid ${C.green}10;flex:1">
+        <div class="dot" style="background:${C.green}"></div>
+        <span style="font-size:13px;color:${C.green};font-weight:600">Data Isolation — JWT token verified. User = sarah@apexuw.com. All downstream queries will be scoped to her assigned policies only.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- AGENT 1: CORTEX -->
+<div class="sec" id="cortex">
+  ${arrow(C.lime)}
+  ${secH(SECTIONS[2],'~5ms · Rule-based · No LLM cost')}
+  <div class="g2">
+    <div class="cd" style="border-color:${C.lime}18">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <span style="font-size:28px">🧠</span>
+        <div><div style="font-size:18px;font-weight:800;color:${C.lime}">RM-Cortex</div>
+          <div style="font-size:12px;color:${C.t2}" class="mn">Domain Intelligence · Session Memory · Behavioral Learning</div></div>
+      </div>
+      <div style="font-size:14px;color:${C.t1};line-height:1.7;margin-bottom:14px"><strong>What it does:</strong> Understands insurance language BEFORE any AI runs. Maps "renew" → renewal decision workflow. Maps "Titan Construction" → policy COMM-2024-003. Checks session memory — is this a follow-up question? Checks behavioral cache — does Sarah ask this type of question often?</div>
+      <div style="font-size:14px;color:${C.t1};line-height:1.7"><strong>What it outputs:</strong> An enriched query package with terminology expansions, KPI directives (compute loss ratio, combined ratio, claim frequency), session context, and predicted next question.</div>
+    </div>
+    <div class="cd" style="border-color:${C.lime}18">
+      <div class="mn" style="font-size:12px;color:${C.lime};font-weight:700;margin-bottom:10px">CORTEX OUTPUT FOR THIS QUERY</div>
+      <div style="padding:14px;border-radius:8px;background:${C.sf};font-size:12px;line-height:1.8;font-family:'JetBrains Mono',monospace;color:${C.t1}">
+        <div style="color:${C.lime}">// Terminology mapping</div>
+        "renew" → renewal_decision workflow<br>
+        "Titan Construction" → policy_id: COMM-2024-003<br><br>
+        <div style="color:${C.lime}">// KPI directives</div>
+        compute: loss_ratio (claims_incurred / earned_premium)<br>
+        compute: combined_ratio<br>
+        compute: claim_frequency<br>
+        compute: severity_index<br><br>
+        <div style="color:${C.lime}">// Behavioral context</div>
+        sarah asks renewal questions 3.2×/week<br>
+        predicted next: policy_drill_down (68%)<br>
+        pre-computing: Titan Construction detail<br><br>
+        <div style="color:${C.lime}">// Session memory</div>
+        queries this session: 0 (new session)<br>
+        <div style="color:${C.lime}">// Self-learning data captured</div>
+        → frequency counter updated<br>
+        → temporal heatmap updated (Thu 8:14 AM)<br>
+        → entity counter: "Titan Construction" +1
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:10px;padding:10px 16px;border-radius:8px;background:${C.lime}06;border:1px dashed ${C.lime}14;text-align:center">
+    <span style="font-size:13px;color:${C.lime};font-weight:600">Cortex is self-learning: tracks what Sarah asks, when she asks, and what she asks next. After 6 months → 65-75% cache hit rate.</span>
+  </div>
+</div>
+
+<!-- AGENT 2: ORCHESTRATOR -->
+<div class="sec" id="orchestrator">
+  ${arrow(C.blue)}
+  ${secH(SECTIONS[3],'~15ms · Rule-based classifier · No LLM cost')}
+  <div class="g2">
+    <div class="cd" style="border-color:${C.blue}18">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <span style="font-size:28px">🧬</span>
+        <div><div style="font-size:18px;font-weight:800;color:${C.blue}">RM-Orchestrator</div>
+          <div style="font-size:12px;color:${C.t2}" class="mn">Intent Router · Execution Planner · Traffic Controller</div></div>
+      </div>
+      <div style="font-size:14px;color:${C.t1};line-height:1.7;margin-bottom:14px"><strong>What it does:</strong> Classifies the query intent ("renewal recommendation") and builds an execution plan — which analytical functions to run, in what order, parallel vs sequential.</div>
+      <div style="font-size:14px;color:${C.t1};line-height:1.7"><strong>What it outputs:</strong> A function execution plan sent downstream to SchemaReader, CacheLayer, Executor, and RAG.</div>
+    </div>
+    <div class="cd" style="border-color:${C.blue}18">
+      <div class="mn" style="font-size:12px;color:${C.blue};font-weight:700;margin-bottom:10px">EXECUTION PLAN</div>
+      <div style="padding:14px;border-radius:8px;background:${C.sf};font-size:12px;line-height:1.8;font-family:'JetBrains Mono',monospace;color:${C.t1}">
+        <div style="color:${C.blue}">intent: renewal_recommendation</div>
+        <div style="color:${C.blue}">target: COMM-2024-003 (Titan Construction)</div>
+        <div style="color:${C.blue}">confidence: 97</div><br>
+        <div style="color:${C.amber}">functions_required: 6</div>
+        ├─ aggregate (claims by type, amount, date)<br>
+        ├─ trend (loss ratio over time)<br>
+        ├─ outlier_detection (claim severity vs benchmark)<br>
+        ├─ threshold_check (zone accumulation)<br>
+        ├─ compare_to_benchmark (industry avg)<br>
+        └─ recommendation_engine<br><br>
+        <div style="color:${C.green}">parallel_group_1: [aggregate, trend, outlier_detection]</div>
+        <div style="color:${C.green}">parallel_group_2: [threshold_check, compare_to_benchmark]</div>
+        <div style="color:${C.orange}">sequential: [recommendation_engine] (after all above)</div>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:8px">
+        ${tag('6 functions',C.blue)} ${tag('2 parallel groups',C.green)} ${tag('~0ms LLM cost',C.amber)}
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+    <div style="font-size:12px;color:${C.t3}" class="mn">GUARDRAIL:</div>
+    <div class="grail" style="background:${C.blue}06;border:1px solid ${C.blue}10;flex:1">
+      <div class="dot" style="background:${C.blue}"></div>
+      <span style="font-size:13px;color:${C.blue};font-weight:600">Input Validation — Query classified as underwriting-related ✓. Not a prompt injection ✓. Complexity within limits (6 functions ≤ 10 max) ✓.</span>
+    </div>
+  </div>
+</div>
+
+<!-- AGENT 3: SCHEMAREADER -->
+<div class="sec" id="schema">
+  ${arrow(C.cyan)}
+  ${secH(SECTIONS[4],'~20ms · Database metadata only · No data access')}
+  <div class="g2">
+    <div class="cd" style="border-color:${C.cyan}18">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <span style="font-size:28px">📐</span>
+        <div><div style="font-size:18px;font-weight:800;color:${C.cyan}">RM-SchemaReader</div>
+          <div style="font-size:12px;color:${C.t2}" class="mn">Schema Introspection · Concept Mapping · Join Paths</div></div>
+      </div>
+      <div style="font-size:14px;color:${C.t1};line-height:1.7;margin-bottom:14px"><strong>What it does:</strong> Reads database METADATA (table names, column names, types, relationships) — NOT the actual data. Maps business concepts to physical columns. "Loss ratio" → claims_incurred / earned_premium from tables claims + policies.</div>
+      <div style="font-size:14px;color:${C.t1};line-height:1.7"><strong>Key point:</strong> Runtime introspection. If you add a column tomorrow, SchemaReader discovers it. Not hardcoded.</div>
+    </div>
+    <div class="cd" style="border-color:${C.cyan}18">
+      <div class="mn" style="font-size:12px;color:${C.cyan};font-weight:700;margin-bottom:10px">SCHEMA MAP FOR THIS QUERY</div>
+      <div style="padding:14px;border-radius:8px;background:${C.sf};font-size:12px;line-height:1.8;font-family:'JetBrains Mono',monospace;color:${C.t1}">
+        <div style="color:${C.cyan}">// Tables needed</div>
+        policies → [policy_number, premium, insured_value,<br>
+        &nbsp;&nbsp;fema_flood_zone, cat_pml_250yr, cresta_zone,<br>
+        &nbsp;&nbsp;business_credit_score, assigned_to]<br>
+        claims → [claim_amount, claim_type, claim_date, status]<br>
+        zone_thresholds → [limit_value, metric, action]<br>
+        zone_accumulation → [total_tiv, pml_250yr]<br><br>
+        <div style="color:${C.cyan}">// Join paths</div>
+        policies.id → claims.policy_id<br>
+        policies.cresta_zone → zone_accumulation.zone_id<br>
+        policies.cresta_zone → zone_thresholds.zone_type<br><br>
+        <div style="color:${C.cyan}">// Computed metrics</div>
+        loss_ratio = SUM(claim_amount) / premium<br>
+        claim_frequency = COUNT(claims) / exposure_years<br>
+        severity_index = AVG(claim_amount) / benchmark
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- AGENT 4: CACHELAYER -->
+<div class="sec" id="cache">
+  ${arrow(C.amber)}
+  ${secH(SECTIONS[5],'~10ms · Redis lookup · Behavioral prediction')}
+  <div class="g2">
+    <div class="cd" style="border-color:${C.amber}18">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <span style="font-size:28px">💾</span>
+        <div><div style="font-size:18px;font-weight:800;color:${C.amber}">RM-CacheLayer</div>
+          <div style="font-size:12px;color:${C.t2}" class="mn">Adaptive Cache · Behavioral Pre-Warming · Hit/Miss Router</div></div>
+      </div>
+      <div style="font-size:14px;color:${C.t1};line-height:1.7;margin-bottom:14px"><strong>What it does:</strong> Checks Redis for pre-computed results. Uses Cortex's behavioral model — if Sarah asked this same query type yesterday, the result might already be cached from pre-warming (computed at 7:50 AM before she logged in).</div>
+      <div style="font-size:14px;color:${C.t1};line-height:1.7"><strong>Routing:</strong> Cache HIT → skip Executor + RAG → straight to Analyst. Cache MISS → continue to Executor + RAG.</div>
+    </div>
+    <div class="cd" style="border-color:${C.amber}18">
+      <div class="mn" style="font-size:12px;color:${C.amber};font-weight:700;margin-bottom:10px">CACHE CHECK RESULT</div>
+      <div style="padding:14px;border-radius:8px;background:${C.sf};font-size:12px;line-height:1.8;font-family:'JetBrains Mono',monospace;color:${C.t1}">
+        <div style="color:${C.amber}">// Checking 6 functions against cache</div>
+        aggregate(COMM-2024-003) → <span style="color:${C.green}">HIT ✓</span> (pre-warmed 7:52 AM)<br>
+        trend(COMM-2024-003) → <span style="color:${C.rose}">MISS ✗</span> (not cached)<br>
+        outlier_detection → <span style="color:${C.rose}">MISS ✗</span><br>
+        threshold_check → <span style="color:${C.green}">HIT ✓</span> (computed 8:01 AM)<br>
+        compare_benchmark → <span style="color:${C.rose}">MISS ✗</span><br>
+        recommendation → <span style="color:${C.rose}">MISS ✗</span> (requires fresh data)<br><br>
+        <div style="color:${C.amber}">// Result: PARTIAL HIT (2/6)</div>
+        <div style="color:${C.amber}">// Route: Send 4 remaining to Executor</div>
+        <div style="color:${C.amber}">// Simultaneously: Trigger RAG retrieval</div>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:8px">
+        ${tag('2 cached → saved ~600ms',C.green)} ${tag('4 need fresh compute',C.rose)}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PARALLEL SPLIT -->
+<div style="text-align:center;padding:12px 0">
+  <div style="display:inline-flex;align-items:center;gap:12px;padding:8px 20px;border-radius:8px;background:${C.green}08;border:1px dashed ${C.green}14">
+    <span style="font-size:16px">⚡</span>
+    <span style="font-size:14px;font-weight:700;color:${C.green}">PARALLEL EXECUTION — Agents 5 + 6 run simultaneously</span>
+    <span style="font-size:16px">📚</span>
+  </div>
+</div>
+
+<!-- AGENT 5 + 6 SIDE BY SIDE -->
+<div class="g2" style="margin-bottom:8px">
+
+  <!-- EXECUTOR -->
+  <div class="sec" id="executor" style="margin-bottom:0">
+    <div class="sec-h"><span class="ic">⚡</span><span class="num" style="background:${C.green}14;color:${C.green}">AGENT 5</span><h2 style="color:${C.green}">RM-Executor</h2></div>
+    <div class="cd" style="border-color:${C.green}18;height:100%">
+      <div style="font-size:12px;color:${C.t2}" class="mn">~300ms · Deterministic SQL · Full dataset · READ-ONLY</div>
+      <div style="margin:12px 0;padding:10px 14px;border-radius:8px;background:${C.green}06;border:1px solid ${C.green}10">
+        <span style="font-size:14px;font-weight:700;color:${C.green}">⚡ THE ONLY AGENT THAT TOUCHES THE DATABASE</span>
+      </div>
+      <div style="font-size:14px;color:${C.t1};line-height:1.7;margin-bottom:12px"><strong>What it does:</strong> Runs parameterized SQL queries against your real database. Pure code — no AI. Scans the FULL dataset. Returns 30-60 summary rows.</div>
+
+      <div class="mn" style="font-size:11px;color:${C.green};font-weight:700;margin-bottom:6px">STRUCTURED DATA QUERIED</div>
+      <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px">
+        ${['policies → premium, insured_value, flood zone, cat model, credit score, zone',
+           'claims → all 51 claims for COMM-2024-003, amounts, types, dates',
+           'zone_accumulation → Harris County TIV, PML, policy count',
+           'zone_thresholds → $7M TIV limit, $5M PML limit',
+           'Third-party enrichment → FEMA zone AE, flood_risk_score 78, cat_pml $890K'
+        ].map(d=>`<div style="padding:5px 10px;border-radius:5px;background:${C.green}06;font-size:12px;color:${C.t1}">💾 ${d}</div>`).join('')}
+      </div>
+
+      <div class="mn" style="font-size:11px;color:${C.green};font-weight:700;margin-bottom:6px">EXECUTOR OUTPUT → 38 SUMMARY ROWS</div>
+      <div style="padding:10px;border-radius:6px;background:${C.sf};font-size:11px;font-family:'JetBrains Mono',monospace;color:${C.t1};line-height:1.7">
+        loss_ratio: 195%<br>
+        combined_ratio: 212%<br>
+        claims_count: 5 (in 24 months)<br>
+        total_claims: $142,000<br>
+        claim_frequency: 2.5/yr (benchmark: 1.1)<br>
+        severity_index: 1.8× benchmark<br>
+        flood_zone: AE (UPGRADED from X)<br>
+        cat_pml_250yr: $890,000<br>
+        credit_score: 38 (declining)<br>
+        zone: US-TX-003 TIV $6.8M / $7M limit<br>
+        zone_pml: $4.7M / $5M limit<br>
+        yoy_trend: claims ↑40%, LR ↑22%
+      </div>
+    </div>
+  </div>
+
+  <!-- RAG -->
+  <div class="sec" id="rag" style="margin-bottom:0">
+    <div class="sec-h"><span class="ic">📚</span><span class="num" style="background:${C.violet}14;color:${C.violet}">AGENT 6</span><h2 style="color:${C.violet}">RM-KnowledgeRAG</h2></div>
+    <div class="cd" style="border-color:${C.violet}18;height:100%">
+      <div style="font-size:12px;color:${C.t2}" class="mn">~40ms · Semantic search · pgvector/ChromaDB · 3 sources</div>
+      <div style="margin:12px 0;padding:10px 14px;border-radius:8px;background:${C.violet}06;border:1px solid ${C.violet}10">
+        <span style="font-size:14px;font-weight:700;color:${C.violet}">📚 RETRIEVES FROM UNSTRUCTURED KNOWLEDGE</span>
+      </div>
+      <div style="font-size:14px;color:${C.t1};line-height:1.7;margin-bottom:12px"><strong>What it does:</strong> Semantic search across 3 sources simultaneously. Finds the guidelines, past decisions, and regulatory docs relevant to THIS specific query. Returns top matches with similarity scores.</div>
+
+      <div class="mn" style="font-size:11px;color:${C.violet};font-weight:700;margin-bottom:6px">3 RAG SOURCES SEARCHED</div>
+      ${[{n:'Underwriting Guidelines',db:'ChromaDB "guidelines" collection',count:'25 docs',ic:'📜',desc:'UW-003, UW-008, 4.1.1, 4.2.2 — loss ratio thresholds, zone limits, flood restrictions, construction safety'},
+         {n:'Past Decisions',db:'ChromaDB "knowledge" collection',count:'15 decision docs',ic:'📁',desc:'DEC-2024-003: Previously declined Titan Construction at 195% LR. DEC-2024-007: Similar construction refer.'},
+         {n:'Regulatory & Cat Commentary',db:'ChromaDB "knowledge" collection',count:'8 docs',ic:'⚖️',desc:'REG-001: NAIC explainability. CAT-002: FEMA flood map revision for TX.'}
+      ].map(s=>`<div style="padding:10px 12px;border-radius:8px;background:${C.violet}06;border:1px solid ${C.violet}08;margin-bottom:6px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <span style="font-size:16px">${s.ic}</span>
+          <span style="font-size:13px;font-weight:700;color:${C.violet}">${s.n}</span>
+          <span class="mn" style="font-size:10px;color:${C.t3}">${s.count} · ${s.db}</span>
+        </div>
+        <div style="font-size:12px;color:${C.t1};line-height:1.5">${s.desc}</div>
+      </div>`).join('')}
+
+      <div class="mn" style="font-size:11px;color:${C.violet};font-weight:700;margin:10px 0 6px">RAG RESULTS (ranked by similarity)</div>
+      <div style="padding:10px;border-radius:6px;background:${C.sf};font-size:11px;font-family:'JetBrains Mono',monospace;color:${C.t1};line-height:1.7">
+        <span style="color:${C.green}">[0.94]</span> UW-003: LR > 150% → refer for decline<br>
+        <span style="color:${C.green}">[0.91]</span> DEC-2024-003: Titan declined at 195% LR<br>
+        <span style="color:${C.green}">[0.88]</span> 4.3.1: Zone TIV limit $7M per CRESTA<br>
+        <span style="color:${C.amber}">[0.82]</span> 4.2.2: FEMA Zone AE flood restrictions<br>
+        <span style="color:${C.amber}">[0.79]</span> 4.4.1: Credit score below 40 → decline<br>
+        <span style="color:${C.amber}">[0.74]</span> 4.1.1: Construction 3+ WC claims → audit
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MERGE POINT -->
+<div style="text-align:center;padding:12px 0">
+  <div style="display:inline-flex;align-items:center;gap:12px;padding:8px 20px;border-radius:8px;background:${C.orange}08;border:1px dashed ${C.orange}14">
+    <span style="font-size:14px;font-weight:700;color:${C.orange}">MERGE → Executor results + RAG documents + Cortex KPIs assembled into one context package</span>
+  </div>
+</div>
+
+<!-- AGENT 7: ANALYST -->
+<div class="sec" id="analyst">
+  ${secH(SECTIONS[8],'~1000ms · THE ONLY LLM CALL · Claude Sonnet')}
+  <div class="cd" style="border-color:${C.orange}22;box-shadow:0 0 40px ${C.orange}06">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      <span style="font-size:34px">🔬</span>
+      <div><div style="font-size:22px;font-weight:800;color:${C.orange}">RM-Analyst</div>
+        <div style="font-size:13px;color:${C.t2}" class="mn">Insight Synthesizer · THE ONLY AGENT CALLING THE LLM</div></div>
+      <div style="margin-left:auto;padding:6px 14px;border-radius:8px;background:${C.orange}10;border:1px solid ${C.orange}18">
+        <span class="mn" style="font-size:12px;color:${C.orange};font-weight:700">~800-1200ms · Claude Sonnet API</span>
+      </div>
+    </div>
+    <div style="font-size:15px;color:${C.t1};line-height:1.7;margin-bottom:16px"><strong>What it receives:</strong> A unified context package — 38 summary rows from Executor + 6 documents from RAG + Cortex KPI directives. All pre-computed. All pre-linked. The LLM's ONLY job: read these findings and write the narrative.</div>
+    <div class="g2" style="margin-bottom:16px">
+      <div>
+        <div class="mn" style="font-size:11px;color:${C.orange};font-weight:700;margin-bottom:8px">WHAT THE LLM SEES (assembled context)</div>
+        <div style="padding:14px;border-radius:8px;background:${C.sf};font-size:11px;font-family:'JetBrains Mono',monospace;color:${C.t1};line-height:1.7">
+          <div style="color:${C.green};font-weight:700">═══ COMPUTED DATA (from Executor) ═══</div>
+          Loss ratio: 195%<br>Claims: 5, total $142K<br>Frequency: 2.5/yr (2.3× benchmark)<br>Zone US-TX-003: TIV 97% of limit<br>Flood zone: AE (UPGRADED)<br>Credit: 38 (declining)<br>YoY: claims ↑40%<br><br>
+          <div style="color:${C.violet};font-weight:700">═══ GUIDELINES (from RAG) ═══</div>
+          UW-003: LR >150% → refer for decline<br>4.3.1: Zone $7M limit, currently $6.8M<br>4.2.2: Zone AE → flood sublimit required<br>4.4.1: Credit <40 → senior approval needed<br><br>
+          <div style="color:${C.blue};font-weight:700">═══ PAST DECISIONS (from RAG) ═══</div>
+          DEC-2024-003: Previously declined at 195% LR<br>
+          Similar construction case: declined after audit<br><br>
+          <div style="color:${C.cyan};font-weight:700">═══ DERIVED KPIs (from Cortex) ═══</div>
+          Combined ratio: 212%<br>Reserve adequacy: 0.88
+        </div>
+      </div>
+      <div>
+        <div class="mn" style="font-size:11px;color:${C.orange};font-weight:700;margin-bottom:8px">WHAT THE LLM PRODUCES</div>
+        <div style="padding:14px;border-radius:8px;background:${C.sf};font-size:12px;color:${C.t1};line-height:1.8">
+          <div style="font-weight:700;color:${C.rose};font-size:14px;margin-bottom:8px">Recommendation: REFER FOR DECLINE</div>
+          <div style="margin-bottom:8px">Titan Construction (COMM-2024-003) shows significant deterioration across multiple risk dimensions. Loss ratio at 195% is nearly 2× the earned premium — for every dollar collected, $1.95 is paid in claims.</div>
+          <div style="margin-bottom:8px"><span style="color:${C.rose};font-weight:600">4 guideline breaches identified:</span><br>
+          • UW-003: LR exceeds 150% threshold<br>
+          • 4.3.1: Zone US-TX-003 at 97% of TIV limit<br>
+          • 4.4.1: Credit score 38, below 40 threshold<br>
+          • 4.2.2: FEMA zone upgraded to AE, no flood sublimit</div>
+          <div><span style="color:${C.amber};font-weight:600">Historical context:</span> This account was previously declined (DEC-2024-003) for the same deteriorating pattern. No improvement since.</div>
+        </div>
+        <div style="margin-top:8px;padding:8px 10px;border-radius:6px;background:${C.orange}06;text-align:center">
+          <span style="font-size:12px;color:${C.orange};font-weight:700">The LLM didn't compute any numbers. It read pre-computed findings and synthesized them.</span>
+        </div>
+      </div>
+    </div>
+    <div style="padding:12px 16px;border-radius:8px;background:${C.orange}06;border:1px solid ${C.orange}14;text-align:center">
+      <span style="font-size:15px;color:${C.orange};font-weight:700">This is the ONLY point in the entire pipeline where an LLM is called. Everything before and after is deterministic code.</span>
+    </div>
+  </div>
+</div>
+
+<!-- AGENT 8: SENTINEL -->
+<div class="sec" id="sentinel">
+  ${arrow(C.pink)}
+  ${secH(SECTIONS[9],'~200ms · Cross-reference validation · Fallback chain')}
+  <div class="g2">
+    <div class="cd" style="border-color:${C.pink}18">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <span style="font-size:28px">🛡️</span>
+        <div><div style="font-size:18px;font-weight:800;color:${C.pink}">RM-Sentinel</div>
+          <div style="font-size:12px;color:${C.t2}" class="mn">Validation Guard · Fact-Checker · Fallback Manager</div></div>
+      </div>
+      <div style="font-size:14px;color:${C.t1};line-height:1.7;margin-bottom:12px"><strong>What it does:</strong> Reads the Analyst's narrative and cross-checks EVERY claim against the Executor's original output. Catches hallucinations, misquoted numbers, fabricated citations before the user sees them.</div>
+    </div>
+    <div class="cd" style="border-color:${C.pink}18">
+      <div class="mn" style="font-size:12px;color:${C.pink};font-weight:700;margin-bottom:10px">5-POINT VALIDATION</div>
+      ${[{n:'Numerical Verification',d:'"LR 195%" → Executor computed 195% ✓',s:'PASS',c:C.green},
+         {n:'Citation Verification',d:'"Per UW-003" → RAG retrieved UW-003 ✓',s:'PASS',c:C.green},
+         {n:'Entity Verification',d:'"COMM-2024-003, Titan Construction" → exists ✓',s:'PASS',c:C.green},
+         {n:'Consistency Check',d:'"4 guideline breaches" → counted 4 ✓',s:'PASS',c:C.green},
+         {n:'Recommendation Validation',d:'"Decline" matches 4 breaches + 195% LR + past decline ✓',s:'PASS',c:C.green}
+      ].map(v=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;margin-bottom:4px;border-radius:5px;background:${v.c}06">
+        <span style="font-size:10px;padding:2px 6px;border-radius:3px;background:${v.c}14;color:${v.c};font-weight:700" class="mn">${v.s}</span>
+        <span style="font-size:12px;font-weight:700;color:${C.t1}">${v.n}:</span>
+        <span style="font-size:12px;color:${C.t2}">${v.d}</span>
+      </div>`).join('')}
+      <div style="margin-top:10px;padding:8px 10px;border-radius:6px;background:${C.sf}">
+        <div class="mn" style="font-size:11px;color:${C.pink};font-weight:600;margin-bottom:4px">LLM FALLBACK CHAIN (if primary fails)</div>
+        <div style="font-size:12px;color:${C.t1}">Claude Sonnet → Bedrock → OpenAI GPT-4o → Template response</div>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+    <div style="font-size:12px;color:${C.t3}" class="mn">GUARDRAIL:</div>
+    <div class="grail" style="background:${C.pink}06;border:1px solid ${C.pink}10;flex:1">
+      <div class="dot" style="background:${C.pink}"></div>
+      <span style="font-size:13px;color:${C.pink};font-weight:600">Output Validation — All 5 checks passed. No hallucinated numbers. No fabricated citations. Response approved for delivery.</span>
+    </div>
+  </div>
+</div>
+
+<!-- AGENT 9: GLASSBOX -->
+<div class="sec" id="glassbox">
+  ${arrow(C.rose)}
+  ${secH(SECTIONS[10],'~50ms · Formatting + Citations + Evidence assembly')}
+  <div class="cd" style="border-color:${C.rose}18">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      <span style="font-size:34px">🔍</span>
+      <div><div style="font-size:22px;font-weight:800;color:${C.rose}">RM-GlassBox</div>
+        <div style="font-size:13px;color:${C.t2}" class="mn">Transparency Layer · Evidence Formatter · Citation Builder · Audit Logger</div></div>
+    </div>
+    <div style="font-size:14px;color:${C.t1};line-height:1.7;margin-bottom:16px"><strong>What it does:</strong> Takes the validated Analyst output and formats it into the Glass Box display — KPI cards, narrative with inline citations, evidence panel showing data sources, confidence score, recommendation with reasoning, and full audit trail.</div>
+    <div class="g3">
+      ${[{n:'KPI Cards',d:'Loss Ratio 195%, Combined 212%, Frequency 2.5/yr, Credit 38 — displayed as visual cards the underwriter sees first.',ic:'📊',c:C.blue},
+         {n:'Citation Trail',d:'Every claim in the narrative linked to its source: "Per UW-003" → clickable link to guideline. "$142K claims" → link to Executor computation.',ic:'🔗',c:C.violet},
+         {n:'Evidence Panel',d:'Tables queried, filters applied, rows scanned, join paths used. The underwriter can verify every number against the raw data.',ic:'📋',c:C.green},
+         {n:'Confidence Score',d:'87/100 — High. Strong data coverage, multiple guideline matches, consistent with past decisions. Score breakdown shown.',ic:'🎯',c:C.amber},
+         {n:'Recommendation',d:'REFER FOR DECLINE — displayed prominently with the 4 guideline breaches, risk factors, and historical precedent listed.',ic:'⚡',c:C.rose},
+         {n:'Audit Log',d:'Immutable record: query, intent, functions run, LLM prompt, LLM response, validation results, final output, timestamp, user ID.',ic:'🔒',c:C.pink}
+      ].map(f=>`<div style="padding:14px;border-radius:10px;background:${f.c}06;border:1px solid ${f.c}10">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span style="font-size:18px">${f.ic}</span>
+          <span style="font-size:14px;font-weight:700;color:${f.c}">${f.n}</span>
+        </div>
+        <div style="font-size:12px;color:${C.t1};line-height:1.5">${f.d}</div>
+      </div>`).join('')}
+    </div>
+  </div>
+</div>
+
+<!-- GUARDRAILS SUMMARY -->
+<div class="sec" id="guardrails">
+  ${secH(SECTIONS[11],'8 layers · Defense in depth')}
+  <div class="cd" style="border-color:${C.green}18">
+    <div style="font-size:18px;font-weight:700;color:${C.green};margin-bottom:16px">Guardrails Applied Throughout the Pipeline</div>
+    ${[{n:'Layer 1: Data Isolation',where:'Before pipeline starts',how:'JWT token → user identity → database WHERE clause. Sarah can only see her 10 policies. Database-level Row Level Security as backup.',c:C.blue,ic:'🔐'},
+       {n:'Layer 2: AI-Data Separation',where:'Architecture-level',how:'LLM has ZERO database access. No connection string. No credentials. No SQL capability. Executor is the only database accessor — deterministic code, read-only.',c:C.green,ic:'🧱'},
+       {n:'Layer 3: Input Validation',where:'Agent 2 (Orchestrator)',how:'Intent classification rejects non-underwriting queries. Input sanitization strips injection patterns. Complexity limit (max 10 functions per query).',c:C.blue,ic:'🚫'},
+       {n:'Layer 4: Confidence Gating',where:'Agents 1+2 (Cortex + Orchestrator)',how:'Below 50 confidence → ask for clarification. 50-60 → answer with uncertainty flag. 60+ → standard response. Never guesses when unsure.',c:C.amber,ic:'🎚️'},
+       {n:'Layer 5: Output Validation',where:'Agent 8 (Sentinel)',how:'5-point check: numerical accuracy, citation verification, entity verification, consistency, recommendation validation. Catches hallucinations.',c:C.pink,ic:'✅'},
+       {n:'Layer 6: LLM Fallback Chain',where:'Agent 8 (Sentinel)',how:'Claude → Bedrock → OpenAI → Template. Four providers deep. If all AI fails, user still gets raw data + guidelines. Never goes blank.',c:C.violet,ic:'🔄'},
+       {n:'Layer 7: Audit Trail',where:'Agent 9 (GlassBox)',how:'Every interaction logged immutably: query, intent, functions, LLM prompt, LLM response, validation, final output, user action. Full compliance trail.',c:C.rose,ic:'📝'},
+       {n:'Layer 8: Human-in-the-Loop',where:'UI Design',how:'AI NEVER auto-executes. "Recommend Decline" is a recommendation, not an action. Underwriter reviews evidence, applies judgment, makes the decision.',c:C.cyan,ic:'👤'}
+    ].map(g=>`<div class="grail" style="background:${g.c}06;border:1px solid ${g.c}10;padding:12px 16px;margin-bottom:8px;border-radius:10px">
+      <span style="font-size:22px;flex-shrink:0">${g.ic}</span>
+      <div style="flex:1">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
+          <span style="font-size:14px;font-weight:700;color:${g.c}">${g.n}</span>
+          ${tag(g.where,g.c)}
+        </div>
+        <div style="font-size:13px;color:${C.t1};line-height:1.5">${g.how}</div>
+      </div>
+    </div>`).join('')}
+  </div>
+</div>
+
+<!-- FINAL OUTPUT -->
+<div class="sec" id="output">
+  ${arrow(C.cyan)}
+  ${secH(SECTIONS[12],'What Sarah actually sees on her screen')}
+  <div class="cd" style="border-color:${C.cyan}22;box-shadow:0 0 40px ${C.cyan}06;padding:28px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px">
+      <div>
+        <div style="font-size:22px;font-weight:800;color:${C.wh}">Should I renew Titan Construction?</div>
+        <div style="font-size:13px;color:${C.t2};margin-top:4px" class="mn">Answered in 1.8 seconds · Confidence: 87/100 · 4 guideline breaches detected</div>
+      </div>
+      <div style="padding:8px 18px;border-radius:8px;background:${C.rose}14;border:1px solid ${C.rose}25">
+        <span style="font-size:16px;font-weight:800;color:${C.rose}">REFER FOR DECLINE</span>
+      </div>
+    </div>
+    <div class="g4" style="margin-bottom:20px">
+      ${[{l:'Loss Ratio',v:'195%',c:C.rose},{l:'Combined Ratio',v:'212%',c:C.rose},{l:'Claim Frequency',v:'2.5/yr',c:C.amber},{l:'Credit Score',v:'38',c:C.rose}].map(k=>`
+        <div style="padding:12px;border-radius:10px;background:${k.c}08;border:1px solid ${k.c}12;text-align:center">
+          <div style="font-size:28px;font-weight:900;color:${k.c};font-family:'JetBrains Mono',monospace">${k.v}</div>
+          <div style="font-size:11px;color:${C.t2};margin-top:2px" class="mn">${k.l}</div>
+        </div>`).join('')}
+    </div>
+    <div style="font-size:15px;color:${C.t1};line-height:1.8;margin-bottom:16px;padding:16px;border-radius:10px;background:${C.sf}">
+      Titan Construction shows significant deterioration across multiple risk dimensions. Loss ratio at 195% means for every $1 collected, $1.95 is paid in claims. Five claims totaling $142K in 24 months, with frequency 2.3× the industry benchmark. The FEMA flood zone was recently upgraded from X to AE, increasing catastrophe exposure. Credit score of 38 is declining and below the UW-009 threshold of 40. Zone US-TX-003 is at 97% of the $7M TIV concentration limit. This account was previously declined (DEC-2024-003) for the same pattern with no improvement since.
+    </div>
+    <div class="g2">
+      <div style="padding:16px;border-radius:10px;background:${C.violet}06;border:1px solid ${C.violet}10">
+        <div style="font-size:13px;font-weight:700;color:${C.violet};margin-bottom:8px">📚 Guidelines Cited</div>
+        <div style="font-size:12px;color:${C.t1};line-height:1.7">
+          • <strong>UW-003</strong> — LR > 150% → refer for decline ❌<br>
+          • <strong>4.3.1</strong> — Zone TIV at 97% of $7M limit ⚠️<br>
+          • <strong>4.4.1</strong> — Credit 38 < 40 threshold ❌<br>
+          • <strong>4.2.2</strong> — FEMA Zone AE, no flood sublimit ❌
+        </div>
+      </div>
+      <div style="padding:16px;border-radius:10px;background:${C.green}06;border:1px solid ${C.green}10">
+        <div style="font-size:13px;font-weight:700;color:${C.green};margin-bottom:8px">💾 Data Sources Used</div>
+        <div style="font-size:12px;color:${C.t1};line-height:1.7">
+          • <strong>policies</strong> — premium, insured value, zone, flood data<br>
+          • <strong>claims</strong> — 5 claims, types, amounts, dates<br>
+          • <strong>zone_accumulation</strong> — US-TX-003 TIV + PML<br>
+          • <strong>Third-party</strong> — FEMA flood zone, D&B credit, RMS cat model<br>
+          • <strong>Past decision</strong> — DEC-2024-003 (declined)
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:14px;padding:12px 18px;border-radius:10px;background:${C.cyan}06;border:1px dashed ${C.cyan}14;text-align:center">
+      <span style="font-size:15px;font-weight:700;color:${C.cyan}">Sarah sees everything. She can verify every number. She can challenge the AI or agree. She decides.</span>
+    </div>
+  </div>
+  <div style="text-align:center;margin-top:28px;padding:16px 0;border-top:1px solid ${C.bd}">
+    <div style="font-size:13px;color:${C.t3}" class="mn">RiskMind AI Pipeline · 9 Agents · 8 Guardrails · Glass Box Transparency · Confidential</div>
+  </div>
+</div>
+`;
+
+// Observe sections
+document.querySelectorAll('.sec').forEach(s=>obs.observe(s));
+</script>
+</body>
+</html>

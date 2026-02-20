@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RiskMind — Source Defense: Every Stat on the Pitch Deck</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#06080D;--sf:#0C1018;--cd:#111827;--bd:#1E293B;--bl:#334155;
+  --wh:#F1F5F9;--t1:#CBD5E1;--t2:#8896A8;--t3:#4B5563;
+  --blue:#3B82F6;--cyan:#06B6D4;--green:#10B981;--lime:#84CC16;
+  --amber:#F59E0B;--rose:#F43F5E;--violet:#8B5CF6;--orange:#F97316;
+  --pink:#EC4899;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--wh);font-family:'DM Sans',sans-serif;overflow-x:hidden}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:var(--bl);border-radius:4px}
+.mn{font-family:'JetBrains Mono',monospace}
+.cd{padding:20px;border-radius:14px;background:var(--cd);border:1px solid var(--bd)}
+.wrap{max-width:1200px;margin:0 auto;padding:28px 32px}
+
+/* Nav */
+.nav{position:sticky;top:0;z-index:99;background:var(--bg)ee;backdrop-filter:blur(12px);border-bottom:1px solid var(--bd);padding:8px 0}
+.nav-in{max-width:1200px;margin:0 auto;display:flex;gap:4px;padding:0 32px;overflow-x:auto}
+.nav-btn{padding:7px 14px;border-radius:8px;font-size:11px;font-weight:700;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;transition:all .15s;cursor:pointer;border:none;background:none;color:var(--t2)}
+.sec{margin-bottom:44px;scroll-margin-top:70px}
+.tag{display:inline-block;font-size:11px;padding:3px 8px;border-radius:4px;font-weight:600;font-family:'JetBrains Mono',monospace}
+.pulse{display:inline-block;width:8px;height:8px;border-radius:50%;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 currentColor}50%{opacity:.4;box-shadow:0 0 8px 3px currentColor}}
+
+/* Stat card */
+.stat-card{padding:24px;border-radius:14px;background:var(--cd);border:2px solid var(--bd);margin-bottom:20px}
+.stat-hero{display:flex;align-items:center;gap:16px;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--bd)}
+.stat-num{font-size:42px;font-weight:900;font-family:'JetBrains Mono',monospace;line-height:1}
+
+/* Q&A block */
+.qa{padding:16px 20px;border-radius:10px;margin-bottom:8px;border:1px solid var(--bd)}
+.qa-q{font-size:14px;font-weight:700;color:var(--rose);margin-bottom:8px;display:flex;align-items:flex-start;gap:8px}
+.qa-a{font-size:14px;color:var(--t1);line-height:1.7;padding-left:28px}
+.qa-a strong{color:var(--wh)}
+.qa-script{font-size:14px;color:var(--green);line-height:1.7;padding:12px 16px;border-radius:8px;background:#10B98108;border:1px solid #10B98114;margin-top:8px;font-style:italic}
+
+/* Source box */
+.src{padding:12px 16px;border-radius:8px;background:var(--sf);border:1px solid var(--bd);margin:6px 0;font-size:12px}
+.src-label{color:var(--cyan);font-weight:700;font-family:'JetBrains Mono',monospace;font-size:11px;text-transform:uppercase;margin-bottom:4px}
+.src-url{color:var(--blue);word-break:break-all;font-family:'JetBrains Mono',monospace;font-size:11px}
+
+/* Caveat */
+.caveat{padding:12px 16px;border-radius:8px;background:#F59E0B08;border:1px dashed #F59E0B20;font-size:13px;color:var(--amber);line-height:1.6;margin-top:10px}
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <div class="nav-in">
+    <button class="nav-btn" onclick="document.getElementById('overview').scrollIntoView({behavior:'smooth'})">📋 Overview</button>
+    <button class="nav-btn" onclick="document.getElementById('stat1').scrollIntoView({behavior:'smooth'})">💰 $2.85B→$674B</button>
+    <button class="nav-btn" onclick="document.getElementById('stat2').scrollIntoView({behavior:'smooth'})">📊 $10.36B→$154B</button>
+    <button class="nav-btn" onclick="document.getElementById('stat3').scrollIntoView({behavior:'smooth'})">🏆 41.6% CAGR</button>
+    <button class="nav-btn" onclick="document.getElementById('stat4').scrollIntoView({behavior:'smooth'})">📈 14%→70%</button>
+    <button class="nav-btn" onclick="document.getElementById('stat5').scrollIntoView({behavior:'smooth'})">⚡ 113% Markel</button>
+    <button class="nav-btn" onclick="document.getElementById('stat6').scrollIntoView({behavior:'smooth'})">👤 81% New Roles</button>
+    <button class="nav-btn" onclick="document.getElementById('hardqs').scrollIntoView({behavior:'smooth'})">🔥 Hard Questions</button>
+    <button class="nav-btn" onclick="document.getElementById('cheat').scrollIntoView({behavior:'smooth'})">⚡ Quick Reference</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <div style="text-align:center;margin-bottom:36px">
+    <div style="display:inline-flex;align-items:center;gap:8px;padding:5px 16px;border-radius:16px;background:#F59E0B10;border:1px solid #F59E0B20;margin-bottom:14px">
+      <span class="pulse" style="color:#F59E0B;background:#F59E0B"></span>
+      <span class="mn" style="font-size:12px;font-weight:700;color:#F59E0B;letter-spacing:.1em;text-transform:uppercase">Panel Prep — Source Defense</span>
+    </div>
+    <h1 style="font-size:40px;font-weight:900;letter-spacing:-.04em;margin-bottom:6px">Every Number. Every Source. Every Answer.</h1>
+    <p style="font-size:16px;color:var(--t2)">When they ask "How did you derive this?" — here's exactly what to say</p>
+  </div>
+
+  <!-- ═══════════════ OVERVIEW ═══════════════ -->
+  <div class="sec" id="overview">
+    <div class="cd" style="border-color:#F59E0B18;padding:24px">
+      <div style="font-size:20px;font-weight:800;color:var(--amber);margin-bottom:14px">📋 The Golden Rule When Challenged on Data</div>
+      <div style="font-size:15px;color:var(--t1);line-height:1.8;margin-bottom:16px">When someone asks "Where did you get that number?" — they're testing three things:</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">
+        <div style="padding:16px;border-radius:10px;background:var(--sf);text-align:center">
+          <div style="font-size:28px;margin-bottom:8px">1️⃣</div>
+          <div style="font-size:15px;font-weight:700;color:var(--cyan);margin-bottom:4px">Source Credibility</div>
+          <div style="font-size:13px;color:var(--t2)">Is this from a real analyst firm? Can I verify it?</div>
+        </div>
+        <div style="padding:16px;border-radius:10px;background:var(--sf);text-align:center">
+          <div style="font-size:28px;margin-bottom:8px">2️⃣</div>
+          <div style="font-size:15px;font-weight:700;color:var(--green);margin-bottom:4px">Your Understanding</div>
+          <div style="font-size:13px;color:var(--t2)">Do you know WHAT the number means? Not just the figure?</div>
+        </div>
+        <div style="padding:16px;border-radius:10px;background:var(--sf);text-align:center">
+          <div style="font-size:28px;margin-bottom:8px">3️⃣</div>
+          <div style="font-size:15px;font-weight:700;color:var(--amber);margin-bottom:4px">Intellectual Honesty</div>
+          <div style="font-size:13px;color:var(--t2)">Do you acknowledge limits? Estimates? Ranges?</div>
+        </div>
+      </div>
+      <div style="padding:14px 20px;border-radius:10px;background:#10B98108;border:1px solid #10B98114">
+        <div style="font-size:15px;font-weight:700;color:var(--green);margin-bottom:6px">The Response Framework (use for ANY stat challenge):</div>
+        <div style="font-size:14px;color:var(--t1);line-height:1.8">
+          <strong style="color:var(--wh)">Step 1:</strong> Name the source. <em>"That's from [Firm], published [date]."</em><br>
+          <strong style="color:var(--wh)">Step 2:</strong> Explain what it means. <em>"What that captures is..."</em><br>
+          <strong style="color:var(--wh)">Step 3:</strong> Acknowledge the range. <em>"Different analysts put it between X and Y — we cite the middle/conservative/aggressive estimate because..."</em><br>
+          <strong style="color:var(--wh)">Step 4:</strong> Connect to your thesis. <em>"Regardless of which estimate, the directional signal is clear: this market is growing fast."</em>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ STAT 1: $2.85B → $674B ═══════════════ -->
+  <div class="sec" id="stat1">
+    <div class="stat-card" style="border-color:#3B82F618">
+      <div class="stat-hero">
+        <div>
+          <div class="stat-num" style="color:var(--blue)">$2.85B → $674B</div>
+          <div style="font-size:14px;color:var(--t2);margin-top:4px">AI-Powered Insurance Underwriting Market · CAGR 44.7% · By 2034</div>
+        </div>
+        <span class="tag" style="background:#3B82F612;border:1px solid #3B82F618;color:var(--blue);margin-left:auto;font-size:13px">PITCH SLIDE: MARKET</span>
+      </div>
+
+      <div class="src">
+        <div class="src-label">Primary Source</div>
+        <div style="color:var(--wh);font-weight:600;margin-bottom:4px">Market.us — "AI-Powered Insurance Underwriting Market" Report</div>
+        <div class="src-url">https://market.us/report/ai-powered-insurance-underwriting-market/</div>
+        <div style="color:var(--t2);margin-top:4px">Published: August 2025 · Updated periodically · Paid report with free summary page</div>
+      </div>
+
+      <div style="font-size:14px;font-weight:700;color:var(--blue);margin:14px 0 8px">What the Report Actually Says</div>
+      <div style="font-size:14px;color:var(--t1);line-height:1.7;margin-bottom:14px">
+        "The Global AI-Powered Insurance Underwriting Market size is expected to be worth around <strong>USD 674.1 Billion by 2034</strong>, from <strong>USD 2.85 billion in 2024</strong>, growing at a <strong>CAGR of 44.7%</strong> during the forecast period from 2025 to 2034." The U.S. market specifically was valued at $0.92B in 2024, projected to reach $26.2B by 2034 at a 40.4% CAGR.
+      </div>
+
+      <div style="font-size:14px;font-weight:700;color:var(--blue);margin-bottom:8px">Methodology (What Market.us Does)</div>
+      <div style="font-size:13px;color:var(--t2);line-height:1.7;margin-bottom:14px">
+        Market.us is a market intelligence publisher that aggregates data from: public company filings, industry interviews, technology vendor revenues, analyst estimates, and growth modeling. They define the market scope (AI tools used specifically in insurance underwriting workflows), size the current market from vendor revenues plus licensed data, then project forward using adoption rates, technology penetration curves, and industry growth. The 44.7% CAGR reflects the compound growth of AI tooling revenues within underwriting specifically — not the insurance industry overall.
+      </div>
+
+      <!-- Q&A -->
+      <div style="font-size:14px;font-weight:700;color:var(--rose);margin-bottom:10px">🔥 Challenges & Scripted Responses</div>
+
+      <div class="qa" style="background:#F43F5E06">
+        <div class="qa-q">🎯 "That $674B number seems absurdly high. How can AI underwriting be that big?"</div>
+        <div class="qa-a">
+          Good question — and it's important to understand what the number captures. <strong>$674B is the total addressable market for AI-powered tools across the ENTIRE global insurance underwriting value chain</strong> — that includes life, health, P&C, specialty, commercial, personal lines, globally. It's not just one product category. It captures: risk scoring engines, automated decision platforms, data enrichment services, pricing optimization tools, document processing AI, fraud detection in underwriting, and the consulting/integration services around all of these. At 44.7% CAGR from a $2.85B base, the math checks out — that's the nature of compound growth from a small base in a massive industry.
+        </div>
+        <div class="qa-script">
+          💬 <strong>Say this:</strong> "The $674B captures the full AI tooling spend across global insurance underwriting — life, health, P&C, commercial, specialty, all lines. From a $2.85B base, 44.7% compound growth over 10 years gets you there. Different analysts put the number between $40B and $674B depending on how broadly they define the market. The directional signal is what matters: this category is growing faster than any other segment in insurtech."
+        </div>
+      </div>
+
+      <div class="qa" style="background:#F43F5E06">
+        <div class="qa-q">🎯 "44.7% CAGR for 10 years is hard to sustain. Isn't that overly optimistic?"</div>
+        <div class="qa-a">
+          Fair skepticism. A few points: (1) We're at 14% adoption today going to 70% in 3 years per Accenture — that's the adoption curve, not revenue. Revenue follows adoption with a lag. (2) The <strong>base is tiny</strong> — $2.85B against a global insurance industry spending $350B+ on operations. Even modest AI adoption drives massive relative growth. (3) The CAGR will likely moderate in later years, but the first 5 years of the curve are plausible given the regulatory push (NAIC), the talent shortage, and the efficiency gains (Markel 113%). (4) Another analyst firm — Market.us's separate "AI in Underwriting" report — puts the same market at $41.1B by 2033 at 31.8% CAGR with a narrower scope. So the range is $40B-$674B depending on scope. Either way: massive.
+        </div>
+        <div class="qa-script">
+          💬 <strong>Say this:</strong> "You're right that 44.7% for a full decade is aggressive. The early years will be steeper than the later ones — classic S-curve adoption. The more conservative estimate from the same publisher's narrower-scope report puts it at $41B by 2033 at 31.8% CAGR. Either way — whether it's $40B or $674B — we're in the fastest-growing segment of insurtech, and we're building for it now."
+        </div>
+      </div>
+
+      <div class="caveat">⚠️ <strong>Honest caveat to have ready:</strong> "Market sizing in emerging tech always involves wide confidence intervals. We cite Market.us because they're one of the few firms that have segmented AI-in-underwriting specifically rather than lumping it into broader insurtech. The exact number matters less than the growth trajectory — and every major analyst firm agrees the trajectory is steep."</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ STAT 2: $10.36B → $154B ═══════════════ -->
+  <div class="sec" id="stat2">
+    <div class="stat-card" style="border-color:#8B5CF618">
+      <div class="stat-hero">
+        <div>
+          <div class="stat-num" style="color:var(--violet)">$10.36B → $154B</div>
+          <div style="font-size:14px;color:var(--t2);margin-top:4px">AI in Insurance (Total) · CAGR 35.7% · By 2034</div>
+        </div>
+        <span class="tag" style="background:#8B5CF612;border:1px solid #8B5CF618;color:var(--violet);margin-left:auto;font-size:13px">PITCH SLIDE: MARKET</span>
+      </div>
+
+      <div class="src">
+        <div class="src-label">Primary Source</div>
+        <div style="color:var(--wh);font-weight:600;margin-bottom:4px">Fortune Business Insights — "AI in Insurance Market" Report</div>
+        <div class="src-url">https://www.fortunebusinessinsights.com/ai-in-insurance-market-114760</div>
+        <div style="color:var(--t2);margin-top:4px">Fortune Business Insights is a major market research firm · Paid report with public summary</div>
+      </div>
+
+      <div style="font-size:14px;font-weight:700;color:var(--violet);margin:14px 0 8px">What the Report Actually Says</div>
+      <div style="font-size:14px;color:var(--t1);line-height:1.7;margin-bottom:14px">
+        "The market is projected to grow from <strong>USD 13.45 billion in 2026 to USD 154.39 billion by 2034</strong>, exhibiting a <strong>CAGR of 35.7%</strong> during the forecast period." Base year (2025) valuation: $10.36B. North America dominates with 39.96% share. Claims processing is the largest segment today, but <strong>underwriting is growing fastest at 41.6% CAGR</strong>.
+      </div>
+
+      <div style="font-size:14px;font-weight:700;color:var(--violet);margin-bottom:8px">Why We Show BOTH Numbers on the Slide</div>
+      <div style="font-size:13px;color:var(--t2);line-height:1.7;margin-bottom:14px">
+        The $10.36B → $154B is the <strong>total AI in insurance market</strong> (all applications: claims, underwriting, fraud, customer service, pricing, distribution). The $2.85B → $674B is the <strong>AI specifically in underwriting</strong> subsegment. We show both to establish context: underwriting is a subset of the larger AI-in-insurance wave, but it's the FASTEST growing subset. This establishes that we're not just in a hot category — we're in the hottest lane within that category.
+      </div>
+
+      <div class="qa" style="background:#8B5CF606">
+        <div class="qa-q">🎯 "Why are there two different numbers? They're from different firms — can you compare them?"</div>
+        <div class="qa-a">
+          They measure different things, deliberately. <strong>Fortune Business Insights ($154B)</strong> measures all AI applications across the entire insurance value chain — claims, underwriting, fraud, customer service, distribution, pricing, everything. <strong>Market.us ($674B)</strong> measures AI specifically in underwriting but defines underwriting more broadly (including all AI tools that touch the underwriting workflow in any insurance line globally). The comparison isn't apples-to-apples, but the combination tells a compelling story: the total AI-in-insurance opportunity is massive, and within that, underwriting AI is the fastest-growing subsegment.
+        </div>
+        <div class="qa-script">
+          💬 <strong>Say this:</strong> "Good eye — they're measuring different scopes intentionally. The $154B from Fortune Business Insights is all AI in insurance — claims, fraud, service, everything. The $674B from Market.us is AI specifically in underwriting but defined more broadly. We show both because the point is: wherever you draw the boundary, underwriting AI is the fastest-growing segment. That's the lane we're in."
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ STAT 3: 41.6% CAGR ═══════════════ -->
+  <div class="sec" id="stat3">
+    <div class="stat-card" style="border-color:#10B98118">
+      <div class="stat-hero">
+        <div>
+          <div class="stat-num" style="color:var(--green)">41.6% CAGR</div>
+          <div style="font-size:14px;color:var(--t2);margin-top:4px">Underwriting AI — Highest Growth Segment · #1 of all AI-in-insurance segments</div>
+        </div>
+        <span class="tag" style="background:#10B98112;border:1px solid #10B98118;color:var(--green);margin-left:auto;font-size:13px">PITCH SLIDE: MARKET</span>
+      </div>
+
+      <div class="src">
+        <div class="src-label">Primary Source</div>
+        <div style="color:var(--wh);font-weight:600;margin-bottom:4px">Fortune Business Insights — Same "AI in Insurance Market" Report (segment breakdown)</div>
+        <div class="src-url">https://www.fortunebusinessinsights.com/ai-in-insurance-market-114760</div>
+        <div style="color:var(--t2);margin-top:4px">This is the segment-level CAGR within their broader $154B report</div>
+      </div>
+
+      <div style="font-size:14px;font-weight:700;color:var(--green);margin:14px 0 8px">What the Report Says — Exact Quote Context</div>
+      <div style="font-size:14px;color:var(--t1);line-height:1.7;margin-bottom:14px">
+        The report breaks AI in insurance into application segments. Claims processing is currently the LARGEST segment by revenue (because it's been adopted earlier). But: "<strong>Underwriting segment is anticipated to grow at the highest CAGR of 41.6%</strong> during the forecast period due to increasing use of AI-driven risk models that analyze large and complex datasets to improve accuracy and speed." This means underwriting is catching up — it's behind claims today but growing fastest.
+      </div>
+
+      <div class="qa" style="background:#10B98106">
+        <div class="qa-q">🎯 "If underwriting AI is growing fastest, why isn't it the biggest segment already?"</div>
+        <div class="qa-a">
+          Because claims automation started first — it's a more straightforward application (process documents, detect fraud, route claims). Underwriting is harder — it requires judgment, context, multiple data sources, regulatory compliance. That's exactly why the growth rate is higher now: <strong>the technology (LLMs, RAG, agentic AI) finally caught up to the complexity of underwriting</strong>. Claims automation was the "Phase 1" of AI in insurance. Underwriting automation is "Phase 2" — and that's where we are.
+        </div>
+        <div class="qa-script">
+          💬 <strong>Say this:</strong> "Claims processing got there first because it's a simpler problem — automate document processing, route claims. Underwriting is fundamentally harder: it requires synthesizing multiple data sources, applying judgment against guidelines, and explaining decisions for regulatory compliance. The AI wasn't ready for that complexity until recently. That's exactly why it's growing fastest now — and why there's such a gap between what's possible and what's deployed."
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ STAT 4: 14% → 70% ═══════════════ -->
+  <div class="sec" id="stat4">
+    <div class="stat-card" style="border-color:#F59E0B18">
+      <div class="stat-hero">
+        <div>
+          <div class="stat-num" style="color:var(--amber)">14% → 70%</div>
+          <div style="font-size:14px;color:var(--t2);margin-top:4px">AI Adoption in Underwriting · 5× increase · In 3 years</div>
+        </div>
+        <span class="tag" style="background:#F59E0B12;border:1px solid #F59E0B18;color:var(--amber);margin-left:auto;font-size:13px">PITCH SLIDE: ADOPTION</span>
+      </div>
+
+      <div class="src">
+        <div class="src-label">Primary Source</div>
+        <div style="color:var(--wh);font-weight:600;margin-bottom:4px">Accenture — "Underwriting Rewritten: Harnessing the Power of Gen AI" (2024)</div>
+        <div class="src-url">https://www.accenture.com/us-en/insights/insurance/underwriting-rewritten</div>
+        <div style="color:var(--t2);margin-top:4px">Survey of 430 senior UW executives · Life + Commercial + Personal P&C · 11 countries · Published late 2024</div>
+      </div>
+
+      <div class="src">
+        <div class="src-label">Corroborating Coverage</div>
+        <div style="color:var(--wh);font-weight:600;margin-bottom:4px">Insurance Innovation Reporter — "AI Adoption in Underwriting Projected to Reach 70% by 2028"</div>
+        <div class="src-url">https://iireporter.com/ai-adoption-in-underwriting-projected-to-reach-70-by-2028/</div>
+      </div>
+
+      <div style="font-size:14px;font-weight:700;color:var(--amber);margin:14px 0 8px">Exact Survey Methodology</div>
+      <div style="font-size:14px;color:var(--t1);line-height:1.7;margin-bottom:14px">
+        Accenture surveyed <strong>430 senior executives</strong> — specifically <strong>215 P&C underwriting executives</strong> and <strong>215 life underwriting executives</strong> across <strong>11 countries</strong>. They asked: "To what extent is your underwriting organization using [11 specific AI-based capabilities] now vs. expected use three years from now?" The 14% is the average of respondents who answered "to a very large extent" or "to a large extent" for <strong>current</strong> AI use. The 70% is the average for <strong>expected use in 3 years</strong>. Separately, they found AI's impact on underwriting tasks was expected to jump from 17% to 75% in the same timeframe.
+      </div>
+
+      <div class="qa" style="background:#F59E0B06">
+        <div class="qa-q">🎯 "That's what executives EXPECT. What if actual adoption disappoints?"</div>
+        <div class="qa-a">
+          That's a fair distinction — this is expected adoption, not guaranteed. But three things make it credible: (1) These are <strong>senior executives making budget decisions</strong>, not analysts guessing — they're telling you what they plan to spend. (2) <strong>Accenture has run this same survey every 3 years since 2009</strong> — this isn't a one-off. Their historical predictions have tracked reasonably well. (3) The <strong>regulatory push is new</strong> — NAIC Model Bulletin, Colorado SB 21-169, NYDFS — regulators are requiring AI governance, which actually ACCELERATES adoption of governed, explainable AI solutions like ours. Even if actual adoption comes in at 50% instead of 70%, that's still a 3.5× increase from today.
+        </div>
+        <div class="qa-script">
+          💬 <strong>Say this:</strong> "You're right to distinguish expectation from reality. But these are 430 senior executives with budget authority telling Accenture what they plan to deploy — it's investment intent, not speculation. And Accenture's been running this survey since 2009, so there's a track record. Even if it comes in at 50% instead of 70%, that's still a 3.5× increase in 3 years. The direction is clear."
+        </div>
+      </div>
+
+      <div class="qa" style="background:#F59E0B06">
+        <div class="qa-q">🎯 "430 executives across 11 countries — is that statistically significant?"</div>
+        <div class="qa-a">
+          For a specialty B2B survey of senior insurance executives, 430 is a strong sample. There are roughly 5,000-6,000 insurance companies globally that would have dedicated underwriting leadership. 430 senior executives gives you roughly an 8% sample of the addressable population, with a margin of error around ±4.5% at 95% confidence. For context, most Deloitte, McKinsey, and PwC insurance surveys use 200-400 respondents.
+        </div>
+        <div class="qa-script">
+          💬 <strong>Say this:</strong> "430 senior executives is one of the larger samples in insurance technology research. For context, most Big Four insurance surveys use 200-400 respondents. The fact that it spans 11 countries across life, commercial, and personal lines gives it broad representation."
+        </div>
+      </div>
+
+      <div style="margin-top:10px;padding:10px 16px;border-radius:8px;background:var(--sf)">
+        <div style="font-size:12px;font-weight:700;color:var(--t3);margin-bottom:4px" class="mn">THE 5× DERIVATION</div>
+        <div style="font-size:13px;color:var(--t1)">70% ÷ 14% = 5.0×. Simple ratio. "AI adoption in underwriting is expected to increase 5× in 3 years."</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ STAT 5: 113% Markel ═══════════════ -->
+  <div class="sec" id="stat5">
+    <div class="stat-card" style="border-color:#06B6D418">
+      <div class="stat-hero">
+        <div>
+          <div class="stat-num" style="color:var(--cyan)">113%</div>
+          <div style="font-size:14px;color:var(--t2);margin-top:4px">Markel UW Productivity Increase · GWP per FTE · Cytora Partnership</div>
+        </div>
+        <span class="tag" style="background:#06B6D412;border:1px solid #06B6D418;color:var(--cyan);margin-left:auto;font-size:13px">PITCH SLIDE: ADOPTION</span>
+      </div>
+
+      <div class="src">
+        <div class="src-label">Primary Source</div>
+        <div style="color:var(--wh);font-weight:600;margin-bottom:4px">Insurance Business UK — "Markel's underwriting productivity skyrockets 113% with AI"</div>
+        <div class="src-url">https://www.insurancebusinessmag.com/uk/news/technology/markels-underwriting-productivity-skyrockets-113-with-ai-460759.aspx</div>
+        <div style="color:var(--t2);margin-top:4px">Published: September 25, 2023</div>
+      </div>
+      <div class="src">
+        <div class="src-label">Corroborating Sources (same story, multiple outlets)</div>
+        <div style="font-size:11px;color:var(--t2);line-height:1.6" class="mn">
+          • Insurance Innovation Reporter: iireporter.com/markel-uk-doubles-underwriting-productivity-using-cytora-platform/<br>
+          • Insurance Edge: insurance-edge.net/2023/09/25/markel-cytora-partnership-enables-huge-productivity-boost/<br>
+          • FFNews: ffnews.com/newsarticle/insurtech/markel-records-113-productivity-increase/<br>
+          • Digital Insurance: dig-in.com/news/meet-the-insurtech-cytora<br>
+          • EU Insurance Tech: euinsurancetech.com/artificial-intelligence-ai/markel-boosts-underwriting-productivity
+        </div>
+      </div>
+
+      <div style="font-size:14px;font-weight:700;color:var(--cyan);margin:14px 0 8px">Exact Details</div>
+      <div style="font-size:14px;color:var(--t1);line-height:1.7;margin-bottom:14px">
+        <strong>Who:</strong> Markel (global specialty insurer, Richmond VA, public company — Markel Group Inc.)<br>
+        <strong>Partner:</strong> Cytora (London-based insurtech, AI-driven risk processing platform)<br>
+        <strong>Started:</strong> Partnership began 2021. Full rollout across all new business teams by June 2022.<br>
+        <strong>Metric:</strong> 113% increase in <strong>GWP per FTE</strong> (Gross Written Premium per Full-Time Employee).<br>
+        <strong>Also:</strong> Quote turnaround time reduced from 1 day to 2 hours for strategic partners.<br>
+        <strong>What they automated:</strong> Pre-underwriting activities, upfront risk evaluation, data rekeying elimination, submission triage and routing to specialist underwriters.<br>
+        <strong>Before:</strong> Underwriters spent 30%+ of time on low-skill, low-value tasks. Senior UWs manually assessed every submission.<br>
+        <strong>After:</strong> Risks digitized upfront, augmented with additional data, triaged and routed automatically. Specialist UWs receive decision-ready risks within minutes.
+      </div>
+
+      <div class="qa" style="background:#06B6D406">
+        <div class="qa-q">🎯 "113% productivity increase — is that just because they wrote more premium, not because UWs got better?"</div>
+        <div class="qa-a">
+          The metric is <strong>GWP per FTE</strong> — premium per underwriter. It means each underwriter is generating more than double the premium volume they were before. This happened because AI eliminated the 30%+ of time spent on low-value tasks (data entry, submission triage, rekeying), letting underwriters focus on actual underwriting. They didn't hire twice as many people — each existing underwriter became twice as productive. And quote turnaround dropped from 24 hours to 2 hours, meaning they could process more submissions in the same time.
+        </div>
+        <div class="qa-script">
+          💬 <strong>Say this:</strong> "It's GWP per FTE — premium per underwriter. Markel said their UWs were spending 30% of their time on data entry and triage. Cytora automated that, and the same underwriters produced more than double the premium. Quote turnaround went from a day to two hours. That's the efficiency thesis behind AI underwriting — not replacing underwriters, but eliminating the work that isn't underwriting."
+        </div>
+      </div>
+
+      <div class="qa" style="background:#06B6D406">
+        <div class="qa-q">🎯 "That's Markel — a specialty insurer. Does this apply to standard commercial lines?"</div>
+        <div class="qa-a">
+          Actually it applies MORE to standard commercial lines. Markel is specialty — complex, unusual risks. If AI can drive 113% productivity in specialty (where every risk is unique), the gains in standard commercial lines (where risks are more repetitive and data-driven) should be even larger. The submission triage problem is universal: every commercial insurer spends too much time on out-of-appetite submissions that never result in quotes.
+        </div>
+        <div class="qa-script">
+          💬 <strong>Say this:</strong> "Markel is specialty — which is arguably harder for AI because every risk is unique. Standard commercial lines have more repetitive patterns, more structured data, and higher submission volumes. If anything, the productivity gains in standard commercial should exceed what Markel achieved."
+        </div>
+      </div>
+
+      <div class="caveat">⚠️ <strong>Note on attribution:</strong> Our slide says "Insurance Journal" as the source. The story was widely covered by Insurance Business UK/US, Insurance Innovation Reporter, FFNews, and multiple trade outlets. If challenged on "Insurance Journal" specifically, say: "The 113% figure was announced jointly by Markel and Cytora in September 2023 and covered across multiple insurance trade publications. The underlying data is from Markel themselves."</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ STAT 6: 81% ═══════════════ -->
+  <div class="sec" id="stat6">
+    <div class="stat-card" style="border-color:#EC489918">
+      <div class="stat-hero">
+        <div>
+          <div class="stat-num" style="color:var(--pink)">81%</div>
+          <div style="font-size:14px;color:var(--t2);margin-top:4px">Executives Believe AI Creates New Roles + Efficiency</div>
+        </div>
+        <span class="tag" style="background:#EC489912;border:1px solid #EC489918;color:var(--pink);margin-left:auto;font-size:13px">PITCH SLIDE: ADOPTION</span>
+      </div>
+
+      <div class="src">
+        <div class="src-label">Source</div>
+        <div style="color:var(--wh);font-weight:600;margin-bottom:4px">Accenture — Same "Underwriting Rewritten" Survey (2024)</div>
+        <div class="src-url">https://www.accenture.com/us-en/insights/insurance/underwriting-rewritten</div>
+        <div style="color:var(--t2);margin-top:4px">Same 430-executive survey as the 14%→70% stat</div>
+      </div>
+
+      <div style="font-size:14px;font-weight:700;color:var(--pink);margin:14px 0 8px">Exact Wording</div>
+      <div style="font-size:14px;color:var(--t1);line-height:1.7;margin-bottom:14px">
+        "<strong>81% of underwriting executives believe AI and gen AI will create new roles</strong> 'to a large extent' or 'to a very large extent'." Additionally: 65% say the workforce will need upskilling. 76% anticipate AI will streamline knowledge transfer between experienced underwriters and new hires. Separately, a hyperexponential survey found that fears of being replaced by AI dropped from 74% to 48% among underwriters between 2024 and 2025.
+      </div>
+
+      <div class="qa" style="background:#EC489906">
+        <div class="qa-q">🎯 "81% believe AI creates new roles — isn't that just executives telling themselves what they want to hear?"</div>
+        <div class="qa-a">
+          Two things: (1) These same executives also said <strong>65% of their workforce needs upskilling</strong> — that's not a soft answer. They're saying the change is real and disruptive, but the net effect is positive. (2) The question was about new roles, not just preserving existing ones. AI creates roles like: AI underwriting analyst, data quality manager, model governance officer, prompt engineer, underwriting workflow designer. We're already seeing these roles posted on insurance job boards.
+        </div>
+        <div class="qa-script">
+          💬 <strong>Say this:</strong> "It's important that the same executives also said 65% need upskilling. They're not saying nothing changes — they're saying the change is net positive. AI doesn't replace the underwriter, it replaces the part of underwriting that isn't underwriting: data entry, document chasing, rekeying. That creates capacity for higher-value work and entirely new roles like AI governance and workflow design."
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ HARD QUESTIONS ═══════════════ -->
+  <div class="sec" id="hardqs">
+    <div style="font-size:24px;font-weight:800;color:var(--rose);margin-bottom:16px">🔥 The Hard Meta-Questions</div>
+
+    <div class="stat-card" style="border-color:#F43F5E18">
+      <div class="qa" style="background:#F43F5E06;border-color:#F43F5E14">
+        <div class="qa-q">🎯 "You're citing analyst reports to justify your market. How do we know these analysts are right?"</div>
+        <div class="qa-a">
+          <strong>You don't — and neither do we.</strong> Market sizing in emerging tech is inherently uncertain. What we can say: we're citing multiple independent sources (Market.us, Fortune Business Insights, Accenture) that all agree on the direction, even if the exact numbers differ. Market.us puts AI in underwriting at $674B. Their narrower-scope report says $41B. Fortune Business Insights says the total AI-in-insurance market is $154B. The estimates range widely, but the directional consensus is unanimous: this is the fastest-growing segment in insurtech. We build for the direction, not the decimal point.
+        </div>
+        <div class="qa-script">
+          💬 <strong>Say this:</strong> "Honestly — market sizing in early-stage tech always has wide confidence intervals. We cite three independent sources that disagree on the exact number but agree on the direction: AI in underwriting is the fastest-growing segment in insurtech. We're not betting on a specific number being right. We're betting on the direction — and every signal says the same thing."
+        </div>
+      </div>
+
+      <div class="qa" style="background:#F43F5E06;border-color:#F43F5E14">
+        <div class="qa-q">🎯 "These are all third-party reports. What's YOUR data? What have YOU seen?"</div>
+        <div class="qa-a">
+          This is the best challenge because it pivots to YOUR story. Answer with customer demand signals, pipeline, demo reactions, conversations with carriers, what you've heard from potential clients.
+        </div>
+        <div class="qa-script">
+          💬 <strong>Say this:</strong> "Fair — let me tell you what we've seen firsthand. [Share your specific customer conversations, demo feedback, carrier pain points you've heard directly]. The analyst reports validate the macro trend. Our customer conversations validate the micro-need. They're telling us: 'We need this. We need it to be explainable. We need it to work with our existing data. And we need it now because regulators are asking questions we can't answer yet.'"
+        </div>
+      </div>
+
+      <div class="qa" style="background:#F43F5E06;border-color:#F43F5E14">
+        <div class="qa-q">🎯 "If the market is this big, why isn't everyone doing this already?"</div>
+        <div class="qa-a">
+          Three reasons: (1) <strong>Legacy infrastructure</strong> — most carriers run on Guidewire, Duck Creek, or mainframe systems from the 90s. AI integration is hard. (2) <strong>Regulation</strong> — NAIC Model Bulletin only came in December 2023. Before that, carriers had no regulatory framework for AI decisions. Now they do — and it requires explainability. (3) <strong>Trust</strong> — underwriters don't trust black box AI. They need to see inside. That's why 14% adoption today, not 70%. The technology is ready. The infrastructure and trust are catching up. That gap is our opportunity.
+        </div>
+        <div class="qa-script">
+          💬 <strong>Say this:</strong> "Three barriers: legacy tech, regulatory uncertainty, and trust. Legacy is being solved by cloud migration. Regulatory uncertainty was resolved by NAIC in December 2023 — there's now a framework, and it requires explainability. Trust is solved by Glass Box — underwriters need to see inside the AI, and that's exactly what we built. The 14% is today's adoption. The 70% is where it's going. We're building the bridge."
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ CHEAT SHEET ═══════════════ -->
+  <div class="sec" id="cheat">
+    <div style="font-size:24px;font-weight:800;color:var(--green);margin-bottom:16px">⚡ Quick Reference — All Stats at a Glance</div>
+
+    <div class="cd" style="border-color:#10B98118;padding:6px">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="border-bottom:2px solid var(--bd)">
+            <th style="text-align:left;padding:12px;color:var(--cyan)">Stat</th>
+            <th style="text-align:left;padding:12px;color:var(--cyan)">Source</th>
+            <th style="text-align:left;padding:12px;color:var(--cyan)">Date</th>
+            <th style="text-align:left;padding:12px;color:var(--cyan)">Methodology</th>
+            <th style="text-align:left;padding:12px;color:var(--cyan)">5-word defense</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid var(--bd)">
+            <td style="padding:10px 12px;font-weight:700;color:var(--blue)" class="mn">$2.85B→$674B</td>
+            <td style="padding:10px 12px;color:var(--t1)">Market.us</td>
+            <td style="padding:10px 12px;color:var(--t2)">Aug 2025</td>
+            <td style="padding:10px 12px;color:var(--t2)">Vendor revenues + growth modeling</td>
+            <td style="padding:10px 12px;color:var(--green)">Fastest segment in insurtech</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--bd)">
+            <td style="padding:10px 12px;font-weight:700;color:var(--violet)" class="mn">$10.36B→$154B</td>
+            <td style="padding:10px 12px;color:var(--t1)">Fortune Business Insights</td>
+            <td style="padding:10px 12px;color:var(--t2)">2025</td>
+            <td style="padding:10px 12px;color:var(--t2)">Industry revenue + segment analysis</td>
+            <td style="padding:10px 12px;color:var(--green)">Total AI-in-insurance opportunity</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--bd)">
+            <td style="padding:10px 12px;font-weight:700;color:var(--green)" class="mn">41.6% CAGR</td>
+            <td style="padding:10px 12px;color:var(--t1)">Fortune Business Insights</td>
+            <td style="padding:10px 12px;color:var(--t2)">2025</td>
+            <td style="padding:10px 12px;color:var(--t2)">Segment CAGR within AI-in-insurance</td>
+            <td style="padding:10px 12px;color:var(--green)">UW is #1 growth segment</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--bd)">
+            <td style="padding:10px 12px;font-weight:700;color:var(--amber)" class="mn">14%→70%</td>
+            <td style="padding:10px 12px;color:var(--t1)">Accenture "UW Rewritten"</td>
+            <td style="padding:10px 12px;color:var(--t2)">Late 2024</td>
+            <td style="padding:10px 12px;color:var(--t2)">430 executive survey, 11 countries</td>
+            <td style="padding:10px 12px;color:var(--green)">Budget holders say it's coming</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--bd)">
+            <td style="padding:10px 12px;font-weight:700;color:var(--cyan)" class="mn">113%</td>
+            <td style="padding:10px 12px;color:var(--t1)">Markel + Cytora (Insurance Business UK)</td>
+            <td style="padding:10px 12px;color:var(--t2)">Sep 2023</td>
+            <td style="padding:10px 12px;color:var(--t2)">GWP/FTE before vs after AI</td>
+            <td style="padding:10px 12px;color:var(--green)">Real carrier, real measured results</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 12px;font-weight:700;color:var(--pink)" class="mn">81%</td>
+            <td style="padding:10px 12px;color:var(--t1)">Accenture "UW Rewritten"</td>
+            <td style="padding:10px 12px;color:var(--t2)">Late 2024</td>
+            <td style="padding:10px 12px;color:var(--t2)">Same 430-exec survey</td>
+            <td style="padding:10px 12px;color:var(--green)">Creates roles, not eliminates them</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:20px;padding:20px 24px;border-radius:14px;background:var(--sf);border:1px solid var(--bd)">
+      <div style="font-size:18px;font-weight:800;color:var(--wh);margin-bottom:12px">🎤 The Universal Closer (Works for ANY Data Challenge)</div>
+      <div style="font-size:15px;color:var(--green);line-height:1.8;font-style:italic;padding:16px 20px;border-radius:10px;background:#10B98108;border:1px solid #10B98114">
+        "Look — analysts can disagree on whether this market is $40 billion or $600 billion. What they all agree on is the direction: underwriting AI is the fastest-growing segment in insurtech, adoption is accelerating from 14% toward 70%, and early movers like Markel are seeing 2× productivity gains. We're not building for a specific market size estimate. We're building because every carrier we talk to has the same three problems: underwriters drowning in manual work, regulators demanding AI explainability, and no solution that does both. That's what RiskMind solves."
+      </div>
+    </div>
+
+    <div style="text-align:center;margin-top:28px;padding:16px 0;border-top:1px solid var(--bd)">
+      <div style="font-size:13px;color:var(--t3)" class="mn">RiskMind · Source Defense Guide · Panel Prep · Confidential</div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

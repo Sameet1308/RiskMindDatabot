@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RiskMind AI Engine — Architecture & Solution Design</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&family=Fira+Code:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px;scroll-behavior:smooth}
+body{background:#06080F;color:#E8ECF4;font-family:'Plus Jakarta Sans',sans-serif;min-height:100vh;overflow-x:hidden}
+button{font-family:inherit;cursor:pointer;border:none;background:none;outline:none}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:#0a0e18}
+::-webkit-scrollbar-thumb{background:#2a3550;border-radius:8px}
+::selection{background:#4E8EF740;color:#fff}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes si{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fi{from{opacity:0}to{opacity:1}}
+@keyframes glow{0%,100%{box-shadow:0 0 12px var(--gc)}50%{box-shadow:0 0 24px var(--gc)}}
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+.si{animation:si .4s ease both}
+.fi{animation:fi .3s ease both}
+.shimmer{background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,.03) 50%,transparent 100%);background-size:200% 100%;animation:shimmer 3s infinite}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const{useState,useEffect,useRef,useCallback}=React;
+
+/* ═══ THEME ═══ */
+const T={
+  bg:"#06080F",s1:"#0B0F1A",s2:"#111827",cd:"#151C2E",cdh:"#1C2640",
+  bd:"#1E2A45",bl:"#2E3F66",
+  wh:"#E8ECF4",t1:"#C4CDD9",t2:"#8494AB",t3:"#576478",
+  blue:"#5B9BF7",cyan:"#2DD4BF",green:"#3FD98F",amber:"#F5B731",
+  rose:"#F76B8A",violet:"#A585F2",orange:"#F59E42",pink:"#E56DAE",
+  lime:"#B5E63A",aws:"#FF9900",anth:"#D4A574",red:"#F05252",teal:"#14B8A6"
+};
+const F="'Fira Code',monospace";
+const J="'Plus Jakarta Sans',sans-serif";
+
+/* ═══ SHARED COMPONENTS ═══ */
+const Glow=({c,s=9,p})=><span style={{display:"inline-block",width:s,height:s,borderRadius:"50%",background:c,boxShadow:`0 0 ${s+5}px ${c}80`,animation:p?"pulse 2.2s ease-in-out infinite":"none",flexShrink:0}}/>;
+
+const Tag=({children,c,sz=13})=><span style={{fontSize:sz,padding:"4px 12px",borderRadius:6,background:c+"10",border:`1px solid ${c}20`,color:c,fontFamily:F,fontWeight:600,whiteSpace:"nowrap"}}>{children}</span>;
+
+const Stat=({label,value,c})=><div style={{display:"flex",alignItems:"center",gap:8,padding:"7px 16px",borderRadius:8,background:c+"0C",border:`1px solid ${c}18`}}><Glow c={c} s={6}/><span style={{fontSize:14,color:T.t2,fontFamily:F}}>{label}</span><span style={{fontSize:16,fontWeight:700,color:c,fontFamily:F}}>{value}</span></div>;
+
+const Section=({children,accent})=><div style={{padding:"22px 26px",borderRadius:16,background:T.s2,border:`1px solid ${T.bd}`,marginBottom:18,position:"relative",overflow:"hidden"}}>{accent&&<div style={{position:"absolute",top:0,left:0,right:0,height:3,background:`linear-gradient(90deg,${accent},${accent}00)`}}/>}{children}</div>;
+
+/* ═══ AGENT DATA ═══ */
+const AGENTS=[
+  {k:"cortex",n:"RM-Cortex",i:"🧠",c:T.lime,r:"Domain Intelligence & Learning",s:"Terminology · KPI formulas · Memory · Learning",aws:"Lambda fn",step:1,
+    h:["Insurance terminology recognition — translates plain English to insurance logic","KPI derivation engine — 42 formulas auto-computed from raw DB fields","Session context memory — remembers conversation across multiple questions","Behavioral pattern learning — tracks query types per user, per role, per time"]},
+  {k:"orchestrator",n:"RM-Orchestrator",i:"🧬",c:T.blue,r:"Central Intelligence Router",s:"Intent classify · Plan build · Agent routing",aws:"Step Functions entry",step:2,
+    h:["Intent classification from natural language into analysis categories","Multi-function execution plan generation (parallel + sequential)","Agent routing via 8-node LangGraph state machine","Decides parallel vs sequential execution based on dependencies"]},
+  {k:"schema",n:"RM-SchemaReader",i:"📐",c:T.cyan,r:"Data Schema Interpreter",s:"Reads metadata · Maps columns · Zero data",aws:"Lambda → Aurora metadata",step:3,
+    h:["Schema introspection without touching actual data rows","Column-to-business-concept mapping (e.g. 'premium_amt' → GWP)","Relationship and join path detection across tables","Query complexity assessment and optimization hints"]},
+  {k:"cache",n:"RM-CacheLayer",i:"💾",c:T.amber,r:"Adaptive Performance Buffer",s:"Pattern-learned · Pre-fetch · Hit/miss routing",aws:"Lambda → ElastiCache",step:4,
+    h:["Pattern-learned adaptive pre-warming based on Cortex signals","User behavior tracking per role, department, and time-of-day","Predictive cache — pre-warms analyses before user even types","Outage buffering — serves stale results during DB maintenance"]},
+  {k:"executor",n:"RM-Executor",i:"⚡",c:T.green,r:"Deterministic Compute Engine",s:"SQL · Stats · Aggregation on full dataset",aws:"Lambda → Aurora queries",step:5,
+    h:["SQL execution on full dataset — handles 50 to 50M rows identically","Statistical analysis: outliers, correlations, distributions","Parallel function execution — multiple analyses simultaneously","Returns 30-60 summary rows to AI — database handles scale"]},
+  {k:"rag",n:"RM-KnowledgeRAG",i:"📚",c:T.violet,r:"3-Source RAG Engine",s:"Semantic search · Guidelines · Past decisions",aws:"Lambda → Aurora pgvector",step:6,
+    h:["ChromaDB/pgvector semantic guideline search across UW manuals","Past decision retrieval — matches similar historical cases","Threshold and limit lookup from regulatory documents","Regulatory context injection for compliance-aware analysis"]},
+  {k:"analyst",n:"RM-Analyst",i:"🔬",c:T.orange,r:"Insight Synthesizer",s:"LLM reasoning on ~52 summary rows",aws:"Lambda → Anthropic API",step:7,
+    h:["Cross-dimensional pattern synthesis across all result sets","Root cause identification with narrative explanation","Confidence scoring (0-100) based on data quality and coverage","Derived KPI integration — merges Cortex-computed metrics into analysis"]},
+  {k:"sentinel",n:"RM-Sentinel",i:"🛡️",c:T.pink,r:"Validation & Failsafe Guard",s:"Verifies claims · Fallback chain · Recovery",aws:"Lambda fn",step:8,
+    h:["Output validation — every numeric claim checked against executor data","LLM fallback chain: Claude → Bedrock → OpenAI → Mock","Error recovery with retry logic and graceful degradation","Detects fabricated policy IDs, impossible ratios, hallucinated names"]},
+  {k:"glassbox",n:"RM-GlassBox",i:"🔍",c:T.rose,r:"Transparency & Verification",s:"KPI cards · Citations · Recommendations",aws:"Lambda → API GW response",step:9,
+    h:["KPI cards with verifiable real numbers from executor output","Source citations for every claim — user can trace back to data","Evidence mapping showing which raw rows support each insight","Actionable recommendation generation with priority ranking"]},
+];
+
+/* ═══ FLOW STEPS ═══ */
+const STEPS=[
+  {id:0,p:"INPUT",a:null,t:"User Question",d:'"Find anomalies in high-risk policies showing deterioration"',v:"input",tm:"0ms",ai:"0",db:"5M rows waiting"},
+  {id:1,p:"CORTEX",a:"cortex",t:"Domain Intelligence & Memory Recall",d:"Recognizes 'deterioration' as insurance term — LR trending above 80% threshold. Recalls user asked about construction risk 2 days ago. Identifies #1 query type: anomaly detection (14× this month). Pre-fetches outlier analysis from behavioral cache.",v:"cortex",tm:"40ms",ai:"0",db:"5M rows"},
+  {id:2,p:"PLAN",a:"orchestrator",t:"Intent Classification → 6-Function Plan",d:"Detects multi-intent: outlier detection, group_by analysis, trend computation, top_n ranking, correlation analysis, and pattern matching. Builds parallel execution plan with dependency graph.",v:"plan",tm:"80ms",ai:"0",db:"5M rows"},
+  {id:3,p:"CACHE",a:"cache",t:"Smart Cache — 3 of 6 Pre-Warmed",d:"Behavioral cache serves 3 analyses instantly from Cortex learning. Only 3 need fresh computation. 50% hit rate from pattern learning → 40% faster overall execution.",v:"cache",tm:"130ms",ai:"0",db:"5M · 3/6 cached"},
+  {id:4,p:"EXECUTE",a:"executor",t:"3 Parallel Queries on 5M Rows",d:"Remaining 3 functions run in parallel. 15M row-scans → 39 summary rows. Zero LLM tokens consumed — pure deterministic SQL + stats. Database handles the volume.",v:"execute",tm:"380ms",ai:"0 (DB only)",db:"15M scans → 39 rows"},
+  {id:5,p:"RAG",a:"rag",t:"Guideline & Knowledge Retrieval",d:"4 matching UW guidelines + 2 past decisions retrieved via pgvector semantic search. UW-003 (LR Threshold 80%), UW-007 (Construction Limits), 2 historical cases.",v:"rag",tm:"420ms",ai:"0",db:"39 + 6 docs"},
+  {id:6,p:"ANALYZE",a:"analyst",t:"AI Synthesis + Derived KPIs",d:"Receives ~52 rows (39 executor + 6 RAG + Cortex-derived KPIs). Claude Sonnet synthesizes: Combined Ratio 102.3%, Frequency 3.2/yr, Severity 1.8× avg. Confidence: 89.",v:"synthesis",tm:"1.6s",ai:"~52 rows to AI",db:"5M in DB"},
+  {id:7,p:"VALIDATE",a:"sentinel",t:"5/5 Validation Checks Passed",d:"All numeric claims verified against executor. Derived KPIs independently recomputed. Guidelines confirmed in RAG. Confidence in range. Zero fabricated IDs.",v:"validate",tm:"1.8s",ai:"~52 verified",db:"5M in DB"},
+  {id:8,p:"OUTPUT",a:"glassbox",t:"Glass Box Response + Learning",d:"Narrative + 4 KPI cards + 3 recommendations + full citation trail. Cortex logs: anomaly weight +1, cache pre-warmed for next session.",v:"output",tm:"2.0s",ai:"→ narrative",db:"5M in DB"},
+];
+
+const getAgent=(k)=>AGENTS.find(a=>a.k===k);
+
+/* ═══════════════════════════════════════════════
+   AI ENGINE — LIVE FLOW
+   ═══════════════════════════════════════════════ */
+function LiveFlow(){
+  const[step,setStep]=useState(0);
+  const[play,setPlay]=useState(false);
+  const timer=useRef();
+  const s=STEPS[step];
+  const ag=s.a?getAgent(s.a):null;
+
+  useEffect(()=>{
+    if(play)timer.current=setInterval(()=>setStep(p=>{if(p>=STEPS.length-1){setPlay(false);return p}return p+1}),3400);
+    return()=>clearInterval(timer.current);
+  },[play]);
+
+  const Visual=()=>{
+    const bx={padding:20,borderRadius:14,background:T.cd,border:`1px solid ${T.bd}`,height:"100%"};
+    if(s.v==="input")return<div style={bx}><div style={{fontSize:14,color:T.t3,fontFamily:F,marginBottom:14,fontWeight:600,textTransform:"uppercase",letterSpacing:".08em"}}>User Query</div><div style={{fontSize:24,color:T.wh,fontWeight:700,lineHeight:1.4,marginBottom:20}}>"{s.d.replace(/"/g,'')}"</div><div style={{display:"flex",gap:10,flexWrap:"wrap"}}>{["Anomaly Detection","Driver Analysis","Pattern Match","Trend Analysis"].map(t=><Tag key={t} c={T.cyan} sz={15}>{t}</Tag>)}</div></div>;
+
+    if(s.v==="cortex")return<div style={bx}>{[{t:"Terminology",x:"'deterioration' → LR above 80% threshold breach",ic:"📖"},{t:"Memory",x:"Construction risk queried 2 days ago — retained",ic:"💭"},{t:"Pattern",x:"#1 query type: anomaly detection (14×/month)",ic:"📊"},{t:"Pre-fetch",x:"Outlier analysis cached from pattern learning",ic:"⚡"},{t:"Derive",x:"Will auto-compute Combined Ratio, Frequency, Severity",ic:"🧮"}].map((a,i)=><div key={i} style={{display:"flex",gap:14,padding:"12px 16px",borderRadius:10,marginBottom:8,background:T.lime+"07",border:`1px solid ${T.lime}12`}}><span style={{fontSize:28}}>{a.ic}</span><div><div style={{fontSize:13,fontWeight:700,color:T.lime,fontFamily:F,textTransform:"uppercase",letterSpacing:".04em",marginBottom:3}}>{a.t}</div><div style={{fontSize:16,color:T.t1,lineHeight:1.55}}>{a.x}</div></div></div>)}</div>;
+
+    if(s.v==="plan")return<div style={bx}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>{["outliers(LR, 2σ)","group_by(industry)","trend(monthly, 12mo)","top_n(policies, 10)","correlation(ind × sev)","pattern_match(3+)"].map((p,i)=><div key={i} style={{padding:"12px 16px",borderRadius:10,background:T.blue+"08",border:`1px solid ${T.blue}14`}}><span style={{fontSize:15,color:T.t3,fontFamily:F,fontWeight:700,marginRight:10}}>{i+1}.</span><span style={{fontSize:16,color:T.cyan,fontFamily:F,fontWeight:600}}>{p}</span></div>)}</div></div>;
+
+    if(s.v==="cache")return<div style={bx}>{[{f:"group_by(industry)",h:true,r:"Pattern cache"},{f:"trend(monthly)",h:true,r:"Recent cache"},{f:"outliers(LR, 2σ)",h:true,r:"Cortex pre-fetch"},{f:"top_n(policies, 10)",h:false,r:"Fresh DB query"},{f:"correlation(ind×sev)",h:false,r:"Fresh DB query"},{f:"pattern_match(3+)",h:false,r:"Fresh DB query"}].map((c,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 16px",borderRadius:10,marginBottom:6,background:(c.h?T.green:T.rose)+"07",border:`1px solid ${c.h?T.green:T.rose}12`}}><Glow c={c.h?T.green:T.rose} s={8}/><span style={{flex:1,fontSize:16,color:T.t1,fontFamily:F}}>{c.f}</span><Tag c={c.h?T.green:T.rose} sz={13}>{c.h?"HIT":"MISS"}</Tag><span style={{fontSize:13,color:T.t3,fontFamily:F,minWidth:110,textAlign:"right"}}>{c.r}</span></div>)}</div>;
+
+    if(s.v==="execute")return<div style={bx}>{[{f:"top_n(LR, 10)",r:"10 rows",t:"280ms"},{f:"correlation(ind × sev)",r:"8 pairs",t:"310ms"},{f:"pattern_match(3+ claims)",r:"7 matches",t:"290ms"}].map((e,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:12,padding:"14px 16px",borderRadius:10,marginBottom:8,background:T.green+"07",border:`1px solid ${T.green}12`}}><span style={{fontSize:17,color:T.green,fontFamily:F,fontWeight:700,flex:1}}>{e.f}</span><Tag c={T.amber} sz={14}>{e.r}</Tag><span style={{fontSize:15,color:T.t2,fontFamily:F}}>{e.t}</span></div>)}<div style={{marginTop:14,padding:14,borderRadius:10,border:`1px dashed ${T.green}25`,textAlign:"center",fontSize:17,color:T.green,fontFamily:F,fontWeight:700}}>15M row-scans → 39 result rows · Zero LLM cost</div></div>;
+
+    if(s.v==="rag")return<div style={bx}>{[{s:"UW Guidelines",d:"UW-003: Loss Ratio Threshold 80%",m:"92%"},{s:"UW Guidelines",d:"UW-007: Construction Portfolio Limits",m:"87%"},{s:"Past Decisions",d:"COMM-2023-041: Declined at 195% LR",m:"84%"},{s:"Past Decisions",d:"COMM-2023-078: Referred at 120% LR",m:"79%"}].map((r,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:14,padding:"12px 16px",borderRadius:10,marginBottom:8,background:T.violet+"07",border:`1px solid ${T.violet}12`}}><span style={{fontSize:28}}>{r.s.includes("UW")?"📜":"📁"}</span><div style={{flex:1}}><div style={{fontSize:17,color:T.t1,fontFamily:F,fontWeight:600}}>{r.d}</div><div style={{fontSize:13,color:T.t3,fontFamily:F}}>{r.s}</div></div><Tag c={T.violet} sz={14}>{r.m}</Tag></div>)}</div>;
+
+    if(s.v==="synthesis")return<div style={bx}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:10,marginBottom:16}}>{[{l:"AI Input",v:"~52",c:T.orange},{l:"Dims",v:"6",c:T.cyan},{l:"Score",v:"89",c:T.green},{l:"DB",v:"5M",c:T.t3}].map((m,i)=><div key={i} style={{padding:14,borderRadius:10,textAlign:"center",background:m.c+"08",border:`1px solid ${m.c}14`}}><div style={{fontSize:26,fontWeight:800,color:m.c,fontFamily:F}}>{m.v}</div><div style={{fontSize:11,color:T.t3,fontFamily:F,textTransform:"uppercase",marginTop:3}}>{m.l}</div></div>)}</div><div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:16}}>{["Combined: 102.3%","Frequency: 3.2/yr","Severity: 1.8×"].map((d,i)=><Tag key={i} c={T.lime} sz={15}>{d}</Tag>)}</div><div style={{padding:16,borderRadius:10,background:T.orange+"07",border:`1px solid ${T.orange}12`}}><div style={{fontSize:17,color:T.t1,lineHeight:1.7}}>Construction sector (38% of losses) → 3 policies driving 80% of deterioration. 3+ claims in year 1 → 78% chance LR exceeds 100%.</div></div></div>;
+
+    if(s.v==="validate")return<div style={bx}>{["All numeric claims match executor output","Derived KPI formulas independently verified","Guideline citations confirmed in RAG store","Confidence score within expected range","Zero fabricated policy IDs detected"].map((c,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:14,padding:"12px 16px",borderRadius:10,marginBottom:8,background:T.green+"07",border:`1px solid ${T.green}12`}}><span style={{fontSize:24}}>✅</span><span style={{flex:1,fontSize:17,color:T.t1}}>{c}</span><Tag c={T.green} sz={13}>PASS</Tag></div>)}</div>;
+
+    if(s.v==="output")return<div style={bx}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>{[{l:"Portfolio LR",v:"84.8%",c:T.blue},{l:"Combined Ratio",v:"102.3%",c:T.rose},{l:"Anomalies",v:"14",c:T.amber},{l:"Confidence",v:"89/100",c:T.green}].map((k,i)=><div key={i} style={{padding:"16px 18px",borderRadius:12,background:k.c+"08",border:`1px solid ${k.c}15`}}><div style={{fontSize:28,fontWeight:800,color:k.c,fontFamily:F}}>{k.v}</div><div style={{fontSize:13,color:T.t2,fontFamily:F,marginTop:4}}>{k.l}</div></div>)}</div><div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>{["Review COMM-2024-003","Decline 3 renewals >150%","Refer 4 to senior UW"].map((a,i)=><Tag key={i} c={T.green} sz={14}>→ {a}</Tag>)}</div><div style={{padding:14,borderRadius:10,background:T.lime+"07",border:`1px dashed ${T.lime}18`,display:"flex",alignItems:"center",gap:12}}><span style={{fontSize:28}}>🧠</span><span style={{fontSize:16,color:T.lime,fontFamily:F,fontWeight:600}}>Cortex logged → anomaly weight +1 → cache pre-warmed for next session</span></div></div>;
+    return null;
+  };
+
+  return<>
+    <div style={{padding:"16px 22px",borderRadius:12,marginBottom:18,background:T.blue+"08",border:`1px solid ${T.blue}14`,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12}}>
+      <div><div style={{fontSize:13,color:T.t3,fontFamily:F,textTransform:"uppercase",letterSpacing:".08em",fontWeight:600}}>Live Use Case Walkthrough</div><div style={{fontSize:20,color:T.wh,fontWeight:700,marginTop:4}}>"Find anomalies in high-risk policies" — <span style={{color:T.cyan}}>5,000,000 rows</span></div></div>
+      <div style={{display:"flex",gap:8}}><button onClick={()=>setPlay(!play)} style={{padding:"10px 22px",borderRadius:8,border:`1.5px solid ${play?T.rose:T.green}40`,background:play?T.rose+"14":T.green+"14",color:play?T.rose:T.green,fontSize:15,fontWeight:700,fontFamily:F}}>{play?"⏸ PAUSE":"▶ PLAY"}</button><button onClick={()=>{setStep(0);setPlay(false)}} style={{padding:"10px 16px",borderRadius:8,border:`1.5px solid ${T.bd}`,color:T.t2,fontSize:14,fontFamily:F}}>↺ RESET</button></div>
+    </div>
+    <div style={{display:"flex",gap:4,marginBottom:18}}>{STEPS.map((st,i)=>{const ac=st.a?getAgent(st.a).c:T.blue;return<button key={i} onClick={()=>{setStep(i);setPlay(false)}} style={{flex:1,padding:"10px 4px",borderRadius:8,border:`1.5px solid ${step===i?ac+"60":T.bd}`,background:step===i?ac+"14":i<step?ac+"06":"transparent",position:"relative",overflow:"hidden",transition:"all .25s"}}>{i<=step&&<div style={{position:"absolute",bottom:0,left:0,right:0,height:3,background:ac}}/>}<div style={{fontSize:10,color:T.t3,fontFamily:F,textTransform:"uppercase",fontWeight:600}}>{st.p}</div><div style={{fontSize:22,marginTop:3}}>{st.a?getAgent(st.a).i:"💬"}</div></button>})}</div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:18,marginBottom:16}}>
+      <div className="fi" key={step+"l"} style={{padding:24,borderRadius:14,background:T.cd,border:`1px solid ${ag?ag.c+"22":T.blue+"22"}`}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}><Tag c={T.t2} sz={14}>STEP {s.id+1} / {STEPS.length}</Tag><span style={{fontSize:18,color:T.amber,fontFamily:F,fontWeight:700}}>{s.tm}</span></div>
+        <h3 style={{fontSize:24,fontWeight:800,color:T.wh,marginBottom:12,lineHeight:1.3}}>{s.t}</h3>
+        <p style={{fontSize:17,color:T.t1,lineHeight:1.75,marginBottom:18}}>{s.d}</p>
+        {ag&&<div style={{padding:"12px 16px",borderRadius:10,background:ag.c+"08",border:`1px solid ${ag.c}12`,display:"flex",alignItems:"center",gap:12}}><span style={{fontSize:28}}>{ag.i}</span><div><div style={{fontSize:16,color:ag.c,fontFamily:F,fontWeight:700}}>{ag.n}</div><div style={{fontSize:14,color:T.t2}}>{ag.r}</div></div></div>}
+      </div>
+      <div className="fi" key={step+"r"}>{Visual()}</div>
+    </div>
+    <div style={{display:"flex",gap:14,padding:"14px 22px",borderRadius:10,background:T.s1,border:`1px solid ${T.bd}`,justifyContent:"space-between",flexWrap:"wrap"}}>
+      <span style={{fontSize:15,color:T.t3,fontFamily:F}}>Database: <span style={{color:T.cyan,fontWeight:700}}>{s.db}</span></span>
+      <span style={{fontSize:15,color:T.t3,fontFamily:F}}>AI Context: <span style={{color:T.amber,fontWeight:700}}>{s.ai}</span></span>
+      <span style={{fontSize:15,color:T.t3,fontFamily:F}}>Elapsed: <span style={{color:T.green,fontWeight:700}}>{s.tm}</span></span>
+    </div>
+  </>;
+}
+
+/* ═══════════════════════════════════════════════
+   AI ENGINE — INTELLIGENCE
+   ═══════════════════════════════════════════════ */
+function Intel(){
+  return<div className="si">
+    <div style={{padding:"22px 28px",borderRadius:14,marginBottom:22,background:`linear-gradient(135deg,${T.lime}08,${T.blue}06)`,border:`1px solid ${T.lime}16`}}>
+      <h3 style={{fontSize:26,fontWeight:800,color:T.wh,marginBottom:8}}>Not Just AI — Domain-Trained, Self-Learning Intelligence</h3>
+      <p style={{fontSize:17,color:T.t1,lineHeight:1.6}}>Pre-trained on insurance terminology. 42 derived KPIs. Gets faster the more you use it. Remembers your conversation context.</p>
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:18}}>
+      <Section accent={T.violet}><div style={{fontSize:20,fontWeight:800,color:T.violet,marginBottom:16}}>📖 Insurance-Trained Brain</div>{[["\"bleeding money\"","Loss Ratio > 150%"],["\"frequency spiking\"","Claims/policy > 2σ"],["\"tail risk exposure\"","Low-prob, high-severity"],["\"burning cost\"","Historical pricing basis"],["\"deteriorating book\"","LR above target 3+ periods"]].map((t,i)=><div key={i} style={{display:"flex",gap:12,marginBottom:6,padding:"10px 14px",borderRadius:8,background:T.violet+"06"}}><span style={{fontSize:16,color:T.amber,fontFamily:F,fontWeight:700,minWidth:190}}>{t[0]}</span><span style={{fontSize:15,color:T.t2}}>→ {t[1]}</span></div>)}</Section>
+      <Section accent={T.lime}><div style={{fontSize:20,fontWeight:800,color:T.lime,marginBottom:16}}>🧮 KPI Derivation — 42 Formulas</div>{[["Combined Ratio","LR + Expense Ratio"],["Claim Frequency","Claims ÷ Earned Policies"],["Severity Index","Avg Claim ÷ Benchmark"],["Retention Rate","Renewed ÷ Total"],["Burning Cost","Incurred ÷ Exposure"],["Reserve Adequacy","Reserves ÷ Ultimate Loss"]].map((k,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",padding:"10px 14px",borderRadius:8,marginBottom:6,background:T.lime+"06"}}><span style={{fontSize:16,fontWeight:700,color:T.lime,fontFamily:F}}>{k[0]}</span><span style={{fontSize:14,color:T.t3,fontFamily:F}}>{k[1]}</span></div>)}</Section>
+      <Section accent={T.amber}><div style={{fontSize:20,fontWeight:800,color:T.amber,marginBottom:16}}>🔄 Self-Learning Cache</div>{[{p:"Week 1",r:"0%",d:"Cold start — learning begins",c:T.rose,w:2},{p:"Week 2",r:"25%",d:"Top 5 query types per user learned",c:T.amber,w:25},{p:"Month 1",r:"45%",d:"Pre-warms at user's active hours",c:T.amber,w:45},{p:"Month 3",r:"60%",d:"Role-based patterns + time predictions",c:T.green,w:60},{p:"Month 6+",r:"75%+",d:"Full behavioral model active",c:T.green,w:75}].map((l,i)=><div key={i} style={{padding:"10px 14px",borderRadius:8,marginBottom:6,background:l.c+"06"}}><div style={{display:"flex",alignItems:"center",gap:12,marginBottom:4}}><span style={{fontSize:16,fontWeight:700,color:T.wh,fontFamily:F,minWidth:76}}>{l.p}</span><div style={{flex:1,height:7,background:T.bd,borderRadius:4,overflow:"hidden"}}><div style={{height:7,borderRadius:4,background:l.c,width:l.w+"%"}}/></div><span style={{fontSize:16,fontWeight:700,color:l.c,fontFamily:F,minWidth:48,textAlign:"right"}}>{l.r}</span></div><div style={{fontSize:14,color:T.t2,paddingLeft:88}}>{l.d}</div></div>)}<div style={{marginTop:12,padding:12,borderRadius:8,border:`1px dashed ${T.amber}20`,textAlign:"center",fontSize:17,color:T.amber,fontFamily:F,fontWeight:700}}>Response: 2.2s → 0.8s after 6 months</div></Section>
+      <Section accent={T.cyan}><div style={{fontSize:20,fontWeight:800,color:T.cyan,marginBottom:16}}>💬 Session Context Memory</div>{[{q:"Show me high-risk policies",x:"Establishes user interest in risk"},{q:"Which industry is worst?",x:"Remembers scoped to high-risk"},{q:"Drill deeper into that",x:"Knows 'that' = construction"},{q:"Compare with healthcare",x:"Builds comparison from prior context"},{q:"Draft a memo on this",x:"Full context preserved across 5 turns"}].map((c,i)=><div key={i} style={{display:"flex",gap:12,padding:"12px 16px",borderRadius:8,marginBottom:6,background:T.cyan+"06"}}><span style={{fontSize:20,fontWeight:800,color:T.cyan,fontFamily:F,minWidth:28,textAlign:"center"}}>{i+1}</span><div style={{flex:1}}><div style={{fontSize:17,fontWeight:600,color:T.wh,marginBottom:3}}>"{c.q}"</div><div style={{fontSize:14,color:T.t2}}>{c.x}</div></div></div>)}<div style={{marginTop:12,padding:12,borderRadius:8,border:`1px dashed ${T.cyan}20`,textAlign:"center",fontSize:16,color:T.cyan,fontFamily:F,fontWeight:600}}>Zero repeated context — each question builds on the last</div></Section>
+    </div>
+  </div>;
+}
+
+/* ═══════════════════════════════════════════════
+   AI ENGINE — AGENTS
+   ═══════════════════════════════════════════════ */
+function AgentRegistry(){
+  const[sel,setSel]=useState(null);
+  const a=sel?getAgent(sel):null;
+  return<div className="si" style={{display:"grid",gridTemplateColumns:"300px 1fr",gap:18,minHeight:520}}>
+    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+      {AGENTS.map(ag=><button key={ag.k} onClick={()=>setSel(ag.k)} style={{padding:"14px 16px",borderRadius:10,textAlign:"left",border:`1.5px solid ${sel===ag.k?ag.c+"45":T.bd}`,background:sel===ag.k?ag.c+"0C":T.cd,display:"flex",alignItems:"center",gap:12,transition:"all .2s"}}>
+        <span style={{fontSize:30}}>{ag.i}</span>
+        <div><div style={{fontSize:16,fontWeight:700,color:sel===ag.k?ag.c:T.wh,fontFamily:F}}>{ag.n}</div><div style={{fontSize:13,color:T.t3}}>{ag.r}</div></div>
+      </button>)}
+    </div>
+    <div style={{padding:30,borderRadius:14,background:T.cd,border:`1px solid ${a?a.c+"22":T.bd}`}}>
+      {a?<div className="si">
+        <div style={{display:"flex",alignItems:"center",gap:18,marginBottom:24}}>
+          <div style={{width:72,height:72,borderRadius:18,display:"flex",alignItems:"center",justifyContent:"center",fontSize:38,background:a.c+"10",border:`2px solid ${a.c}30`}}>{a.i}</div>
+          <div><div style={{fontSize:28,fontWeight:800,color:T.wh}}>{a.n}</div><div style={{fontSize:18,color:a.c,fontFamily:F,fontWeight:600}}>{a.r}</div><Tag c={T.aws} sz={12}>⚡ {a.aws}</Tag></div>
+        </div>
+        {a.h.map((h,i)=><div key={i} style={{display:"flex",alignItems:"flex-start",gap:14,padding:"14px 18px",borderRadius:10,marginBottom:8,background:a.c+"06",border:`1px solid ${a.c}10`}}><Glow c={a.c} s={8}/><span style={{fontSize:16,color:T.t1,lineHeight:1.55}}>{h}</span></div>)}
+      </div>:
+      <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100%",color:T.t3}}>
+        <div style={{textAlign:"center"}}><div style={{fontSize:56,marginBottom:12}}>👈</div><div style={{fontSize:20,fontWeight:600}}>Select an agent to explore</div></div>
+      </div>}
+    </div>
+  </div>;
+}
+
+/* ═══════════════════════════════════════════════
+   AWS ARCHITECTURE
+   ═══════════════════════════════════════════════ */
+function AWSArch(){
+  const[sel,setSel]=useState(null);
+  const DET={cf:{t:"CloudFront + S3",d:"Static React app from 300+ edge locations. S3 ~$0.023/GB. Shield Standard free DDoS protection. Cache-Control headers minimize origin hits.",c:"~$3/mo",s:"Unlimited users, 300+ edges"},waf:{t:"WAF + Cognito",d:"WAF blocks injection & DDoS. Cognito JWT auth with 50K MAU free tier. User-scoped access enforced at token level before any data query.",c:"~$6/mo",s:"50K MAU free tier"},apigw:{t:"API Gateway HTTP",d:"HTTP API — 71% cheaper than REST API. Routes to Lambda. WebSocket for streaming AI responses. Auto-throttle and CORS.",c:"$1/1M req",s:"10K concurrent"},lambda:{t:"Lambda (Python)",d:"All 9 LangGraph agents as serverless functions. 1M free requests/month. Provisioned Concurrency on hot paths for cold start mitigation.",c:"$0.20/1M",s:"1K concurrent, instant"},stepfn:{t:"Step Functions Express",d:"Orchestrates the multi-agent pipeline. Express workflows for synchronous flows. Handles parallel execution, retry logic, error routing.",c:"$0.025/1K",s:"Unlimited parallel"},aurora:{t:"Aurora Serverless v2 + pgvector",d:"PostgreSQL with pgvector eliminates separate vector DB ($50-200/mo saved). Scales 0.5→128 ACU auto. HNSW indexing for fast semantic search.",c:"$0.12/ACU-hr",s:"0→128 ACU auto-scale"},redis:{t:"ElastiCache Serverless (Redis)",d:"Behavioral query cache learned by RM-Cortex. Serverless = scales to zero when idle. Stores pre-warmed results, session context, user patterns.",c:"$0.0034/ECPU-hr",s:"Auto-scale, zero idle"},claude:{t:"Anthropic Claude (Direct API)",d:"Direct API = 15-30% cheaper than Bedrock. Claude Sonnet for analysis, Haiku for lookups. Multi-provider fallback chain for zero downtime.",c:"~$3+$15/1K tok",s:"Rate-limited by Lambda"}};
+  const d=sel?DET[sel]:null;
+
+  const SB=({id,nm,sb,c,co})=><div onClick={()=>setSel(sel===id?null:id)} style={{padding:"14px 18px",borderRadius:10,background:sel===id?c+"0C":T.cd,border:`1.5px solid ${sel===id?c+"45":T.bd}`,cursor:"pointer",transition:"all .2s",minWidth:150}}>
+    <div style={{fontSize:16,fontWeight:700,color:sel===id?c:T.wh}}>{nm}</div>
+    <div style={{fontSize:13,color:T.t2,fontFamily:F,marginTop:3}}>{sb}</div>
+    {co&&<div style={{marginTop:7}}><Tag c={T.green} sz={12}>{co}</Tag></div>}
+  </div>;
+
+  /* Agent flow node */
+  const AN=({a})=><div style={{flex:1,padding:"16px 18px",borderRadius:12,background:T.cd,border:`1.5px solid ${T.bd}`,position:"relative"}}>
+    <div style={{position:"absolute",top:-11,left:14,padding:"3px 12px",borderRadius:12,background:a.c,fontSize:12,fontWeight:700,color:"#000",fontFamily:F}}>STEP {a.step}</div>
+    <div style={{display:"flex",alignItems:"center",gap:12,marginTop:6,marginBottom:8}}><span style={{fontSize:28}}>{a.i}</span><div><div style={{fontSize:15,fontWeight:700,color:a.c,fontFamily:F}}>{a.n}</div><div style={{fontSize:13,color:T.t2}}>{a.r}</div></div></div>
+    <div style={{fontSize:14,color:T.t1,lineHeight:1.5}}>{a.s}</div>
+    <div style={{marginTop:8}}><Tag c={T.aws} sz={11}>⚡ {a.aws}</Tag></div>
+  </div>;
+
+  const FA=({lb,c=T.t2})=><div style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"0 8px",minWidth:55}}>
+    <svg width="50" height="22" viewBox="0 0 50 22"><line x1="0" y1="11" x2="38" y2="11" stroke={c} strokeWidth="2" strokeDasharray="5,3"/><polygon points="37,6 49,11 37,16" fill={c}/></svg>
+    <span style={{fontSize:11,color:T.t3,fontFamily:F,whiteSpace:"nowrap"}}>{lb}</span>
+  </div>;
+  const DA=({lb,c=T.t2})=><div style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"3px 0"}}>
+    <svg width="18" height="28" viewBox="0 0 18 28"><line x1="9" y1="0" x2="9" y2="20" stroke={c} strokeWidth="2" strokeDasharray="5,3"/><polygon points="4,19 9,28 14,19" fill={c}/></svg>
+    <span style={{fontSize:11,color:T.t3,fontFamily:F}}>{lb}</span>
+  </div>;
+
+  return<div className="si">
+    {/* Agent Pipeline */}
+    <Section accent={T.blue}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:22,flexWrap:"wrap",gap:10}}>
+        <div><div style={{fontSize:13,color:T.t3,fontFamily:F,textTransform:"uppercase",letterSpacing:".1em",fontWeight:600}}>Step Functions Express · LangGraph State Machine</div><div style={{fontSize:22,fontWeight:700,color:T.wh,marginTop:4}}>9-Agent Pipeline Flow</div></div>
+        <div style={{display:"flex",gap:14}}><div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:28,height:2,background:T.t2}}/><span style={{fontSize:13,color:T.t3,fontFamily:F}}>data flow</span></div><div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:28,height:2,background:T.amber,opacity:.6}}/><span style={{fontSize:13,color:T.t3,fontFamily:F}}>cache skip</span></div></div>
+      </div>
+      {/* Row 1 */}
+      <div style={{display:"flex",alignItems:"stretch",gap:0,marginBottom:8}}><AN a={AGENTS[0]}/><FA lb="enriched query" c={T.lime}/><AN a={AGENTS[1]}/><FA lb="execution plan" c={T.blue}/><AN a={AGENTS[2]}/></div>
+      <div style={{display:"flex",justifyContent:"flex-end",paddingRight:"15%"}}><DA lb="schema context" c={T.cyan}/></div>
+      <div style={{position:"relative",height:0}}><div style={{position:"absolute",left:"5%",top:-16,padding:"5px 14px",borderRadius:14,background:T.amber+"12",border:`1px dashed ${T.amber}30`,zIndex:2}}><span style={{fontSize:13,color:T.amber,fontFamily:F,fontWeight:700}}>Cache HITs skip to Analyst ⤵</span></div></div>
+      {/* Row 2 */}
+      <div style={{display:"flex",alignItems:"stretch",gap:0,marginBottom:8}}><AN a={AGENTS[3]}/><FA lb="cache misses" c={T.amber}/><AN a={AGENTS[4]}/><FA lb="parallel" c={T.green}/><AN a={AGENTS[5]}/></div>
+      <div style={{display:"flex",gap:0}}><div style={{flex:1,display:"flex",justifyContent:"center"}}><DA lb="results (39 rows)" c={T.green}/></div><div style={{flex:1,display:"flex",justifyContent:"center"}}><DA lb="guidelines (4 docs)" c={T.violet}/></div></div>
+      {/* Row 3 */}
+      <div style={{display:"flex",alignItems:"stretch",gap:0}}><AN a={AGENTS[6]}/><FA lb="synthesis" c={T.orange}/><AN a={AGENTS[7]}/><FA lb="validated" c={T.pink}/><AN a={AGENTS[8]}/></div>
+      {/* Summary */}
+      <div style={{marginTop:18,padding:"14px 20px",borderRadius:10,background:T.cd,border:`1px solid ${T.bd}`,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
+        <div style={{display:"flex",alignItems:"center",gap:14}}>
+          {[{l:"User Query",c:T.wh,ic:"💬"},{l:"5M scanned",c:T.green,ic:"⚡"},{l:"~52 to AI",c:T.orange,ic:"🔬"},{l:"Glass Box",c:T.rose,ic:"🔍"}].map((d,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:7}}>{i>0&&<span style={{color:T.t3,fontSize:16}}>→</span>}<span style={{fontSize:20}}>{d.ic}</span><span style={{fontSize:15,color:d.c,fontFamily:F,fontWeight:600}}>{d.l}</span></div>)}
+        </div>
+        <span style={{fontSize:16,color:T.amber,fontFamily:F,fontWeight:700}}>~2.0s total</span>
+      </div>
+    </Section>
+
+    {/* Infrastructure */}
+    <Section accent={T.aws}>
+      <div style={{fontSize:14,color:T.t3,fontFamily:F,textTransform:"uppercase",letterSpacing:".1em",fontWeight:600,marginBottom:18}}>AWS Infrastructure — Click Any Service for Details</div>
+      {/* Edge */}
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,flexWrap:"wrap"}}><div style={{width:85,fontSize:14,color:T.aws,fontFamily:F,fontWeight:700}}>EDGE</div><div style={{padding:"12px 20px",borderRadius:10,border:`1px dashed ${T.t3}30`,display:"flex",alignItems:"center",gap:12}}><span style={{fontSize:28}}>👤</span><div><div style={{fontSize:15,fontWeight:700,color:T.wh}}>Users</div><div style={{fontSize:13,color:T.t3,fontFamily:F}}>Browser / Mobile</div></div></div><span style={{fontSize:20,color:T.t3}}>→</span><SB id="cf" nm="CloudFront + S3" sb="Static CDN" c={T.aws} co="~$3/mo"/><span style={{fontSize:20,color:T.t3}}>→</span><SB id="waf" nm="WAF + Cognito" sb="Auth + Security" c={T.aws} co="~$6/mo"/><span style={{fontSize:20,color:T.t3}}>→</span><SB id="apigw" nm="API Gateway" sb="HTTP API" c={T.violet} co="$1/1M"/></div>
+      <div style={{height:1,background:T.bd,margin:"6px 0 6px 85px"}}/>
+      {/* Compute */}
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,flexWrap:"wrap"}}><div style={{width:85,fontSize:14,color:T.violet,fontFamily:F,fontWeight:700}}>COMPUTE</div><SB id="lambda" nm="Lambda Functions" sb="Python · 9 Agents" c={T.aws} co="$0.20/1M"/><span style={{fontSize:20,color:T.t3}}>→</span><SB id="stepfn" nm="Step Functions" sb="Express Pipeline" c={T.pink} co="$0.025/1K"/><span style={{fontSize:20,color:T.t3}}>→</span><div style={{padding:"10px 16px",borderRadius:10,background:T.blue+"08",border:`1px solid ${T.blue}14`}}><span style={{fontSize:14,color:T.blue,fontFamily:F,fontWeight:700}}>↑ 9-Agent Pipeline</span></div></div>
+      <div style={{height:1,background:T.bd,margin:"6px 0 6px 85px"}}/>
+      {/* Data + AI */}
+      <div style={{display:"flex",gap:18,flexWrap:"wrap"}}><div style={{flex:1,minWidth:300}}><div style={{fontSize:14,color:T.blue,fontFamily:F,fontWeight:700,marginBottom:12}}>DATA LAYER (AWS)</div><div style={{display:"flex",flexDirection:"column",gap:10}}><SB id="aurora" nm="Aurora Serverless v2" sb="PostgreSQL + pgvector" c={T.blue} co="$0.12/ACU-hr"/><SB id="redis" nm="ElastiCache Redis" sb="Behavioral Cache" c={T.teal} co="$0.0034/ECPU-hr"/></div></div>
+        <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8}}><svg width="46" height="20" viewBox="0 0 46 20"><line x1="7" y1="10" x2="35" y2="10" stroke={T.t3} strokeWidth="1.8" strokeDasharray="4,3"/><polygon points="34,5 44,10 34,15" fill={T.t3}/><polygon points="11,5 1,10 11,15" fill={T.t3}/></svg><span style={{fontSize:12,color:T.t3,fontFamily:F}}>queries ↔ results</span></div>
+        <div style={{flex:1,minWidth:300}}><div style={{fontSize:14,color:T.anth,fontFamily:F,fontWeight:700,marginBottom:12}}>AI LAYER (MIXED CLOUD)</div><div style={{display:"flex",flexDirection:"column",gap:10}}><SB id="claude" nm="Anthropic Claude" sb="Direct API · Primary" c={T.anth} co="~$3+$15/1K tok"/><div style={{padding:"12px 16px",borderRadius:10,background:T.cd,border:`1px solid ${T.bd}`}}><div style={{fontSize:12,color:T.t3,fontFamily:F,textTransform:"uppercase",fontWeight:600,marginBottom:10}}>LLM Fallback Chain</div><div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>{[{n:"Claude",c:T.anth,t:"PRIMARY"},{n:"Bedrock",c:T.aws,t:"FALLBACK 1"},{n:"OpenAI",c:T.green,t:"FALLBACK 2"},{n:"Mock",c:T.t3,t:"LAST RESORT"}].map((l,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:6}}><div style={{padding:"6px 12px",borderRadius:6,background:l.c+"0A",border:`1px solid ${l.c}18`,textAlign:"center"}}><div style={{fontSize:14,fontWeight:700,color:l.c,fontFamily:F}}>{l.n}</div><div style={{fontSize:10,color:T.t3,fontFamily:F}}>{l.t}</div></div>{i<3&&<span style={{fontSize:16,color:T.t3}}>→</span>}</div>)}</div></div></div></div>
+      </div>
+    </Section>
+
+    {/* Detail panel */}
+    {d&&<div className="fi" style={{padding:24,borderRadius:14,background:T.cd,border:`1px solid ${T.bl}`,marginBottom:18}}>
+      <div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><h3 style={{fontSize:22,fontWeight:700,color:T.wh}}>{d.t}</h3><button onClick={()=>setSel(null)} style={{color:T.t3,fontSize:22}}>✕</button></div>
+      <p style={{fontSize:17,color:T.t1,lineHeight:1.75,marginBottom:16}}>{d.d}</p>
+      <div style={{display:"flex",gap:16}}><div style={{padding:"12px 20px",borderRadius:10,background:T.green+"08",border:`1px solid ${T.green}15`}}><div style={{fontSize:12,color:T.t3,fontFamily:F,textTransform:"uppercase"}}>Cost</div><div style={{fontSize:20,fontWeight:700,color:T.green,fontFamily:F}}>{d.c}</div></div><div style={{padding:"12px 20px",borderRadius:10,background:T.blue+"08",border:`1px solid ${T.blue}15`}}><div style={{fontSize:12,color:T.t3,fontFamily:F,textTransform:"uppercase"}}>Scale</div><div style={{fontSize:16,fontWeight:600,color:T.blue,fontFamily:F}}>{d.s}</div></div></div>
+    </div>}
+
+    {/* Decisions */}
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:14,marginBottom:18}}>
+      {[{ic:"💡",t:"Why Mixed Cloud?",c:T.green,items:["Anthropic direct = 15-30% cheaper than Bedrock","Multi-provider fallback = zero LLM downtime","AWS for infra (cheapest serverless)","Best-of-breed at every layer"]},{ic:"💡",t:"Why pgvector on Aurora?",c:T.blue,items:["Eliminates vector DB ($50-200/mo saved)","Same DB for structured + vector queries","HNSW indexing = fast semantic search","One less service to manage"]},{ic:"💡",t:"Why Serverless Everything?",c:T.aws,items:["Pay-per-use: $0 when idle","No EC2 to patch or manage","Auto-scaling every layer","~$15/mo idle → ~$180/mo at scale"]}].map((d,i)=><div key={i} style={{padding:18,borderRadius:12,background:T.cd,border:`1px solid ${T.bd}`}}>
+        <div style={{fontSize:15,fontWeight:700,color:d.c,marginBottom:10}}>{d.ic} {d.t}</div>
+        {d.items.map((t,j)=><div key={j} style={{fontSize:14,color:T.t1,padding:"4px 0",fontFamily:F,display:"flex",gap:6,lineHeight:1.5}}><span style={{color:d.c,flexShrink:0}}>›</span>{t}</div>)}
+      </div>)}
+    </div>
+
+    {/* Cost */}
+    <Section accent={T.green}>
+      <div style={{fontSize:16,fontWeight:700,color:T.wh,marginBottom:14}}>Monthly Cost Estimate</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16}}>
+        {[{t:"Development",c:"~$15/mo",cl:T.green,items:["Lambda: free tier","Aurora: 0.5 ACU idle","Cache: minimal","S3 + CF: free tier"]},{t:"Production",c:"~$65/mo",cl:T.blue,sub:"1K queries/day",items:["Lambda: ~$3","Aurora: 2-4 ACU","Anthropic: ~$25","Cache + other: ~$18"]},{t:"Scale",c:"~$180/mo",cl:T.aws,sub:"10K queries/day",items:["Lambda: ~$12","Aurora: 8-16 ACU","Anthropic: ~$90","Cache + other: ~$45"]}].map((ct,i)=><div key={i} style={{padding:"18px 20px",borderRadius:12,background:ct.cl+"07",border:`1px solid ${ct.cl}14`}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:4}}><span style={{fontSize:16,fontWeight:700,color:T.wh}}>{ct.t}</span><span style={{fontSize:26,fontWeight:800,color:ct.cl,fontFamily:F}}>{ct.c}</span></div>
+          {ct.sub&&<div style={{fontSize:13,color:T.t3,fontFamily:F,marginBottom:6}}>{ct.sub}</div>}
+          {ct.items.map((it,j)=><div key={j} style={{fontSize:14,color:T.t2,fontFamily:F,padding:"3px 0"}}>{it}</div>)}
+        </div>)}
+      </div>
+      <div style={{marginTop:14,padding:"10px 16px",borderRadius:8,border:`1px dashed ${T.green}20`,textAlign:"center",fontSize:16,color:T.green,fontFamily:F,fontWeight:700}}>Per query: ~$0.003 · Scales to zero · No servers to manage</div>
+    </Section>
+  </div>;
+}
+
+/* ═══════════════════════════════════════════════
+   MAIN APP
+   ═══════════════════════════════════════════════ */
+function App(){
+  const[sec,setSec]=useState("ai");
+  const[aiTab,setAiTab]=useState("flow");
+
+  return<div style={{maxWidth:1340,margin:"0 auto",padding:"36px 32px"}}>
+    {/* Header */}
+    <div style={{textAlign:"center",marginBottom:32}}>
+      <div style={{display:"inline-flex",alignItems:"center",gap:10,padding:"7px 18px",borderRadius:24,background:T.lime+"10",border:`1px solid ${T.lime}20`,marginBottom:14}}>
+        <Glow c={T.lime} s={8} p/>
+        <span style={{fontSize:14,fontWeight:700,color:T.lime,fontFamily:F,letterSpacing:".08em",textTransform:"uppercase"}}>Interactive Pitch Demo — Click Anywhere</span>
+      </div>
+      <h1 style={{fontSize:52,fontWeight:900,letterSpacing:"-.04em",background:`linear-gradient(135deg,${T.wh},${T.blue},${T.lime})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",lineHeight:1.1,marginBottom:14}}>RiskMind AI Engine</h1>
+      <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap"}}>
+        <Stat label="Agents" value="9" c={T.blue}/>
+        <Stat label="Scale" value="50 → 50M rows" c={T.green}/>
+        <Stat label="Derived KPIs" value="42" c={T.lime}/>
+        <Stat label="Response" value="< 2.5s" c={T.amber}/>
+      </div>
+    </div>
+
+    {/* Main Tabs */}
+    <div style={{display:"flex",justifyContent:"center",gap:10,marginBottom:22}}>
+      {[{id:"ai",l:"🧬 AI Engine Architecture",c:T.blue},{id:"aws",l:"☁️ AWS Solution Architecture",c:T.aws}].map(t=>
+        <button key={t.id} onClick={()=>setSec(t.id)} style={{padding:"14px 34px",borderRadius:12,border:`2px solid ${sec===t.id?t.c+"60":T.bd}`,background:sec===t.id?t.c+"12":"transparent",color:sec===t.id?t.c:T.t2,fontSize:18,fontWeight:700,transition:"all .25s"}}>
+          {t.l}
+        </button>
+      )}
+    </div>
+
+    {/* AI Sub-tabs + Content */}
+    {sec==="ai"&&<>
+      <div style={{display:"flex",justifyContent:"center",gap:8,marginBottom:22}}>
+        {[{id:"flow",l:"⚡ Live Flow"},{id:"intel",l:"🧠 Intelligence"},{id:"agents",l:"🧬 Agents"}].map(t=>
+          <button key={t.id} onClick={()=>setAiTab(t.id)} style={{padding:"10px 24px",borderRadius:8,border:`1.5px solid ${aiTab===t.id?T.blue+"55":T.bd}`,background:aiTab===t.id?T.blue+"10":"transparent",color:aiTab===t.id?T.blue:T.t2,fontSize:16,fontWeight:700,transition:"all .2s"}}>
+            {t.l}
+          </button>
+        )}
+      </div>
+      {aiTab==="flow"&&<div className="si"><LiveFlow/></div>}
+      {aiTab==="intel"&&<Intel/>}
+      {aiTab==="agents"&&<AgentRegistry/>}
+    </>}
+
+    {sec==="aws"&&<AWSArch/>}
+
+    {/* Footer */}
+    <div style={{textAlign:"center",marginTop:40,padding:"16px 0",borderTop:`1px solid ${T.bd}`}}>
+      <span style={{fontSize:14,color:T.t3,fontFamily:F}}>RiskMind AI Engine · Architecture & Solution Design · Confidential</span>
+    </div>
+  </div>;
+}
+
+ReactDOM.render(<App/>,document.getElementById("root"));
+</script>
+</body>
+</html>

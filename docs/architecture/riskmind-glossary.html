@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RiskMind — Insurance Glossary, Formulas & Terminology</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#06080D;--sf:#0C1018;--cd:#111827;--bd:#1E293B;--bl:#334155;
+  --wh:#F1F5F9;--t1:#CBD5E1;--t2:#8896A8;--t3:#4B5563;
+  --blue:#3B82F6;--cyan:#06B6D4;--green:#10B981;--lime:#84CC16;
+  --amber:#F59E0B;--rose:#F43F5E;--violet:#8B5CF6;--orange:#F97316;
+  --pink:#EC4899;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--wh);font-family:'DM Sans',sans-serif;overflow-x:hidden}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:var(--wh)}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:var(--bl);border-radius:4px}
+.mn{font-family:'JetBrains Mono',monospace}
+.cd{padding:20px;border-radius:14px;background:var(--cd);border:1px solid var(--bd)}
+.wrap{max-width:1360px;margin:0 auto;padding:28px 32px}
+
+/* Nav */
+.nav{position:sticky;top:0;z-index:99;background:var(--bg)ee;backdrop-filter:blur(12px);border-bottom:1px solid var(--bd);padding:8px 0}
+.nav-in{max-width:1360px;margin:0 auto;display:flex;gap:4px;padding:0 32px;overflow-x:auto}
+.nav-btn{padding:7px 14px;border-radius:8px;font-size:11px;font-weight:700;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;transition:all .15s}
+
+.sec{margin-bottom:44px;scroll-margin-top:70px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.tag{display:inline-block;font-size:11px;padding:3px 8px;border-radius:4px;font-weight:600;font-family:'JetBrains Mono',monospace}
+.pulse{display:inline-block;width:8px;height:8px;border-radius:50%;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 currentColor}50%{opacity:.4;box-shadow:0 0 8px 3px currentColor}}
+
+/* Formula box */
+.formula{padding:18px 24px;border-radius:10px;background:#0D1117;border:1px solid #21262D;text-align:center;margin:10px 0}
+.formula .eq{font-size:22px;font-weight:800;font-family:'JetBrains Mono',monospace;letter-spacing:.02em}
+.formula .sub{font-size:12px;color:var(--t2);margin-top:6px}
+
+/* Example calc */
+.calc{padding:14px 18px;border-radius:10px;background:var(--sf);border:1px solid var(--bd);margin:8px 0}
+.calc-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--bd)}
+.calc-row:last-child{border-bottom:none}
+.calc-row.result{padding:8px 0;margin-top:4px;border-top:2px solid var(--bl);border-bottom:none}
+
+/* Search */
+.search-box{width:100%;padding:14px 20px 14px 44px;border-radius:12px;background:var(--cd);border:1px solid var(--bd);color:var(--wh);font-size:16px;font-family:'DM Sans',sans-serif;outline:none;transition:border .2s}
+.search-box:focus{border-color:var(--cyan)}
+.search-wrap{position:relative;margin-bottom:20px}
+.search-wrap::before{content:'🔍';position:absolute;left:16px;top:50%;transform:translateY(-50%);font-size:16px}
+
+/* Glossary entry */
+.gloss{padding:16px 20px;border-radius:12px;background:var(--cd);border:1px solid var(--bd);margin-bottom:8px;transition:all .2s}
+.gloss:hover{border-color:var(--cyan)30}
+.gloss-head{display:flex;align-items:center;gap:10px;cursor:pointer}
+.gloss-body{max-height:0;overflow:hidden;transition:max-height .3s ease}
+.gloss.open .gloss-body{max-height:2000px}
+.gloss-toggle{width:24px;height:24px;border-radius:6px;background:var(--sf);display:flex;align-items:center;justify-content:center;font-size:12px;transition:transform .2s;flex-shrink:0}
+.gloss.open .gloss-toggle{transform:rotate(90deg)}
+
+/* Meter bar */
+.meter{height:8px;border-radius:4px;background:var(--bd);overflow:hidden}
+.meter-fill{height:100%;border-radius:4px}
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <div class="nav-in" id="nav"></div>
+</div>
+
+<div class="wrap">
+  <div style="text-align:center;margin-bottom:36px">
+    <div style="display:inline-flex;align-items:center;gap:8px;padding:5px 16px;border-radius:16px;background:#06B6D410;border:1px solid #06B6D420;margin-bottom:14px">
+      <span class="pulse" style="color:#06B6D4;background:#06B6D4"></span>
+      <span class="mn" style="font-size:12px;font-weight:700;color:#06B6D4;letter-spacing:.1em;text-transform:uppercase">Reference Guide</span>
+    </div>
+    <h1 style="font-size:44px;font-weight:900;letter-spacing:-.04em;background:linear-gradient(135deg,var(--wh),var(--cyan),var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px">📐 Insurance Glossary & Formulas</h1>
+    <p style="font-size:17px;color:var(--t2)">Every acronym, formula, and term — with real math, worked examples, and business context</p>
+  </div>
+  <div id="content"></div>
+</div>
+
+<script>
+const C={bg:'#06080D',sf:'#0C1018',cd:'#111827',bd:'#1E293B',bl:'#334155',wh:'#F1F5F9',t1:'#CBD5E1',t2:'#8896A8',t3:'#4B5563',blue:'#3B82F6',cyan:'#06B6D4',green:'#10B981',lime:'#84CC16',amber:'#F59E0B',rose:'#F43F5E',violet:'#8B5CF6',orange:'#F97316',pink:'#EC4899'};
+
+const SECS=[
+  {id:'acronyms',n:'Acronym Master List',ic:'🔤'},
+  {id:'formulas',n:'Core Formulas',ic:'📐'},
+  {id:'catformulas',n:'Cat Model Formulas',ic:'🌀'},
+  {id:'pricing',n:'Pricing & Rating',ic:'💰'},
+  {id:'portfolio',n:'Portfolio Analytics',ic:'📊'},
+  {id:'lifecycle',n:'Policy Lifecycle',ic:'🔄'},
+  {id:'perils',n:'Perils & Hazards',ic:'⚡'},
+  {id:'datasources',n:'Data Sources',ic:'💾'},
+  {id:'regulatory',n:'Regulatory Terms',ic:'⚖️'},
+  {id:'tech',n:'AI & Tech Terms',ic:'🤖'},
+  {id:'pronounce',n:'Pronunciation Guide',ic:'🗣️'},
+];
+
+document.getElementById('nav').innerHTML=SECS.map(s=>`<button class="nav-btn" data-s="${s.id}" style="color:${C.cyan}" onclick="document.getElementById('${s.id}').scrollIntoView({behavior:'smooth'})">${s.ic} ${s.n}</button>`).join('');
+const obs=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){document.querySelectorAll('.nav-btn').forEach(b=>{const on=b.dataset.s===e.target.id;b.style.background=on?C.cyan+'18':'transparent';b.style.color=on?C.cyan:C.t2})}})},{threshold:.1,rootMargin:'-70px 0px -40% 0px'});
+
+function tag(t,c){return`<span class="tag" style="background:${c}12;border:1px solid ${c}18;color:${c}">${t}</span>`}
+function formula(eq,sub){return`<div class="formula"><div class="eq" style="color:${C.cyan}">${eq}</div>${sub?`<div class="sub">${sub}</div>`:''}</div>`}
+function calcBox(rows,result,rc){
+  return`<div class="calc">${rows.map(r=>`<div class="calc-row"><span style="font-size:13px;color:${C.t2}">${r[0]}</span><span class="mn" style="font-size:13px;color:${C.t1}">${r[1]}</span></div>`).join('')}<div class="calc-row result"><span style="font-size:14px;font-weight:700;color:${rc||C.cyan}">Result</span><span class="mn" style="font-size:16px;font-weight:800;color:${rc||C.cyan}">${result}</span></div></div>`;
+}
+
+document.getElementById('content').innerHTML=`
+
+<!-- ═══════════════ ACRONYMS ═══════════════ -->
+<div class="sec" id="acronyms">
+  <h2 style="font-size:28px;font-weight:800;color:${C.cyan};margin-bottom:6px">🔤 Acronym Master List</h2>
+  <p style="font-size:14px;color:${C.t2};margin-bottom:16px">Every abbreviation you'll hear in insurance, with full forms and one-line definitions</p>
+
+  <div class="search-wrap">
+    <input type="text" class="search-box" placeholder="Search acronyms... (e.g. PML, FEMA, LR)" id="acronym-search" oninput="filterAcronyms(this.value)">
+  </div>
+
+  <div id="acronym-list">
+  ${[
+    {cat:'Government & Regulatory',c:C.blue,items:[
+      ['FEMA','Federal Emergency Management Agency','US disaster response agency. Produces official flood zone maps (NFHL).'],
+      ['NFHL','National Flood Hazard Layer','FEMA\'s official map of flood risk zones for every property in the US.'],
+      ['NFIP','National Flood Insurance Program','Government flood insurance program managed by FEMA.'],
+      ['NAIC','National Association of Insurance Commissioners','Organization of all US state insurance regulators. Sets model laws.'],
+      ['DOI','Department of Insurance','State-level insurance regulator (e.g., Texas DOI). Most states use this name.'],
+      ['OIR','Office of Insurance Regulation','Florida\'s insurance regulator. Same role as DOI in other states.'],
+      ['FBI UCR','Federal Bureau of Investigation Uniform Crime Reporting','National crime statistics. Used for property crime rate in underwriting.'],
+      ['NOAA','National Oceanic and Atmospheric Administration','US weather/climate agency. Historical storm data for cat modeling.'],
+      ['NCDC','National Climatic Data Center','Part of NOAA. Historical weather event database.'],
+      ['OSHA','Occupational Safety and Health Administration','Workplace safety regulator. Relevant for workers comp underwriting.'],
+    ]},
+    {cat:'Industry Companies & Standards',c:C.violet,items:[
+      ['RMS','Risk Management Solutions (now Moody\'s RMS)','Catastrophe modeling company. Simulates hurricanes, earthquakes, etc.'],
+      ['AIR','AIR Worldwide (now part of Verisk)','Cat modeling company. Main competitor to RMS.'],
+      ['ISO','Insurance Services Office (now part of Verisk)','Industry-standard rating data, policy forms, protection classes.'],
+      ['BCEGS','Building Code Effectiveness Grading Schedule','Verisk rating of how well a community enforces building codes. 1-10.'],
+      ['CRESTA','Catastrophe Risk Evaluation and Standardizing Target Accumulations','Standard zone system for cat risk. Format: US-TX-003.'],
+      ['D&B','Dun & Bradstreet','Business credit reporting. Like Experian for businesses.'],
+      ['COPE','Construction, Occupancy, Protection, External Exposure','The 4 key property risk factors underwriters evaluate.'],
+      ['ACORD','Association for Cooperative Operations Research and Development','Insurance data standards body. ACORD forms are the industry\'s standard apps.'],
+    ]},
+    {cat:'Financial & Underwriting Metrics',c:C.green,items:[
+      ['LR','Loss Ratio','Claims paid ÷ Premium earned. Below 100% = profitable. THE core metric.'],
+      ['CR','Combined Ratio','Loss ratio + expense ratio. Below 100% = underwriting profit.'],
+      ['ER','Expense Ratio','Operating expenses ÷ Premium. Typically 25-35%.'],
+      ['TIV','Total Insured Value','Maximum possible payout if everything destroyed.'],
+      ['PML','Probable Maximum Loss','Realistic worst-case loss at a given probability (e.g., 250-year).'],
+      ['AAL','Annual Average Loss','Average expected cat loss per year across all simulated scenarios.'],
+      ['MSL','Maximum Single Loss','Largest individual policy exposure in a zone or portfolio.'],
+      ['GWP','Gross Written Premium','Total premium collected before reinsurance and commissions.'],
+      ['NWP','Net Written Premium','Premium AFTER reinsurance costs deducted. What the carrier keeps.'],
+      ['NEP','Net Earned Premium','Portion of NWP "earned" in the current period (pro-rated to exposure).'],
+      ['IBNR','Incurred But Not Reported','Estimated reserve for claims that happened but haven\'t been filed yet.'],
+      ['LAE','Loss Adjustment Expense','Cost to investigate and settle claims (adjusters, legal, admin).'],
+      ['ALAE','Allocated Loss Adjustment Expense','LAE assignable to a specific claim (attorney for that case).'],
+      ['ULAE','Unallocated Loss Adjustment Expense','LAE not assignable to specific claims (claims dept salaries).'],
+      ['ITV','Insurance to Value','Insured value ÷ Replacement cost. Ideally 100%. Below 80% = under-insured.'],
+      ['ROE','Return on Equity','Net income ÷ Shareholders\' equity. Insurer profitability measure.'],
+      ['RBC','Risk-Based Capital','Minimum capital regulators require an insurer to hold. Formula-driven.'],
+    ]},
+    {cat:'Policy & Coverage Terms',c:C.amber,items:[
+      ['LOB','Line of Business','Insurance product category: commercial property, GL, auto, WC, etc.'],
+      ['GL','General Liability','Coverage for third-party bodily injury and property damage claims.'],
+      ['WC','Workers\' Compensation','Coverage for employee workplace injuries. Required by most states.'],
+      ['E&O','Errors & Omissions','Professional liability for service providers. Also an insurer\'s own risk.'],
+      ['D&O','Directors & Officers','Liability insurance for company executives.'],
+      ['EPL','Employment Practices Liability','Coverage for wrongful termination, harassment, discrimination claims.'],
+      ['BOP','Business Owners Policy','Bundled commercial property + GL for small businesses.'],
+      ['CGL','Commercial General Liability','The standard GL policy form. ISO form CG 00 01.'],
+      ['CPP','Commercial Package Policy','Multiple coverages bundled: property + GL + auto + umbrella.'],
+      ['BI','Business Interruption','Coverage for lost revenue when business can\'t operate due to covered event.'],
+      ['SIR','Self-Insured Retention','Amount the insured pays before insurance kicks in. Like a deductible.'],
+      ['ACV','Actual Cash Value','Replacement cost minus depreciation. Lower payout than RCV.'],
+      ['RCV','Replacement Cost Value','Cost to replace with new, similar property. No depreciation deduction.'],
+    ]},
+    {cat:'Catastrophe & Risk Terms',c:C.rose,items:[
+      ['CAT','Catastrophe','Industry shorthand for natural disaster events (hurricanes, earthquakes).'],
+      ['SCS','Severe Convective Storm','Hail + tornadoes + straight-line winds + lightning. Major loss driver.'],
+      ['WUI','Wildland-Urban Interface','Where buildings meet undeveloped wildland. High wildfire risk zone.'],
+      ['PCS','Property Claims Services','Verisk unit that designates official catastrophe events and tracks losses.'],
+      ['EQ','Earthquake','Seismic peril. Separate policy or endorsement in most states.'],
+      ['NatCat','Natural Catastrophe','Broader term for all natural disaster perils.'],
+      ['AEP','Aggregate Exceedance Probability','Probability total annual losses exceed a threshold.'],
+      ['OEP','Occurrence Exceedance Probability','Probability any single event exceeds a threshold.'],
+      ['EP','Exceedance Probability','General: probability losses exceed a given amount.'],
+      ['RP','Return Period','Inverse of annual probability. 250-year = 0.4% annual chance.'],
+    ]},
+    {cat:'Reinsurance',c:C.orange,items:[
+      ['RI','Reinsurance','Insurance for insurance companies. Transfers risk to a reinsurer.'],
+      ['QS','Quota Share','Proportional reinsurance: reinsurer takes fixed % of every policy.'],
+      ['XOL','Excess of Loss','Non-proportional: reinsurer pays above a retention threshold.'],
+      ['Cat XOL','Catastrophe Excess of Loss','XOL specifically for catastrophe events. Most common cat treaty type.'],
+      ['LAR','Large Account Reinsurance','Facultative RI for individual high-value policies.'],
+      ['FAC','Facultative Reinsurance','Individual policy reinsurance (vs treaty which covers a portfolio).'],
+      ['UNL','Ultimate Net Loss','Total loss to the insurer after all reinsurance recoveries.'],
+    ]},
+    {cat:'People & Roles',c:C.pink,items:[
+      ['UW','Underwriter / Underwriting','Person or process of evaluating and pricing insurance risk.'],
+      ['CUO','Chief Underwriting Officer','Executive who owns underwriting quality and risk appetite.'],
+      ['CRO','Chief Risk Officer','Executive who owns enterprise risk management.'],
+      ['CTO','Chief Technology Officer','Executive who owns technology strategy and architecture.'],
+      ['CFO','Chief Financial Officer','Relevant for reserving, investment income, capital adequacy.'],
+      ['MGA','Managing General Agent','Third party with delegated underwriting authority from an insurer.'],
+      ['TPA','Third-Party Administrator','Company that manages claims on behalf of an insurer.'],
+    ]},
+    {cat:'Technology & AI',c:C.cyan,items:[
+      ['RAG','Retrieval-Augmented Generation','Search relevant docs → feed to LLM → generate informed answer.'],
+      ['LLM','Large Language Model','AI model that reads and generates text (Claude, GPT, Llama).'],
+      ['ETL','Extract, Transform, Load','Pipeline: pull data → clean/normalize → load to database.'],
+      ['CDC','Change Data Capture','Detect and process only data that changed since last sync.'],
+      ['SFTP','Secure File Transfer Protocol','Standard secure file transfer between systems.'],
+      ['JWT','JSON Web Token','Authentication token carrying user identity. Used for data isolation.'],
+      ['RLS','Row-Level Security','Database feature restricting which rows a user can see.'],
+      ['GIS','Geographic Information System','Software for mapping, spatial analysis, geocoding.'],
+      ['HNSW','Hierarchical Navigable Small World','Algorithm for fast similarity search in vector databases.'],
+      ['API','Application Programming Interface','How software systems talk to each other. REST, GraphQL.'],
+      ['SDK','Software Development Kit','Pre-built code library for integrating with a service.'],
+    ]},
+  ].map(cat=>`
+    <div style="margin-bottom:16px" data-cat="${cat.cat}">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span style="font-size:14px;font-weight:800;color:${cat.c}" class="mn">${cat.cat.toUpperCase()}</span>
+        <span style="font-size:11px;color:${C.t3}" class="mn">${cat.items.length} terms</span>
+      </div>
+      ${cat.items.map(i=>`
+      <div class="gloss" data-term="${i[0].toLowerCase()} ${i[1].toLowerCase()} ${i[2].toLowerCase()}" onclick="this.classList.toggle('open')">
+        <div class="gloss-head">
+          <div class="gloss-toggle">▶</div>
+          <span class="mn" style="font-size:15px;font-weight:800;color:${cat.c};min-width:80px">${i[0]}</span>
+          <span style="font-size:14px;font-weight:600;color:${C.t1}">${i[1]}</span>
+        </div>
+        <div class="gloss-body">
+          <div style="padding:10px 0 4px 34px;font-size:14px;color:${C.t2};line-height:1.6">${i[2]}</div>
+        </div>
+      </div>`).join('')}
+    </div>`).join('')}
+  </div>
+</div>
+
+<!-- ═══════════════ CORE FORMULAS ═══════════════ -->
+<div class="sec" id="formulas">
+  <h2 style="font-size:28px;font-weight:800;color:${C.green};margin-bottom:6px">📐 Core Underwriting Formulas</h2>
+  <p style="font-size:14px;color:${C.t2};margin-bottom:16px">The math that drives every underwriting decision — with worked examples</p>
+
+  <div class="g2">
+    ${[
+      {n:'Loss Ratio (LR)',c:C.green,eq:'LR = (Incurred Losses ÷ Earned Premium) × 100',
+       desc:'THE single most important underwriting metric. Tells you how much of every premium dollar goes to paying claims.',
+       good:'Below 60%',warn:'60-80%',bad:'Above 80%',terrible:'Above 100% = losing money',
+       calc:[['Incurred losses (claims paid + reserves)','$285,000'],['Earned premium','$150,000']],result:'190.0%',rc:C.rose,
+       note:'At 190%, for every $1 of premium, $1.90 goes to claims. This is Titan Construction\'s loss ratio — clearly unsustainable.'},
+
+      {n:'Combined Ratio (CR)',c:C.blue,eq:'CR = Loss Ratio + Expense Ratio',
+       desc:'Total cost of running the insurance business. THE measure of underwriting profitability.',
+       good:'Below 95%',warn:'95-100%',bad:'Above 100%',terrible:'Above 110% = significant loss',
+       calc:[['Loss ratio','65%'],['Expense ratio (commissions + admin + IT)','32%']],result:'97.0%',rc:C.amber,
+       note:'At 97%, this book is barely profitable from underwriting. Investment income needs to cover the gap.'},
+
+      {n:'Expense Ratio (ER)',c:C.violet,eq:'ER = (Underwriting Expenses ÷ Written Premium) × 100',
+       desc:'How much of premium goes to running the business — commissions, salaries, IT, rent. NOT claims.',
+       good:'Below 28%',warn:'28-35%',bad:'Above 35%',terrible:'Above 40% = operational bloat',
+       calc:[['Total expenses (commissions $120K + ops $80K)','$200,000'],['Written premium','$625,000']],result:'32.0%',rc:C.amber,
+       note:'32% is typical. This is where RiskMind creates value — automating the 70% of UW work that isn\'t analysis.'},
+
+      {n:'Insurance to Value (ITV)',c:C.amber,eq:'ITV = (Insured Value ÷ Replacement Cost) × 100',
+       desc:'Is the property fully insured? Below 80% is a problem — coinsurance penalty kicks in.',
+       good:'90-110%',warn:'80-90%',bad:'Below 80%',terrible:'Below 70% = severe under-insurance',
+       calc:[['Insured value (on policy)','$1,200,000'],['Replacement cost (CoreLogic estimate)','$1,650,000']],result:'72.7%',rc:C.rose,
+       note:'Under-insured by 27%. In a total loss, insured gets $1.2M but needs $1.65M. Coinsurance penalty applies. RiskMind flags this automatically.'},
+
+      {n:'Claim Frequency',c:C.pink,eq:'Frequency = Number of Claims ÷ Exposure (policy years)',
+       desc:'How OFTEN claims happen. Industry benchmarks vary by LOB — commercial property averages ~0.8-1.2 claims per policy year.',
+       good:'Below 1.0/yr',warn:'1.0-2.0/yr',bad:'Above 2.0/yr',terrible:'Above 3.0/yr = serious problem',
+       calc:[['Total claims in period','5'],['Exposure (policies × years)','2.0 policy-years']],result:'2.5/yr',rc:C.rose,
+       note:'2.5 claims per year is 2.3× the benchmark of 1.1/yr. This triggers UW-003 frequency threshold.'},
+
+      {n:'Claim Severity',c:C.orange,eq:'Severity = Total Incurred Losses ÷ Number of Claims',
+       desc:'How BAD each claim is on average. High severity = each claim costs a lot, even if they\'re infrequent.',
+       good:'Below $20K',warn:'$20K-$50K',bad:'Above $50K',terrible:'Depends on LOB and TIV',
+       calc:[['Total incurred losses','$142,000'],['Number of claims','5']],result:'$28,400 avg',rc:C.amber,
+       note:'$28,400 average severity is moderate. But combined with 2.5/yr frequency, total exposure compounds fast.'},
+    ].map(f=>`
+    <div class="cd" style="border-color:${f.c}18;padding:22px">
+      <div style="font-size:18px;font-weight:800;color:${f.c};margin-bottom:4px">${f.n}</div>
+      <div style="font-size:13px;color:${C.t2};line-height:1.6;margin-bottom:10px">${f.desc}</div>
+      ${formula(f.eq)}
+      <div style="display:flex;gap:6px;margin:8px 0;flex-wrap:wrap">
+        <span class="tag" style="background:${C.green}12;border:1px solid ${C.green}18;color:${C.green}">Good: ${f.good}</span>
+        <span class="tag" style="background:${C.amber}12;border:1px solid ${C.amber}18;color:${C.amber}">Caution: ${f.warn}</span>
+        <span class="tag" style="background:${C.rose}12;border:1px solid ${C.rose}18;color:${C.rose}">Bad: ${f.bad}</span>
+      </div>
+      <div style="font-size:12px;font-weight:700;color:${C.t3};margin:8px 0 4px" class="mn">WORKED EXAMPLE — TITAN CONSTRUCTION</div>
+      ${calcBox(f.calc,f.result,f.rc)}
+      <div style="font-size:12px;color:${C.t2};line-height:1.5;margin-top:6px;font-style:italic">💡 ${f.note}</div>
+    </div>`).join('')}
+  </div>
+
+  <!-- Pure Loss Ratio, Operating Ratio, Trade Ratio -->
+  <div style="margin-top:16px">
+    <div class="cd" style="border-color:${C.cyan}18">
+      <div style="font-size:18px;font-weight:800;color:${C.cyan};margin-bottom:14px">Advanced Ratio Formulas</div>
+      <div class="g3">
+        ${[{n:'Pure Loss Ratio',eq:'Incurred Losses ÷ Earned Premium',desc:'Claims only, no LAE. Purest measure of risk selection quality.',c:C.green},
+           {n:'Incurred Loss Ratio',eq:'(Paid + Reserved + IBNR) ÷ Earned Premium',desc:'Includes estimated reserves for open claims and unreported claims.',c:C.blue},
+           {n:'Operating Ratio',eq:'Combined Ratio − Investment Income Ratio',desc:'True profitability including investment returns on float.',c:C.violet},
+           {n:'Trade Ratio',eq:'(Losses + LAE) ÷ Earned Premium',desc:'Loss ratio including adjustment expenses. More complete than pure LR.',c:C.amber},
+           {n:'Retention Ratio',eq:'Net Premium ÷ Gross Premium',desc:'How much risk the insurer keeps vs cedes to reinsurers. Higher = more risk retained.',c:C.orange},
+           {n:'Premium Adequacy',eq:'Required Premium ÷ Actual Premium',desc:'Is the price sufficient? Above 100% = under-priced. RiskMind flags this.',c:C.rose},
+        ].map(r=>`
+        <div style="padding:14px;border-radius:10px;background:${r.c}06;border:1px solid ${r.c}10">
+          <div style="font-size:14px;font-weight:700;color:${r.c};margin-bottom:4px">${r.n}</div>
+          <div class="mn" style="font-size:12px;color:${C.t1};margin-bottom:6px;padding:6px 10px;border-radius:5px;background:${C.sf}">${r.eq}</div>
+          <div style="font-size:12px;color:${C.t2};line-height:1.5">${r.desc}</div>
+        </div>`).join('')}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ CAT FORMULAS ═══════════════ -->
+<div class="sec" id="catformulas">
+  <h2 style="font-size:28px;font-weight:800;color:${C.rose};margin-bottom:6px">🌀 Catastrophe Model Formulas</h2>
+  <p style="font-size:14px;color:${C.t2};margin-bottom:16px">How cat models quantify disaster risk — the math reinsurers care about</p>
+
+  <div class="g2">
+    ${[
+      {n:'Annual Average Loss (AAL)',c:C.blue,
+       eq:'AAL = Σ (Loss<sub>i</sub> × Probability<sub>i</sub>) for all simulated events',
+       desc:'The expected annual loss from catastrophes, averaged over tens of thousands of simulated years. Think: "average cost of bad weather per year."',
+       calc:[['Year 1: No hurricane','$0'],['Year 2: Cat 2 hits edge of zone','$2,100,000'],['Year 3: No event','$0'],['Year 4: Tropical storm','$400,000'],['... averaged over 100,000 simulated years','...']],
+       result:'AAL = $520,000/yr',rc:C.blue,
+       note:'You must collect at least $520K in cat-loaded premium just to break even on average cat losses. In reality, charge more for profit + reinsurance costs.'},
+
+      {n:'Probable Maximum Loss (PML)',c:C.rose,
+       eq:'PML<sub>RP</sub> = Loss at (1 ÷ Return Period) exceedance probability',
+       desc:'The worst realistic loss at a given return period. PML at 250yr = loss exceeded with 0.4% annual probability.',
+       calc:[['Return period','250 years'],['Annual exceedance probability','1/250 = 0.4%'],['From simulation: loss at 0.4% exceedance','$4,800,000'],['This means: 0.4% chance in any year','loss ≥ $4.8M']],
+       result:'PML₂₅₀ = $4,800,000',rc:C.rose,
+       note:'Over a 30-year period, there\'s actually an 11.3% chance of this "250-year event" happening. Not as rare as it sounds.'},
+
+      {n:'Exceedance Probability (EP)',c:C.amber,
+       eq:'EP(L) = P(Annual Loss > L) = 1 − (1 − 1/RP)',
+       desc:'Probability that losses in any year exceed a given amount. Inverse of return period.',
+       calc:[['At 100-year RP','EP = 1/100 = 1.0% per year'],['At 250-year RP','EP = 1/250 = 0.4% per year'],['At 500-year RP','EP = 1/500 = 0.2% per year'],['Over 30 years at 250-yr','1-(1-0.004)^30 = 11.3%']],
+       result:'Not as rare as it sounds',rc:C.amber,
+       note:'Key pitch point: "250-year" doesn\'t mean once every 250 years. It means 0.4% EVERY year. Over a typical policy lifecycle, the probability is material.'},
+
+      {n:'Zone Accumulation',c:C.green,
+       eq:'Zone TIV = Σ Insured_Value<sub>i</sub> for all policies in zone',
+       desc:'Total exposure concentrated in one geographic area. If one hurricane hits the zone, this is your theoretical maximum loss.',
+       calc:[['Policy COMM-2024-003 (Titan Construction)','$1,800,000'],['Policy COMM-2024-007 (Gulf Coast Mfg)','$2,200,000'],['Policy COMM-2024-012 (Houston Medical)','$1,500,000'],['Policy COMM-2024-018 (Bayou Restaurant)','$1,300,000']],
+       result:'Zone US-TX-003 TIV = $6,800,000',rc:C.amber,
+       note:'$6.8M against $7M limit = 97% of threshold. One more policy in this zone and RiskMind flags a breach of guideline 4.3.1.'},
+    ].map(f=>`
+    <div class="cd" style="border-color:${f.c}18;padding:22px">
+      <div style="font-size:18px;font-weight:800;color:${f.c};margin-bottom:4px">${f.n}</div>
+      <div style="font-size:13px;color:${C.t2};line-height:1.6;margin-bottom:10px">${f.desc}</div>
+      ${formula(f.eq)}
+      <div style="font-size:12px;font-weight:700;color:${C.t3};margin:8px 0 4px" class="mn">WORKED EXAMPLE</div>
+      ${calcBox(f.calc,f.result,f.rc)}
+      <div style="font-size:12px;color:${C.t2};line-height:1.5;margin-top:6px;font-style:italic">💡 ${f.note}</div>
+    </div>`).join('')}
+  </div>
+
+  <div class="cd" style="border-color:${C.violet}18;margin-top:16px">
+    <div style="font-size:18px;font-weight:800;color:${C.violet};margin-bottom:14px">How AAL, PML, and TIV Relate</div>
+    <div style="padding:18px;border-radius:10px;background:${C.sf};line-height:2;font-size:14px;color:${C.t1}">
+      <strong style="color:${C.cyan}">TIV = $6,800,000</strong> — Theoretical maximum. Every building in the zone totally destroyed.<br>
+      <strong style="color:${C.rose}">PML₂₅₀ = $4,800,000</strong> — Realistic worst case. 70% of TIV damaged in a major hurricane. 0.4% annual chance.<br>
+      <strong style="color:${C.blue}">AAL = $520,000</strong> — Average year. Most years $0, some years $2M, rare year $4.8M. Averages to $520K.<br>
+      <strong style="color:${C.green}">Premium needed ≥ AAL + expenses + profit</strong> — Must charge at least $520K in cat premium across this zone just to cover expected losses.
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ PRICING ═══════════════ -->
+<div class="sec" id="pricing">
+  <h2 style="font-size:28px;font-weight:800;color:${C.amber};margin-bottom:6px">💰 Pricing & Rating Formulas</h2>
+  <p style="font-size:14px;color:${C.t2};margin-bottom:16px">How premiums are calculated — the math behind the price</p>
+
+  <div class="g2">
+    ${[
+      {n:'Technical Premium',c:C.amber,
+       eq:'Technical Premium = (Expected Losses + LAE) ÷ (1 − Expense Ratio − Profit Margin)',
+       desc:'The minimum premium needed to cover expected losses, expenses, and target profit. "What we SHOULD charge."',
+       calc:[['Expected losses (AAL + attritional)','$85,000'],['LAE (12% of losses)','$10,200'],['Expense ratio','32%'],['Target profit margin','5%'],['Denominator: 1 - 0.32 - 0.05','0.63']],
+       result:'$151,111',rc:C.amber,
+       note:'If actual premium is $150K, it\'s almost exactly at the technical rate — no margin for error. Below $130K = under-priced.'},
+
+      {n:'Experience Modification (Mod)',c:C.green,
+       eq:'Mod = (Actual Losses ÷ Expected Losses)',
+       desc:'Compares THIS account\'s losses to what\'s expected for its class. Above 1.0 = worse than average, below 1.0 = better.',
+       calc:[['Actual incurred losses (3yr)','$285,000'],['Expected losses for class (3yr avg)','$120,000']],
+       result:'Mod = 2.38',rc:C.rose,
+       note:'Mod of 2.38 means losses are 138% ABOVE expected for construction class. Premium should be adjusted up by 2.38×. This is why Titan is being non-renewed.'},
+
+      {n:'Rate Per $100 of Exposure',c:C.blue,
+       eq:'Rate = (Premium ÷ Insured Value) × 100',
+       desc:'Normalized pricing. Allows comparison across different-sized policies. "How much per $100 of coverage?"',
+       calc:[['Annual premium','$45,000'],['Insured value','$1,800,000']],
+       result:'$2.50 per $100',rc:C.blue,
+       note:'Industry benchmark for commercial property construction: ~$1.50-$3.00/100. At $2.50, this is within range but should be higher given the loss history.'},
+
+      {n:'Burning Cost',c:C.rose,
+       eq:'Burning Cost = Total Losses (N years) ÷ Total Premium (N years)',
+       desc:'Simple backward-looking measure. What ACTUALLY happened. Used to validate prospective pricing models.',
+       calc:[['Total claims (3 years)','$285,000'],['Total premium (3 years)','$135,000']],
+       result:'211%',rc:C.rose,
+       note:'Burning cost of 211% = the actual loss experience was catastrophic. No amount of rate increase can fix this without loss control improvements.'},
+    ].map(f=>`
+    <div class="cd" style="border-color:${f.c}18;padding:22px">
+      <div style="font-size:18px;font-weight:800;color:${f.c};margin-bottom:4px">${f.n}</div>
+      <div style="font-size:13px;color:${C.t2};line-height:1.6;margin-bottom:10px">${f.desc}</div>
+      ${formula(f.eq)}
+      ${calcBox(f.calc,f.result,f.rc)}
+      <div style="font-size:12px;color:${C.t2};line-height:1.5;margin-top:6px;font-style:italic">💡 ${f.note}</div>
+    </div>`).join('')}
+  </div>
+</div>
+
+<!-- ═══════════════ PORTFOLIO ═══════════════ -->
+<div class="sec" id="portfolio">
+  <h2 style="font-size:28px;font-weight:800;color:${C.violet};margin-bottom:6px">📊 Portfolio Analytics Formulas</h2>
+  <p style="font-size:14px;color:${C.t2};margin-bottom:16px">Book-level metrics that CUOs and risk managers track</p>
+
+  <div class="g3">
+    ${[{n:'Concentration Risk',eq:'Zone TIV ÷ Total Book TIV × 100',desc:'What % of your total exposure sits in one zone? Above 15% = concerning.',example:'$6.8M / $28M = 24.3% in one zone',c:C.rose},
+       {n:'Diversification Score',eq:'1 − HHI (Herfindahl-Hirschman Index)',desc:'Measures how spread your book is across zones/LOBs. HHI = Σ(share²). Low HHI = well diversified.',example:'5 zones with equal share: HHI=0.2, Div=0.8 (good)',c:C.green},
+       {n:'Policy Count Velocity',eq:'(Policies This Quarter − Last Quarter) ÷ Last Quarter × 100',desc:'How fast your book is growing or shrinking. Fast growth + stable LR = good. Fast growth + rising LR = trouble.',example:'(21 - 18) / 18 = 16.7% growth QoQ',c:C.blue},
+       {n:'Retention Rate',eq:'Renewed Policies ÷ Expiring Policies × 100',desc:'How many customers you keep. Below 80% = churn problem. Above 90% = strong relationships.',example:'17 renewed / 19 expiring = 89.5%',c:C.amber},
+       {n:'Average Premium',eq:'Total GWP ÷ Policy Count',desc:'Simple but useful for monitoring book composition changes. Rising avg = writing bigger risks.',example:'$945,000 / 21 = $45,000 avg',c:C.violet},
+       {n:'Premium-to-Surplus Ratio',eq:'NWP ÷ Policyholder Surplus',desc:'Leverage measure. How much risk vs how much capital? Regulators watch this. Above 3:1 = danger.',example:'$12M NWP / $8M surplus = 1.5:1 (healthy)',c:C.orange},
+    ].map(f=>`
+    <div class="cd" style="border-color:${f.c}14;padding:16px">
+      <div style="font-size:15px;font-weight:800;color:${f.c};margin-bottom:4px">${f.n}</div>
+      <div class="mn" style="font-size:11px;color:${C.t1};padding:6px 10px;border-radius:5px;background:${C.sf};margin:6px 0">${f.eq}</div>
+      <div style="font-size:12px;color:${C.t2};line-height:1.5;margin-bottom:6px">${f.desc}</div>
+      <div style="font-size:11px;color:${f.c};font-style:italic" class="mn">Example: ${f.example}</div>
+    </div>`).join('')}
+  </div>
+</div>
+
+<!-- ═══════════════ LIFECYCLE ═══════════════ -->
+<div class="sec" id="lifecycle">
+  <h2 style="font-size:28px;font-weight:800;color:${C.orange};margin-bottom:6px">🔄 Policy Lifecycle</h2>
+  <p style="font-size:14px;color:${C.t2};margin-bottom:16px">How risk flows through the insurance value chain</p>
+
+  <div style="display:flex;flex-direction:column;gap:6px">
+    ${[{stage:'Submission',who:'Broker → Underwriter',what:'Broker sends application (ACORD form) for their client. Includes: business details, coverage request, current premium, loss history.',time:'Day 1',c:C.blue},
+       {stage:'Triage',who:'Underwriter',what:'First-pass filter. Does this fit our appetite? Right industry? Right geography? Within authority? If not → decline immediately.',time:'Day 1-2',c:C.cyan},
+       {stage:'Analysis',who:'Underwriter + AI',what:'Deep dive: pull claims, compute loss ratio, check guidelines, assess cat exposure, verify zone capacity. THIS is where RiskMind lives.',time:'Day 2-5',c:C.green},
+       {stage:'Pricing',who:'Underwriter + Actuarial',what:'Set the premium. Apply base rate × mods (experience, territory, schedule credits/debits, cat load, expense load, profit load).',time:'Day 3-7',c:C.amber},
+       {stage:'Quote',who:'Underwriter → Broker',what:'Send the offer: coverage terms, premium, deductibles, sublimits, endorsements, conditions. Broker shops it to their client.',time:'Day 5-10',c:C.violet},
+       {stage:'Negotiation',who:'Broker ↔ Underwriter',what:'"Can you do $40K instead of $45K?" — Price, terms, and conditions may be adjusted. This is where relationship and judgment matter.',time:'Day 7-14',c:C.orange},
+       {stage:'Bind',who:'Broker confirms → Underwriter',what:'Deal done. Policy issued. Coverage active from effective date. Premium billed. TIV added to zone accumulation. Reinsurance applied.',time:'Day 10-30',c:C.green},
+       {stage:'In-Force',who:'All parties',what:'Policy active. Claims can occur. Mid-term endorsements possible (add location, increase limits). Insured pays premium installments.',time:'12 months',c:C.blue},
+       {stage:'Renewal Analysis',who:'Underwriter + AI',what:'60-90 days before expiration: review loss experience, rate adequacy, zone concentration, guideline compliance. Decide: renew, modify, or non-renew.',time:'Day 270-330',c:C.amber},
+       {stage:'Decision',who:'Underwriter (human)',what:'Accept renewal (with/without changes), refer to senior UW, or decline/non-renew. AI recommends. Human decides. Both recorded.',time:'Day 300-350',c:C.rose},
+    ].map((s,i)=>`
+    <div style="display:flex;gap:14px;align-items:stretch">
+      <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:32px">
+        <div style="width:12px;height:12px;border-radius:50%;background:${s.c};flex-shrink:0;margin-top:8px"></div>
+        ${i<9?`<div style="flex:1;width:2px;background:${C.bd}"></div>`:''}
+      </div>
+      <div style="flex:1;padding:10px 16px;border-radius:10px;background:${C.cd};border:1px solid ${C.bd}">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+          <span style="font-size:16px;font-weight:800;color:${s.c}">${s.stage}</span>
+          ${tag(s.who,s.c)}
+          <span class="mn" style="font-size:10px;color:${C.t3};margin-left:auto">${s.time}</span>
+        </div>
+        <div style="font-size:13px;color:${C.t1};line-height:1.5">${s.what}</div>
+      </div>
+    </div>`).join('')}
+  </div>
+</div>
+
+<!-- ═══════════════ PERILS ═══════════════ -->
+<div class="sec" id="perils">
+  <h2 style="font-size:28px;font-weight:800;color:${C.rose};margin-bottom:6px">⚡ Perils & Hazards</h2>
+  <p style="font-size:14px;color:${C.t2};margin-bottom:16px">What can go wrong — the causes of loss</p>
+
+  <div class="g3">
+    ${[{n:'Wind / Hurricane',zones:'Gulf Coast (FL, TX, LA), Atlantic Coast',annual:'$20-80B US annual losses',freq:'3-5 major US landfalls per decade',severity:'Single event can exceed $50B',peak:'Aug-Oct',c:C.blue,ic:'🌀'},
+       {n:'Flood',zones:'Coastal, river valleys, low elevation nationwide',annual:'$5-15B annual',freq:'Most common natural disaster',severity:'Average claim ~$50K',peak:'Hurricane season + spring melt',c:C.cyan,ic:'🌊'},
+       {n:'Earthquake',zones:'CA, Pacific NW, New Madrid (MO), Charleston (SC)',annual:'$1-5B avg (highly variable)',freq:'Rare but catastrophic',severity:'Single event can exceed $100B',peak:'No season — any time',c:C.amber,ic:'🏚️'},
+       {n:'Wildfire',zones:'CA, CO, OR, WA (WUI zones)',annual:'$10-30B recent years',freq:'Increasing dramatically',severity:'$5-15B per major event',peak:'Jun-Nov (fire season)',c:C.orange,ic:'🔥'},
+       {n:'Hail / SCS',zones:'TX, OK, KS, CO, NE ("Hail Alley")',annual:'$15-35B (largest cat peril by frequency)',freq:'Thousands of events per year',severity:'Single storm: $1-5B',peak:'Mar-Jun',c:C.violet,ic:'🧊'},
+       {n:'Tornado',zones:'Central US, Southeast',annual:'$5-20B',freq:'~1,200 US tornadoes per year',severity:'EF4-5 can devastate entire towns',peak:'Apr-Jun (Tornado Alley), Nov-Dec (SE)',c:C.rose,ic:'🌪️'},
+       {n:'Winter Storm',zones:'Northeast, Midwest, Mountain states',annual:'$3-10B',freq:'Multiple major events per year',severity:'Ice storms most damaging',peak:'Dec-Mar',c:C.blue,ic:'❄️'},
+       {n:'Storm Surge',zones:'Coastal FL, TX, LA, Carolinas',annual:'Part of hurricane losses',freq:'Every major hurricane landfall',severity:'Can exceed wind damage',peak:'Aug-Oct',c:C.cyan,ic:'🌊'},
+       {n:'Cyber',zones:'Nationwide — not geographic',annual:'$6-10B and growing rapidly',freq:'Increasing 20-30% per year',severity:'Single breach: $1-100M+',peak:'No season — constant',c:C.pink,ic:'💻'},
+    ].map(p=>`
+    <div class="cd" style="border-color:${p.c}14;padding:16px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span style="font-size:24px">${p.ic}</span>
+        <span style="font-size:16px;font-weight:800;color:${p.c}">${p.n}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:3px;font-size:12px;color:${C.t1};line-height:1.5">
+        <div><span style="color:${C.t3}" class="mn">WHERE:</span> ${p.zones}</div>
+        <div><span style="color:${C.t3}" class="mn">ANNUAL:</span> ${p.annual}</div>
+        <div><span style="color:${C.t3}" class="mn">FREQ:</span> ${p.freq}</div>
+        <div><span style="color:${C.t3}" class="mn">SEVERITY:</span> ${p.severity}</div>
+        <div><span style="color:${C.t3}" class="mn">PEAK:</span> ${p.peak}</div>
+      </div>
+    </div>`).join('')}
+  </div>
+</div>
+
+<!-- ═══════════════ DATA SOURCES ═══════════════ -->
+<div class="sec" id="datasources">
+  <h2 style="font-size:28px;font-weight:800;color:${C.blue};margin-bottom:6px">💾 Third-Party Data Sources</h2>
+  <p style="font-size:14px;color:${C.t2};margin-bottom:16px">Where the data comes from, what it provides, and what it costs</p>
+
+  <div style="display:flex;flex-direction:column;gap:8px">
+    ${[{n:'FEMA NFHL',provider:'Federal Government',data:'Flood zone maps (A, AE, V, VE, X, X500) for every US property',update:'Periodic (varies by community, often 5-10yr cycle)',cost:'FREE — public data',url:'fema.gov/flood-maps',use:'Geocode property → spatial join to flood zone polygon → assign zone',c:C.blue},
+       {n:'First Street Foundation',provider:'Nonprofit',data:'Property-level flood risk scores (1-10), projected flood frequency, climate-adjusted forward-looking risk',update:'Annual model refresh',cost:'Licensed — per-lookup or annual',url:'firststreet.org',use:'Supplements FEMA with forward-looking climate projections. Catches risk FEMA maps miss.',c:C.cyan},
+       {n:'RMS RiskLink',provider:'Moody\'s RMS',data:'Cat model output: AAL, PML (100/250/500yr), vulnerability curves per property',update:'Annual model version',cost:'$50K-$200K+/yr license',url:'rms.com',use:'Input property COPE data → model simulates 100K+ scenarios → output AAL/PML per peril',c:C.rose},
+       {n:'AIR Touchstone',provider:'Verisk (AIR)',data:'Same as RMS — cat model output. Different model, sometimes different results.',update:'Annual',cost:'$50K-$200K+/yr license',url:'air-worldwide.com',use:'Carriers often run BOTH RMS and AIR and take the more conservative result.',c:C.orange},
+       {n:'CoreLogic Property',provider:'CoreLogic',data:'Construction type, year built, sq footage, stories, roof type, replacement cost estimate',update:'Quarterly',cost:'Per-lookup or annual license',url:'corelogic.com',use:'Property characteristics for rating + ITV check (replacement cost vs insured value)',c:C.green},
+       {n:'ISO / Verisk',provider:'Verisk',data:'Protection class (1-10), BCEGS, base rates, class codes, policy forms',update:'Ongoing',cost:'Annual membership',url:'verisk.com',use:'Protection class drives fire rate. BCEGS affects cat damage expectations.',c:C.violet},
+       {n:'D&B Credit',provider:'Dun & Bradstreet',data:'Business credit score, payment history, financial stability, bankruptcy/liens',update:'Monthly refresh',cost:'$5-15 per report',url:'dnb.com',use:'Low credit correlates with claims. Below 40 = flag. Below 30 = auto-decline per UW-009.',c:C.amber},
+       {n:'FBI UCR / NIBRS',provider:'Federal Government',data:'Crime rates by county/ZIP: property crime, violent crime, arson',update:'Annual',cost:'FREE — public data',url:'crime-data-explorer.fr.cloud.gov',use:'Property crime index drives theft/vandalism rate loading.',c:C.pink},
+       {n:'NOAA Storm Events',provider:'Federal Government',data:'Historical severe weather: hail events, tornado touchdowns, hurricane tracks, fire weather',update:'Monthly',cost:'FREE — public data',url:'ncdc.noaa.gov/stormevents',use:'5-year hail count for SCS loading. Wildfire incidents for fire risk scoring.',c:C.blue},
+    ].map(s=>`
+    <div class="cd" style="border-color:${s.c}14;padding:16px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">
+        <span style="font-size:16px;font-weight:800;color:${s.c}">${s.n}</span>
+        ${tag(s.provider,s.c)}
+        ${tag(s.cost,s.cost.includes('FREE')?C.green:C.amber)}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
+        <div><span style="color:${C.t3}" class="mn">DATA:</span> <span style="color:${C.t1}">${s.data}</span></div>
+        <div><span style="color:${C.t3}" class="mn">UPDATE:</span> <span style="color:${C.t1}">${s.update}</span></div>
+        <div style="grid-column:span 2"><span style="color:${C.t3}" class="mn">HOW WE USE IT:</span> <span style="color:${C.t1}">${s.use}</span></div>
+      </div>
+    </div>`).join('')}
+  </div>
+</div>
+
+<!-- ═══════════════ REGULATORY ═══════════════ -->
+<div class="sec" id="regulatory">
+  <h2 style="font-size:28px;font-weight:800;color:${C.amber};margin-bottom:6px">⚖️ Regulatory Terms</h2>
+  <p style="font-size:14px;color:${C.t2};margin-bottom:16px">Key regulations and compliance concepts</p>
+
+  <div class="g2">
+    ${[{n:'NAIC Model Bulletin',date:'Dec 4, 2023',status:'Adopted by 23 states + DC',desc:'The primary AI governance framework for US insurance. Requires: transparency, explainability, human oversight, fairness testing, consumer notification, vendor oversight. RiskMind\'s Glass Box is designed to address every requirement.',c:C.amber},
+       {n:'Colorado SB 21-169',date:'2021',status:'First state AI bias testing law',desc:'Requires insurers to test algorithms for unfairly discriminatory outcomes. If you can\'t explain your model, you can\'t test it for bias. Black box = automatic compliance failure.',c:C.green},
+       {n:'NYDFS Circular Letter',date:'2024',status:'New York guidance',desc:'NY DFS guidance on AI in insurance. Requires governance frameworks, documentation of AI systems, and ability to explain AI-influenced decisions to consumers.',c:C.blue},
+       {n:'Unfair Discrimination',date:'Core insurance law',status:'Every state',desc:'Insurance pricing may use actuarial factors (loss history, construction type, location) but NOT protected classes (race, religion, national origin). AI models must be tested to ensure no proxy discrimination.',c:C.rose},
+       {n:'Rate Filing',date:'Ongoing',status:'Required in most states',desc:'Insurers must file rates with state DOI for approval. Rates must be adequate, not excessive, and not unfairly discriminatory. AI-driven pricing changes may need filing.',c:C.violet},
+       {n:'Market Conduct Exam',date:'Periodic',status:'State DOI initiated',desc:'Regulator audits insurer practices: underwriting, claims, pricing, marketing. AI-assisted decisions will be scrutinized. Glass Box audit trail = prepared for exam.',c:C.orange},
+    ].map(r=>`
+    <div class="cd" style="border-color:${r.c}14;padding:18px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+        <span style="font-size:16px;font-weight:800;color:${r.c}">${r.n}</span>
+        ${tag(r.date,r.c)} ${tag(r.status,C.green)}
+      </div>
+      <div style="font-size:13px;color:${C.t1};line-height:1.6">${r.desc}</div>
+    </div>`).join('')}
+  </div>
+</div>
+
+<!-- ═══════════════ TECH ═══════════════ -->
+<div class="sec" id="tech">
+  <h2 style="font-size:28px;font-weight:800;color:${C.cyan};margin-bottom:6px">🤖 AI & Technology Terms</h2>
+  <p style="font-size:14px;color:${C.t2};margin-bottom:16px">The tech stack explained for non-engineers</p>
+
+  <div class="g3">
+    ${[{n:'RAG',full:'Retrieval-Augmented Generation',desc:'Instead of relying on AI\'s training data, first SEARCH your own documents for relevant info, then give that info to the AI along with the question. Result: AI answers are grounded in YOUR data, not internet knowledge.',c:C.violet},
+       {n:'LangGraph',full:'Graph-based AI Pipeline Framework',desc:'Like a flowchart engine for AI. Each node does one thing (parse intent, query DB, call LLM, validate output). Nodes connect with conditional edges — if confidence < 50, go to clarify node instead of LLM node.',c:C.blue},
+       {n:'Vector Database',full:'ChromaDB / pgvector',desc:'Stores text as mathematical vectors (embeddings). Similar text = nearby vectors. Enables semantic search: "find documents about flood risk" matches "FEMA zone AE coastal exposure" even though the words are different.',c:C.green},
+       {n:'Embedding',full:'Text → Numbers',desc:'Converts text into a list of 1,536 numbers that capture meaning. "Dog" and "puppy" have similar embeddings. "Dog" and "database" don\'t. This is how semantic search works.',c:C.cyan},
+       {n:'LLM',full:'Large Language Model',desc:'AI trained on text to understand and generate language. Claude, GPT, Llama. In RiskMind, the LLM reads pre-computed data and writes narrative. It never generates numbers or accesses the database.',c:C.orange},
+       {n:'Prompt Engineering',full:'Designing AI Instructions',desc:'Crafting the system prompt that tells the LLM how to behave. "You are an underwriting assistant. Only use the data provided. Cite guidelines by section code. Never fabricate policy IDs."',c:C.amber},
+       {n:'Hallucination',full:'AI Inventing False Facts',desc:'The LLM generates something that sounds true but isn\'t — a fake policy number, a made-up guideline, a wrong loss ratio. This is why Sentinel validates every claim against source data.',c:C.rose},
+       {n:'Token',full:'AI Processing Unit',desc:'~4 characters of text = 1 token. Pricing is per token. A 2,000 word response ≈ 2,500 tokens ≈ $0.003 with Claude Sonnet. RiskMind averages ~$0.003 per query for the LLM call.',c:C.pink},
+       {n:'Deterministic',full:'Same Input → Same Output, Always',desc:'RiskMind\'s Executor is deterministic: given the same data, it produces the exact same numbers every time. Unlike LLMs, which can vary. This is why numbers come from code, not AI.',c:C.green},
+    ].map(t=>`
+    <div class="cd" style="border-color:${t.c}14;padding:16px">
+      <div style="font-size:16px;font-weight:800;color:${t.c};margin-bottom:2px">${t.n}</div>
+      <div style="font-size:12px;color:${t.c};margin-bottom:6px" class="mn">${t.full}</div>
+      <div style="font-size:13px;color:${C.t1};line-height:1.6">${t.desc}</div>
+    </div>`).join('')}
+  </div>
+</div>
+
+<!-- ═══════════════ PRONUNCIATION ═══════════════ -->
+<div class="sec" id="pronounce">
+  <h2 style="font-size:28px;font-weight:800;color:${C.pink};margin-bottom:6px">🗣️ Pronunciation Guide</h2>
+  <p style="font-size:14px;color:${C.t2};margin-bottom:16px">Don't mispronounce these in the room</p>
+
+  <div class="cd" style="border-color:${C.pink}14">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0">
+      ${[['CRESTA','KRES-tah','Not "cresta" like crest'],
+         ['FEMA','FEE-muh','Everyone knows this one'],
+         ['NAIC','N-A-I-C','Spell it out, 4 letters'],
+         ['Verisk','VAIR-isk','Emphasis on first syllable'],
+         ['PML','P-M-L','Spell it out, 3 letters'],
+         ['AAL','A-A-L','Spell out, or some say "ahl"'],
+         ['TIV','T-I-V','Spell it out, 3 letters'],
+         ['ISO','I-S-O','Spell it out, 3 letters'],
+         ['BCEGS','B-SEGS','B then "segs"'],
+         ['SCS','S-C-S','Spell it out, 3 letters'],
+         ['WUI','WOO-ee','Rhymes with "gooey"'],
+         ['SFTP','S-F-T-P','Spell it out, 4 letters'],
+         ['NOAA','NO-ah','Like the name Noah'],
+         ['ACORD','a-CORD','Emphasis on second syllable'],
+         ['COPE','KOHP','Like "cope" with stress'],
+         ['peril','PAIR-ul','Not "pearl"'],
+         ['reinsurance','ree-in-SHUR-ance','4 syllables'],
+         ['actuarial','ak-choo-AIR-ee-ul','5 syllables'],
+         ['facultative','FAK-ul-tay-tiv','Not "faculty-tive"'],
+         ['coinsurance','ko-in-SHUR-ance','4 syllables'],
+         ['ChromaDB','KROH-mah D-B','Chrome + ah + DB'],
+      ].map(p=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid ${C.bd}">
+        <span class="mn" style="font-size:14px;font-weight:700;color:${C.pink};min-width:80px">${p[0]}</span>
+        <span class="mn" style="font-size:13px;color:${C.wh};min-width:120px">${p[1]}</span>
+        <span style="font-size:11px;color:${C.t3}">${p[2]}</span>
+      </div>`).join('')}
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div style="text-align:center;margin-top:28px;padding:16px 0;border-top:1px solid ${C.bd}">
+  <div style="font-size:13px;color:${C.t3}" class="mn">RiskMind · Insurance Glossary & Formulas · ${new Date().toLocaleDateString()} · Confidential</div>
+</div>
+`;
+
+// Observe sections
+document.querySelectorAll('.sec').forEach(s=>obs.observe(s));
+
+// Search filter
+window.filterAcronyms=function(val){
+  const q=val.toLowerCase();
+  document.querySelectorAll('#acronym-list .gloss').forEach(g=>{
+    const match=g.dataset.term.includes(q);
+    g.style.display=match||!q?'block':'none';
+  });
+};
+</script>
+</body>
+</html>

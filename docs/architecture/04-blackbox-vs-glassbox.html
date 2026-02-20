@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RiskMind — Black Box vs Glass Box</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#06080D;--sf:#0C1018;--cd:#111827;--bd:#1E293B;--bl:#334155;
+  --wh:#F1F5F9;--t1:#CBD5E1;--t2:#8896A8;--t3:#4B5563;
+  --blue:#3B82F6;--cyan:#06B6D4;--green:#10B981;--lime:#84CC16;
+  --amber:#F59E0B;--rose:#F43F5E;--violet:#8B5CF6;--orange:#F97316;
+  --pink:#EC4899;--red:#EF4444;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--wh);font-family:'DM Sans',sans-serif;overflow-x:hidden}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:var(--wh)}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:var(--bl);border-radius:4px}
+.mn{font-family:'JetBrains Mono',monospace}
+
+.wrap{max-width:1360px;margin:0 auto;padding:28px 32px}
+
+/* Nav */
+.nav{position:sticky;top:0;z-index:99;background:var(--bg)ee;backdrop-filter:blur(12px);border-bottom:1px solid var(--bd);padding:8px 0}
+.nav-in{max-width:1360px;margin:0 auto;display:flex;gap:4px;padding:0 32px;overflow-x:auto}
+.nav-btn{padding:7px 16px;border-radius:8px;font-size:12px;font-weight:700;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;transition:all .15s}
+
+.sec{margin-bottom:44px;scroll-margin-top:70px}
+.cd{padding:20px;border-radius:14px;background:var(--cd);border:1px solid var(--bd)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+
+.pulse{display:inline-block;width:8px;height:8px;border-radius:50%;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 currentColor}50%{opacity:.4;box-shadow:0 0 8px 3px currentColor}}
+
+/* Split columns */
+.bb{border-color:var(--rose)18;background:linear-gradient(135deg,#1a0a0e,var(--cd))}
+.gb{border-color:var(--green)18;background:linear-gradient(135deg,#0a1a12,var(--cd))}
+.bb-h{color:var(--rose)}
+.gb-h{color:var(--green)}
+
+/* Tag */
+.tag{display:inline-block;font-size:11px;padding:3px 8px;border-radius:4px;font-weight:600;font-family:'JetBrains Mono',monospace}
+
+/* Versus badge */
+.vs{display:flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:50%;background:var(--bg);border:2px solid var(--bl);font-size:14px;font-weight:900;color:var(--amber);font-family:'JetBrains Mono',monospace;flex-shrink:0;z-index:2}
+
+/* Step rows */
+.step-row{display:grid;grid-template-columns:1fr 48px 1fr;gap:0;align-items:stretch;margin-bottom:12px}
+.step-row .vs{align-self:center;justify-self:center}
+
+/* Animated bars */
+@keyframes fillBar{from{width:0}to{width:var(--w)}}
+.bar{height:8px;border-radius:4px;animation:fillBar 1s ease forwards}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.fi{animation:fadeUp .5s ease both}
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <div class="nav-in" id="nav"></div>
+</div>
+
+<div class="wrap">
+  <!-- Header -->
+  <div style="text-align:center;margin-bottom:36px">
+    <div style="display:inline-flex;align-items:center;gap:8px;padding:5px 16px;border-radius:16px;background:#06B6D410;border:1px solid #06B6D420;margin-bottom:14px">
+      <span class="pulse" style="color:#06B6D4;background:#06B6D4"></span>
+      <span class="mn" style="font-size:12px;font-weight:700;color:#06B6D4;letter-spacing:.1em;text-transform:uppercase">Interactive Comparison</span>
+    </div>
+    <h1 style="font-size:46px;font-weight:900;letter-spacing:-.04em;margin-bottom:6px">
+      <span style="color:var(--rose)">Black Box</span>
+      <span style="color:var(--t3);margin:0 12px">vs</span>
+      <span style="color:var(--green)">Glass Box</span>
+    </h1>
+    <p style="font-size:17px;color:var(--t2)">Why regulators, auditors, and underwriters need to see inside the AI</p>
+  </div>
+
+  <div id="content"></div>
+</div>
+
+<script>
+const C={bg:'#06080D',sf:'#0C1018',cd:'#111827',bd:'#1E293B',bl:'#334155',wh:'#F1F5F9',t1:'#CBD5E1',t2:'#8896A8',t3:'#4B5563',blue:'#3B82F6',cyan:'#06B6D4',green:'#10B981',lime:'#84CC16',amber:'#F59E0B',rose:'#F43F5E',violet:'#8B5CF6',orange:'#F97316',pink:'#EC4899'};
+
+const SECS=[
+  {id:'concept',n:'The Core Problem',ic:'⚡'},
+  {id:'realworld',n:'Real-World Examples',ic:'🏢'},
+  {id:'samequestion',n:'Same Question, Two Systems',ic:'💬'},
+  {id:'flow',n:'How Each Works Inside',ic:'🔬'},
+  {id:'audit',n:'The Audit Test',ic:'📋'},
+  {id:'regulator',n:'The Regulator Test',ic:'🏛️'},
+  {id:'trust',n:'The Trust Test',ic:'🤝'},
+  {id:'naic',n:'NAIC Compliance',ic:'⚖️'},
+  {id:'summary',n:'The Verdict',ic:'✅'},
+];
+
+document.getElementById('nav').innerHTML=SECS.map(s=>`<button class="nav-btn" data-s="${s.id}" style="color:${C.cyan}" onclick="document.getElementById('${s.id}').scrollIntoView({behavior:'smooth'})">${s.ic} ${s.n}</button>`).join('');
+
+const obs=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){document.querySelectorAll('.nav-btn').forEach(b=>{const on=b.dataset.s===e.target.id;b.style.background=on?C.cyan+'18':'transparent';b.style.color=on?C.cyan:C.t2})}})},{threshold:.2,rootMargin:'-70px 0px -50% 0px'});
+
+function tag(t,c){return`<span class="tag" style="background:${c}12;border:1px solid ${c}18;color:${c}">${t}</span>`}
+
+document.getElementById('content').innerHTML=`
+
+<!-- CONCEPT -->
+<div class="sec" id="concept">
+  <div style="text-align:center;margin-bottom:24px">
+    <h2 style="font-size:30px;font-weight:800;letter-spacing:-.03em">Every AI system in insurance does one thing</h2>
+    <p style="font-size:16px;color:${C.t2};margin-top:6px">Takes data → Runs it through AI → Produces an answer. The difference is: <strong style="color:${C.wh}">can you see inside?</strong></p>
+  </div>
+  <div class="g2" style="gap:20px">
+    <div class="cd bb" style="padding:28px;text-align:center">
+      <div style="font-size:48px;margin-bottom:12px">⬛</div>
+      <div style="font-size:28px;font-weight:900;color:${C.rose};margin-bottom:8px">Black Box AI</div>
+      <div style="font-size:16px;color:${C.t1};line-height:1.7;margin-bottom:16px">Data goes in. Answer comes out.<br><strong style="color:${C.rose}">You cannot see why.</strong></div>
+      <div style="padding:16px;border-radius:10px;background:${C.rose}06;border:1px solid ${C.rose}12">
+        <div style="display:flex;align-items:center;justify-content:center;gap:12px">
+          <div style="padding:10px 16px;border-radius:8px;background:${C.cd};font-size:13px;font-weight:600">Policy Data</div>
+          <span style="color:${C.t3}">→</span>
+          <div style="padding:10px 16px;border-radius:8px;background:${C.rose}14;border:1px solid ${C.rose}22;font-size:13px;font-weight:700;color:${C.rose}">🔒 Proprietary AI</div>
+          <span style="color:${C.t3}">→</span>
+          <div style="padding:10px 16px;border-radius:8px;background:${C.cd};font-size:13px;font-weight:600">"Score: 73"</div>
+        </div>
+      </div>
+      <div style="margin-top:14px;font-size:13px;color:${C.t2}">
+        Why 73? Which data mattered? What would change the score?<br>
+        <strong style="color:${C.rose}">Nobody knows. Not even the vendor.</strong>
+      </div>
+    </div>
+    <div class="cd gb" style="padding:28px;text-align:center">
+      <div style="font-size:48px;margin-bottom:12px">🔍</div>
+      <div style="font-size:28px;font-weight:900;color:${C.green};margin-bottom:8px">Glass Box AI</div>
+      <div style="font-size:16px;color:${C.t1};line-height:1.7;margin-bottom:16px">Data goes in. Answer comes out.<br><strong style="color:${C.green}">You can see everything.</strong></div>
+      <div style="padding:16px;border-radius:10px;background:${C.green}06;border:1px solid ${C.green}12">
+        <div style="display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap">
+          <div style="padding:10px 14px;border-radius:8px;background:${C.cd};font-size:12px;font-weight:600">Policy Data</div>
+          <span style="color:${C.t3}">→</span>
+          <div style="padding:8px 12px;border-radius:8px;background:${C.green}08;border:1px solid ${C.green}14;font-size:11px;color:${C.green}" class="mn">Executor</div>
+          <span style="color:${C.t3}">+</span>
+          <div style="padding:8px 12px;border-radius:8px;background:${C.violet}08;border:1px solid ${C.violet}14;font-size:11px;color:${C.violet}" class="mn">RAG</div>
+          <span style="color:${C.t3}">→</span>
+          <div style="padding:8px 12px;border-radius:8px;background:${C.orange}08;border:1px solid ${C.orange}14;font-size:11px;color:${C.orange}" class="mn">Analyst</div>
+          <span style="color:${C.t3}">→</span>
+          <div style="padding:8px 12px;border-radius:8px;background:${C.pink}08;border:1px solid ${C.pink}14;font-size:11px;color:${C.pink}" class="mn">Sentinel ✓</div>
+          <span style="color:${C.t3}">→</span>
+          <div style="padding:10px 14px;border-radius:8px;background:${C.cd};font-size:12px;font-weight:600">"Refer — here's why"</div>
+        </div>
+      </div>
+      <div style="margin-top:14px;font-size:13px;color:${C.t2}">
+        Which data? <span style="color:${C.green}">Shown.</span> Which rules? <span style="color:${C.green}">Cited.</span> Why this answer? <span style="color:${C.green}">Explained.</span><br>
+        <strong style="color:${C.green}">Everyone can verify. Everyone can trust.</strong>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- REAL WORLD EXAMPLES -->
+<div class="sec" id="realworld">
+  <div style="text-align:center;margin-bottom:24px">
+    <h2 style="font-size:30px;font-weight:800;letter-spacing:-.03em">Black Box AI in the Wild — Real Examples</h2>
+    <p style="font-size:16px;color:${C.t2};margin-top:6px">These aren't hypotheticals. These happened.</p>
+  </div>
+
+  ${[
+    {company:'United Healthcare',year:'2023-2024',what:'AI system (naviHealth) used to deny post-acute care claims. System had 90% error rate on appeal — meaning 90% of AI denials were wrong.',impact:'Class action lawsuit. Congressional investigation. CEO assassination linked to public anger over AI denials. Massive reputational damage.',lesson:'AI made decisions without explanation. Patients couldn\'t understand why they were denied. Doctors couldn\'t challenge the logic. The "why" was locked inside.',ic:'🏥',c:C.rose},
+    {company:'Lemonade Insurance',year:'2021',what:'CEO tweeted that their AI "collects 1,600 data points" and uses facial recognition in claims processing. Public outcry over opaque AI scoring of claimants.',impact:'Stock dropped. Regulatory scrutiny increased. Company had to publicly walk back claims about their AI. Trust eroded with consumers.',lesson:'Even mentioning black-box AI without explaining it destroyed trust. The more data points ≠ the more trustworthy. Transparency does.',ic:'🍋',c:C.amber},
+    {company:'Allstate / Arity',year:'2024',what:'AI telematics-based pricing model accused of discriminatory impact. Algorithmic pricing raised rates in minority neighborhoods. Model internals not disclosed.',impact:'Multiple state investigations. NAIC cited as reason for AI governance bulletin. Regulators demanded model explainability.',lesson:'When the model is a black box, you can\'t prove it\'s NOT discriminatory. The burden of proof shifts to the insurer — and they can\'t meet it without transparency.',ic:'🚗',c:C.violet},
+    {company:'Verisk / ISO',year:'2022-ongoing',what:'Traditional insurance scoring models (ISO ClaimSearch, risk scores) operate as proprietary black boxes. Insurers USE the scores but can\'t explain HOW they were derived.',impact:'Growing regulatory pushback. Colorado SB 21-169 requires insurers to test AI for bias — but how do you test a score you can\'t inspect?',lesson:'Even trusted industry incumbents face the transparency problem. A score without an explanation is a liability in the new regulatory environment.',ic:'📊',c:C.blue},
+    {company:'Ping An (China)',year:'2020-present',what:'World\'s largest insurer by customers uses AI for everything: facial micro-expression analysis for fraud detection, AI-only claims processing, automated underwriting.',impact:'Used as a cautionary example by Western regulators. NAIC specifically referenced opaque AI systems in Asian markets when drafting the Model Bulletin.',lesson:'Scale + Black Box = existential regulatory risk. The bigger you get, the more scrutiny. Without explainability, growth becomes a liability.',ic:'🏦',c:C.orange},
+  ].map(ex=>`
+  <div class="cd" style="border-color:${ex.c}14;margin-bottom:14px">
+    <div style="display:flex;align-items:flex-start;gap:16px">
+      <span style="font-size:36px;flex-shrink:0">${ex.ic}</span>
+      <div style="flex:1">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">
+          <span style="font-size:20px;font-weight:800;color:${ex.c}">${ex.company}</span>
+          ${tag(ex.year,ex.c)}
+          ${tag('BLACK BOX FAILURE',C.rose)}
+        </div>
+        <div style="font-size:14px;color:${C.t1};line-height:1.7;margin-bottom:10px"><strong>What happened:</strong> ${ex.what}</div>
+        <div style="font-size:14px;color:${C.t1};line-height:1.7;margin-bottom:10px"><strong>Impact:</strong> ${ex.impact}</div>
+        <div style="padding:10px 14px;border-radius:8px;background:${ex.c}06;border:1px dashed ${ex.c}14">
+          <span style="font-size:13px;color:${ex.c};font-weight:600">💡 Lesson: </span>
+          <span style="font-size:13px;color:${C.t1}">${ex.lesson}</span>
+        </div>
+      </div>
+    </div>
+  </div>`).join('')}
+</div>
+
+<!-- SAME QUESTION TWO SYSTEMS -->
+<div class="sec" id="samequestion">
+  <div style="text-align:center;margin-bottom:24px">
+    <h2 style="font-size:30px;font-weight:800;letter-spacing:-.03em">Same Question. Two Systems.</h2>
+    <p style="font-size:16px;color:${C.t2};margin-top:6px">Underwriter asks: <strong style="color:${C.wh}">"Should I renew Titan Construction?"</strong></p>
+  </div>
+
+  <div class="step-row">
+    <div class="cd bb" style="padding:20px">
+      <div style="font-size:16px;font-weight:800;color:${C.rose};margin-bottom:12px">⬛ Black Box Response</div>
+      <div style="padding:20px;border-radius:10px;background:${C.sf};margin-bottom:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <span style="font-size:14px;color:${C.t2}">Risk Assessment</span>
+          <span style="font-size:24px;font-weight:900;color:${C.rose}" class="mn">Score: 27/100</span>
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:16px">
+          <div style="padding:8px 14px;border-radius:6px;background:${C.rose}14;font-size:13px;font-weight:700;color:${C.rose}">HIGH RISK</div>
+          <div style="padding:8px 14px;border-radius:6px;background:${C.rose}08;font-size:13px;color:${C.t2}">Recommend: Non-Renew</div>
+        </div>
+        <div style="font-size:14px;color:${C.t2};line-height:1.6;font-style:italic">"Based on our proprietary risk model analysis, this account exhibits elevated risk characteristics. The AI confidence in this assessment is high."</div>
+      </div>
+      <div style="font-size:14px;color:${C.t1};line-height:1.7;margin-bottom:10px"><strong style="color:${C.rose}">What the underwriter is thinking:</strong></div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        ${['"Why 27? What drove the score?"','"Which data points mattered most?"','"What would it take to make this a 50?"','"Can I explain this to the broker?"','"If the insured disputes, what do I show them?"','"In an audit, how do I justify this?"'].map(q=>`
+        <div style="padding:6px 12px;border-radius:6px;background:${C.rose}06;font-size:13px;color:${C.rose}">❓ ${q}</div>`).join('')}
+      </div>
+      <div style="margin-top:12px;padding:10px 14px;border-radius:8px;background:${C.rose}08;text-align:center">
+        <span style="font-size:14px;font-weight:700;color:${C.rose}">Answer to all: "We don't know."</span>
+      </div>
+    </div>
+    <div class="vs">VS</div>
+    <div class="cd gb" style="padding:20px">
+      <div style="font-size:16px;font-weight:800;color:${C.green};margin-bottom:12px">🔍 Glass Box Response</div>
+      <div style="padding:20px;border-radius:10px;background:${C.sf};margin-bottom:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <span style="font-size:14px;color:${C.t2}">Recommendation</span>
+          <div style="display:flex;gap:8px">
+            <span style="padding:6px 12px;border-radius:6px;background:${C.rose}14;font-size:13px;font-weight:700;color:${C.rose}">REFER FOR DECLINE</span>
+            <span style="padding:6px 12px;border-radius:6px;background:${C.amber}10;font-size:13px;font-weight:600;color:${C.amber}" class="mn">87/100</span>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:14px">
+          ${[{l:'Loss Ratio',v:'195%',c:C.rose},{l:'Claims',v:'5 / $142K',c:C.rose},{l:'Credit',v:'38 ↓',c:C.rose},{l:'Zone TIV',v:'97% of limit',c:C.amber}].map(k=>`
+          <div style="padding:8px;border-radius:6px;background:${k.c}08;text-align:center">
+            <div style="font-size:16px;font-weight:900;color:${k.c}" class="mn">${k.v}</div>
+            <div style="font-size:10px;color:${C.t2}" class="mn">${k.l}</div>
+          </div>`).join('')}
+        </div>
+        <div style="font-size:13px;color:${C.t1};line-height:1.7">Loss ratio at 195% breaches UW-003 threshold of 150%. Five claims totaling $142K with frequency 2.3× benchmark. FEMA zone upgraded to AE. Credit score 38, below UW-009 threshold. Zone US-TX-003 at 97% of $7M TIV limit. Previously declined (DEC-2024-003) for same pattern.</div>
+      </div>
+      <div style="font-size:14px;color:${C.t1};line-height:1.7;margin-bottom:10px"><strong style="color:${C.green}">What the underwriter is thinking:</strong></div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        ${[{q:'Why decline?',a:'4 guideline breaches — I can see each one'},{q:'Which data?',a:'Claims table, zone accumulation, FEMA flood, D&B credit — all listed'},{q:'What would change this?',a:'If LR dropped below 80% and credit improved above 55'},{q:'Can I explain to broker?',a:'Yes — copy the evidence panel and send it'},{q:'If insured disputes?',a:'Show them the cited guidelines and data sources'},{q:'Audit justification?',a:'Full audit trail — every data point, every guideline, every step'}].map(q=>`
+        <div style="padding:6px 12px;border-radius:6px;background:${C.green}06;font-size:13px">
+          <span style="color:${C.green};font-weight:600">✓ ${q.q}</span>
+          <span style="color:${C.t1};margin-left:6px">→ ${q.a}</span>
+        </div>`).join('')}
+      </div>
+      <div style="margin-top:12px;padding:10px 14px;border-radius:8px;background:${C.green}08;text-align:center">
+        <span style="font-size:14px;font-weight:700;color:${C.green}">Every question answered. Every number sourced.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- HOW EACH WORKS INSIDE -->
+<div class="sec" id="flow">
+  <div style="text-align:center;margin-bottom:24px">
+    <h2 style="font-size:30px;font-weight:800;letter-spacing:-.03em">How Each Works Inside</h2>
+    <p style="font-size:16px;color:${C.t2};margin-top:6px">Follow the data through both systems</p>
+  </div>
+
+  ${[
+    {step:'1. Data Input',
+     bb:{t:'Data sent to vendor cloud',d:'Your policy data uploaded to vendor\'s servers. Commingled with other clients\' data. You don\'t know what other data sources they mix in. Feature engineering is proprietary.',items:['Your data leaves your control','Mixed with unknown external data','Feature selection is hidden','You don\'t know what variables matter']},
+     gb:{t:'Data stays in YOUR database',d:'RiskMind connects to your database (SQLite/Aurora) with read-only access. Data never leaves your environment. Every table, column, and join path is visible in SchemaReader.',items:['Data never leaves your infrastructure','Read-only connection — can\'t modify','SchemaReader shows every table and column used','Third-party data pre-ingested and visible']}},
+    {step:'2. Processing',
+     bb:{t:'Proprietary algorithm runs',d:'A trained model (neural network, gradient boosted trees, or ensemble) processes hundreds to thousands of features. Weight assignments are opaque. No one — including the vendor — can fully explain why a specific input changed the output by a specific amount.',items:['Model weights are opaque','Thousands of features, unknown importance','Non-linear interactions — impossible to trace','Even vendor can\'t explain individual decisions']},
+     gb:{t:'9 specialized agents, each visible',d:'Cortex maps language. Orchestrator plans. SchemaReader maps data. CacheLayer checks history. Executor runs deterministic SQL. RAG retrieves guidelines. Analyst writes narrative. Sentinel validates. GlassBox assembles evidence. Every step is logged.',items:['Each agent has one clear job','Executor runs SQL you can inspect','RAG retrieval shows similarity scores','Only ONE agent (Analyst) calls the LLM']}},
+    {step:'3. AI Reasoning',
+     bb:{t:'AI generates the answer directly',d:'The model produces a score or classification from your raw data. The AI IS the computation — it takes data in and produces a number. There\'s no separation between data processing and AI reasoning.',items:['AI generates numbers from raw data','No separation between compute and reasoning','Hallucinated numbers indistinguishable from real','No validation layer before output']},
+     gb:{t:'AI only reads pre-computed findings',d:'All numbers are computed by deterministic code (Executor) BEFORE the LLM sees anything. The LLM receives 30-60 pre-computed summary rows + retrieved guidelines. It writes the narrative. It CANNOT generate numbers — only describe them.',items:['All numbers from deterministic SQL — not AI','LLM sees only pre-computed results','LLM writes narrative, doesn\'t compute','Hallucinated numbers caught by Sentinel']}},
+    {step:'4. Output',
+     bb:{t:'A score. Maybe a category.',d:'"Risk Score: 27/100. Classification: High Risk. Recommendation: Non-Renew." No explanation of which factors drove the score. No guideline citations. No evidence trail. No audit log of the AI\'s internal reasoning.',items:['Single score or category','No explanation of factors','No guideline references','No audit trail of reasoning','Can\'t reproduce the result']},
+     gb:{t:'Narrative + evidence + citations + confidence + audit',d:'Full analysis with KPI cards showing actual numbers, narrative citing specific guidelines, evidence panel showing every data source, confidence score with explanation, and immutable audit log capturing the entire pipeline execution.',items:['KPI cards with actual computed numbers','Narrative citing specific guidelines by ID','Evidence panel — tables, filters, row counts','Confidence score with breakdown','Full audit trail — reproducible']}},
+  ].map(s=>`
+    <div style="margin-bottom:6px;text-align:center">
+      <span style="font-size:14px;font-weight:800;color:${C.cyan}" class="mn">${s.step.toUpperCase()}</span>
+    </div>
+    <div class="step-row">
+      <div class="cd bb">
+        <div style="font-size:15px;font-weight:700;color:${C.rose};margin-bottom:8px">⬛ ${s.bb.t}</div>
+        <div style="font-size:13px;color:${C.t1};line-height:1.6;margin-bottom:10px">${s.bb.d}</div>
+        ${s.bb.items.map(i=>`<div style="display:flex;align-items:center;gap:6px;padding:3px 0"><span style="color:${C.rose}">✗</span><span style="font-size:12px;color:${C.t2}">${i}</span></div>`).join('')}
+      </div>
+      <div class="vs">VS</div>
+      <div class="cd gb">
+        <div style="font-size:15px;font-weight:700;color:${C.green};margin-bottom:8px">🔍 ${s.gb.t}</div>
+        <div style="font-size:13px;color:${C.t1};line-height:1.6;margin-bottom:10px">${s.gb.d}</div>
+        ${s.gb.items.map(i=>`<div style="display:flex;align-items:center;gap:6px;padding:3px 0"><span style="color:${C.green}">✓</span><span style="font-size:12px;color:${C.t1}">${i}</span></div>`).join('')}
+      </div>
+    </div>
+  `).join('')}
+</div>
+
+<!-- AUDIT TEST -->
+<div class="sec" id="audit">
+  <div style="text-align:center;margin-bottom:24px">
+    <h2 style="font-size:30px;font-weight:800;letter-spacing:-.03em">The Audit Test</h2>
+    <p style="font-size:16px;color:${C.t2};margin-top:6px">Auditor asks: "Why was Titan Construction non-renewed?"</p>
+  </div>
+  <div class="step-row">
+    <div class="cd bb" style="padding:24px">
+      <div style="font-size:18px;font-weight:800;color:${C.rose};margin-bottom:14px">⬛ Black Box Audit Response</div>
+      <div style="padding:16px;border-radius:10px;background:${C.sf};margin-bottom:14px">
+        <div style="font-size:14px;color:${C.t1};line-height:1.8">
+          <strong>Auditor:</strong> "Why was this policy non-renewed?"<br><br>
+          <strong>Underwriter:</strong> "The AI system flagged it as high risk. Score was 27."<br><br>
+          <strong>Auditor:</strong> "What data drove that score?"<br><br>
+          <strong>Underwriter:</strong> "I... don't have visibility into the model's factors."<br><br>
+          <strong>Auditor:</strong> "Did you apply company underwriting guidelines?"<br><br>
+          <strong>Underwriter:</strong> "The AI recommendation aligned with our general appetite. I used my judgment."<br><br>
+          <strong>Auditor:</strong> "Show me the documentation."<br><br>
+          <strong>Underwriter:</strong> "I have the score screenshot and my notes."
+        </div>
+      </div>
+      <div style="padding:12px 16px;border-radius:8px;background:${C.rose}08;border:1px dashed ${C.rose}14">
+        <div style="font-size:14px;font-weight:700;color:${C.rose};margin-bottom:6px">Audit Finding: DEFICIENCY</div>
+        <div style="font-size:13px;color:${C.t1};line-height:1.6">"Insufficient documentation of AI-assisted decision. Unable to verify that company underwriting guidelines were consistently applied. Recommendation: Implement explainable AI framework per NAIC Model Bulletin."</div>
+      </div>
+    </div>
+    <div class="vs">VS</div>
+    <div class="cd gb" style="padding:24px">
+      <div style="font-size:18px;font-weight:800;color:${C.green};margin-bottom:14px">🔍 Glass Box Audit Response</div>
+      <div style="padding:16px;border-radius:10px;background:${C.sf};margin-bottom:14px">
+        <div style="font-size:14px;color:${C.t1};line-height:1.8">
+          <strong>Auditor:</strong> "Why was this policy non-renewed?"<br><br>
+          <strong>Underwriter:</strong> "Let me pull up the Glass Box trail."<br><br>
+          <em style="color:${C.green}">[Opens audit log — shows full pipeline execution from Feb 19]</em><br><br>
+          "Four guideline breaches: UW-003 loss ratio at 195% exceeds 150% threshold. Section 4.3.1 zone concentration at 97%. Section 4.4.1 credit score 38 below 40 threshold. Section 4.2.2 flood zone upgraded with no sublimit."<br><br>
+          <strong>Auditor:</strong> "Were past decisions considered?"<br><br>
+          <strong>Underwriter:</strong> "Yes — the system retrieved decision DEC-2024-003 showing we previously declined this account for the same pattern. That's cited in the evidence panel."<br><br>
+          <strong>Auditor:</strong> "Show me the data sources."<br><br>
+          <strong>Underwriter:</strong> "Here — policies table, claims table, zone accumulation, FEMA flood data, D&B credit report. Row counts, query timestamps, everything."
+        </div>
+      </div>
+      <div style="padding:12px 16px;border-radius:8px;background:${C.green}08;border:1px dashed ${C.green}14">
+        <div style="font-size:14px;font-weight:700;color:${C.green};margin-bottom:6px">Audit Finding: COMPLIANT</div>
+        <div style="font-size:13px;color:${C.t1};line-height:1.6">"AI-assisted decision fully documented. Underwriting guidelines consistently applied with specific citations. Data sources traceable. Decision rationale clear and reproducible. No deficiencies noted."</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- REGULATOR TEST -->
+<div class="sec" id="regulator">
+  <div style="text-align:center;margin-bottom:24px">
+    <h2 style="font-size:30px;font-weight:800;letter-spacing:-.03em">The Regulator Test</h2>
+    <p style="font-size:16px;color:${C.t2};margin-top:6px">State DOI asks: "Explain how your AI affects consumer decisions."</p>
+  </div>
+  <div class="step-row">
+    <div class="cd bb" style="padding:24px">
+      <div style="font-size:18px;font-weight:800;color:${C.rose};margin-bottom:14px">⬛ Black Box Answer</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${['"Our AI uses advanced machine learning to assess risk."','"The model was trained on millions of historical data points."','"We regularly validate model performance against benchmarks."','"The specific model architecture is proprietary intellectual property."','"We can provide aggregate model performance statistics."','"Individual prediction explanations are not available due to model complexity."'].map(q=>`
+        <div style="padding:8px 12px;border-radius:6px;background:${C.rose}06;font-size:13px;color:${C.t1};line-height:1.5">${q}</div>`).join('')}
+      </div>
+      <div style="margin-top:14px;padding:10px 14px;border-radius:8px;background:${C.rose}08;text-align:center">
+        <span style="font-size:13px;font-weight:700;color:${C.rose}">Regulator: "This does not meet NAIC transparency requirements."</span>
+      </div>
+    </div>
+    <div class="vs">VS</div>
+    <div class="cd gb" style="padding:24px">
+      <div style="font-size:18px;font-weight:800;color:${C.green};margin-bottom:14px">🔍 Glass Box Answer</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${[{a:'Here is every data source the AI accesses — policy data, claims, zone accumulation, FEMA flood zones, cat models, credit scores. All listed with provider, update frequency, and last refresh date.',ic:'💾'},
+           {a:'The AI does not generate numbers. All computation is deterministic SQL code that can be inspected and reproduced. The AI only reads pre-computed results and writes narrative.',ic:'⚙️'},
+           {a:'Every response cites specific underwriting guidelines by section code. Here is guideline UW-003 that triggered the loss ratio flag.',ic:'📜'},
+           {a:'Here is the confidence score methodology: data coverage × guideline match × historical consistency. Scored 87/100 on this decision.',ic:'🎯'},
+           {a:'Here is the full audit trail — query, intent classification, functions executed, AI prompt, AI response, validation results, user action. Timestamped and immutable.',ic:'📋'},
+           {a:'Here is the Sentinel validation report showing every number in the AI response was cross-checked against the Executor computation. Zero discrepancies.',ic:'🛡️'}
+        ].map(q=>`
+        <div style="padding:8px 12px;border-radius:6px;background:${C.green}06;font-size:13px;color:${C.t1};line-height:1.5;display:flex;gap:8px;align-items:flex-start">
+          <span style="font-size:16px;flex-shrink:0">${q.ic}</span><span>${q.a}</span>
+        </div>`).join('')}
+      </div>
+      <div style="margin-top:14px;padding:10px 14px;border-radius:8px;background:${C.green}08;text-align:center">
+        <span style="font-size:13px;font-weight:700;color:${C.green}">Regulator: "This is the level of transparency we expect."</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TRUST TEST -->
+<div class="sec" id="trust">
+  <div style="text-align:center;margin-bottom:24px">
+    <h2 style="font-size:30px;font-weight:800;letter-spacing:-.03em">The Trust Test</h2>
+    <p style="font-size:16px;color:${C.t2};margin-top:6px">Will people actually USE it? Trust determines adoption.</p>
+  </div>
+  <div class="g3">
+    ${[{role:'Underwriter',question:'Will I trust AI to help me make decisions?',
+      bb:'I\'m told to follow the score but I can\'t see why. I\'m rubber-stamping an algorithm. If it\'s wrong, I get blamed. I stop using it.',
+      gb:'I can see every number, every guideline, every data source. I can challenge it. I can override it. It makes me faster AND smarter. I use it every day.',ic:'👤'},
+     {role:'CUO / Risk Manager',question:'Can I trust that guidelines are being followed?',
+      bb:'I set guidelines but I have no way to verify the AI follows them. The score is a black box. I\'m trusting the vendor, not the system.',
+      gb:'Every response cites the specific guidelines applied. I can audit any decision and see which rules triggered. My guidelines are enforced consistently across every underwriter.',ic:'👔'},
+     {role:'Broker / Customer',question:'Can I understand why my renewal was declined?',
+      bb:'"Your risk score was 27." That\'s it. I can\'t advocate for my client. I can\'t explain what to improve. I switch carriers out of frustration.',
+      gb:'"Here are the 4 specific factors: loss ratio at 195%, credit score declining, zone concentration, flood zone upgrade. If you address the loss ratio and credit, we can reconsider." I can work with that.',ic:'🤝'}
+    ].map(p=>`
+    <div class="cd" style="border-color:${C.cyan}14;padding:22px">
+      <div style="font-size:24px;margin-bottom:8px">${p.ic}</div>
+      <div style="font-size:16px;font-weight:800;color:${C.cyan};margin-bottom:4px">${p.role}</div>
+      <div style="font-size:13px;color:${C.t2};margin-bottom:14px;font-style:italic">"${p.question}"</div>
+      <div style="padding:12px;border-radius:8px;background:${C.rose}06;border:1px solid ${C.rose}10;margin-bottom:10px">
+        <div style="font-size:11px;font-weight:700;color:${C.rose};margin-bottom:4px" class="mn">⬛ BLACK BOX</div>
+        <div style="font-size:13px;color:${C.t1};line-height:1.5">${p.bb}</div>
+      </div>
+      <div style="padding:12px;border-radius:8px;background:${C.green}06;border:1px solid ${C.green}10">
+        <div style="font-size:11px;font-weight:700;color:${C.green};margin-bottom:4px" class="mn">🔍 GLASS BOX</div>
+        <div style="font-size:13px;color:${C.t1};line-height:1.5">${p.gb}</div>
+      </div>
+    </div>`).join('')}
+  </div>
+</div>
+
+<!-- NAIC COMPLIANCE -->
+<div class="sec" id="naic">
+  <div style="text-align:center;margin-bottom:24px">
+    <h2 style="font-size:30px;font-weight:800;letter-spacing:-.03em">NAIC Model Bulletin Compliance</h2>
+    <p style="font-size:16px;color:${C.t2};margin-top:6px">23 states + DC have adopted these requirements. How does each approach fare?</p>
+  </div>
+  <div class="cd" style="border-color:${C.cyan}14;padding:6px">
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead>
+        <tr style="border-bottom:2px solid ${C.bd}">
+          <th style="text-align:left;padding:14px 16px;color:${C.cyan};font-weight:700">NAIC Requirement</th>
+          <th style="text-align:center;padding:14px 16px;color:${C.rose};font-weight:700;width:200px">⬛ Black Box</th>
+          <th style="text-align:center;padding:14px 16px;color:${C.green};font-weight:700;width:200px">🔍 Glass Box</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${[{req:'Explain AI outcomes to consumers',bb:'Cannot explain individual decisions',gb:'Every factor cited with evidence'},
+           {req:'Explain AI outcomes to regulators',bb:'Aggregate statistics only',gb:'Full audit trail per decision'},
+           {req:'Human oversight of AI decisions',bb:'Human rubber-stamps a score',gb:'Human reviews evidence, applies judgment'},
+           {req:'Test AI for unfair discrimination',bb:'Can\'t inspect model features',gb:'All dimensions visible and auditable'},
+           {req:'Third-party AI vendor oversight',bb:'Vendor says "trust our model"',gb:'Full pipeline transparency'},
+           {req:'Data quality and governance',bb:'Unknown what data is used',gb:'Every source, table, column documented'},
+           {req:'Consumer notification',bb:'No explanation available to share',gb:'Glass Box evidence exportable'}
+        ].map((r,i)=>`
+        <tr style="border-bottom:1px solid ${C.bd}">
+          <td style="padding:12px 16px;color:${C.t1}">${r.req}</td>
+          <td style="padding:12px 16px;text-align:center;background:${C.rose}04"><span style="color:${C.rose};font-weight:600">❌ ${r.bb}</span></td>
+          <td style="padding:12px 16px;text-align:center;background:${C.green}04"><span style="color:${C.green};font-weight:600">✅ ${r.gb}</span></td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- SUMMARY -->
+<div class="sec" id="summary">
+  <div style="text-align:center;margin-bottom:24px">
+    <h2 style="font-size:30px;font-weight:800;letter-spacing:-.03em">The Verdict</h2>
+  </div>
+  <div class="g2" style="gap:20px;margin-bottom:24px">
+    <div class="cd bb" style="padding:28px;text-align:center">
+      <div style="font-size:48px;margin-bottom:12px">⬛</div>
+      <div style="font-size:24px;font-weight:900;color:${C.rose};margin-bottom:14px">Black Box</div>
+      ${['Can\'t explain decisions','Can\'t pass audits','Can\'t satisfy regulators','Can\'t build user trust','Can\'t detect bias','Can\'t prove compliance','Can\'t justify to consumers'].map(p=>`
+      <div style="padding:6px 0;font-size:14px;color:${C.t2}"><span style="color:${C.rose};margin-right:6px">✗</span>${p}</div>`).join('')}
+      <div style="margin-top:16px;padding:10px 16px;border-radius:8px;background:${C.rose}08">
+        <span style="font-size:14px;font-weight:700;color:${C.rose}">A liability in the NAIC era</span>
+      </div>
+    </div>
+    <div class="cd gb" style="padding:28px;text-align:center">
+      <div style="font-size:48px;margin-bottom:12px">🔍</div>
+      <div style="font-size:24px;font-weight:900;color:${C.green};margin-bottom:14px">Glass Box</div>
+      ${['Every decision fully explained','Audit-ready from day one','Regulator-ready by architecture','Users trust what they can verify','Bias detectable and addressable','Compliance documented automatically','Consumer explanations built-in'].map(p=>`
+      <div style="padding:6px 0;font-size:14px;color:${C.t1}"><span style="color:${C.green};margin-right:6px">✓</span>${p}</div>`).join('')}
+      <div style="margin-top:16px;padding:10px 16px;border-radius:8px;background:${C.green}08">
+        <span style="font-size:14px;font-weight:700;color:${C.green}">Built for the NAIC era</span>
+      </div>
+    </div>
+  </div>
+  <div style="text-align:center;padding:24px;border-radius:14px;background:${C.sf};border:1px solid ${C.bd}">
+    <div style="font-size:24px;font-weight:900;color:${C.wh};margin-bottom:8px">The question isn't "AI or no AI"</div>
+    <div style="font-size:18px;color:${C.cyan};font-weight:700;margin-bottom:6px">It's: can you see inside?</div>
+    <div style="font-size:15px;color:${C.t2};margin-bottom:16px">Regulators are mandating it. Auditors are requiring it. Underwriters are demanding it.</div>
+    <div style="display:flex;justify-content:center;gap:20px;flex-wrap:wrap">
+      <div style="padding:12px 24px;border-radius:10px;background:${C.green}10;border:1px solid ${C.green}20">
+        <span style="font-size:16px;font-weight:800;color:${C.green}">AI recommends. Underwriter decides. Glass Box proves why.</span>
+      </div>
+    </div>
+  </div>
+  <div style="text-align:center;margin-top:28px;padding:16px 0;border-top:1px solid ${C.bd}">
+    <div style="font-size:13px;color:${C.t3}" class="mn">RiskMind · Glass Box AI · Confidential</div>
+  </div>
+</div>
+`;
+
+document.querySelectorAll('.sec').forEach(s=>obs.observe(s));
+</script>
+</body>
+</html>

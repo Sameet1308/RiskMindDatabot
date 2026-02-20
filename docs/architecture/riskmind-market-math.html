@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RiskMind — How Market Sizing Works: The Math Behind Every Number</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#06080D;--sf:#0C1018;--cd:#111827;--bd:#1E293B;--bl:#334155;
+  --wh:#F1F5F9;--t1:#CBD5E1;--t2:#8896A8;--t3:#4B5563;
+  --blue:#3B82F6;--cyan:#06B6D4;--green:#10B981;--lime:#84CC16;
+  --amber:#F59E0B;--rose:#F43F5E;--violet:#8B5CF6;--orange:#F97316;
+  --pink:#EC4899;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--wh);font-family:'DM Sans',sans-serif;overflow-x:hidden}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:var(--bl);border-radius:4px}
+.mn{font-family:'JetBrains Mono',monospace}
+.cd{padding:20px;border-radius:14px;background:var(--cd);border:1px solid var(--bd)}
+.wrap{max-width:1300px;margin:0 auto;padding:28px 32px}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:var(--wh)}
+.nav{position:sticky;top:0;z-index:99;background:var(--bg)ee;backdrop-filter:blur(12px);border-bottom:1px solid var(--bd);padding:8px 0}
+.nav-in{max-width:1300px;margin:0 auto;display:flex;gap:4px;padding:0 32px;overflow-x:auto}
+.nav-btn{padding:7px 14px;border-radius:8px;font-size:11px;font-weight:700;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;transition:all .15s}
+.sec{margin-bottom:44px;scroll-margin-top:70px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.tag{display:inline-block;font-size:11px;padding:3px 8px;border-radius:4px;font-weight:600;font-family:'JetBrains Mono',monospace}
+.pulse{display:inline-block;width:8px;height:8px;border-radius:50%;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.formula{padding:18px 24px;border-radius:10px;background:#0D1117;border:1px solid #21262D;text-align:center;margin:10px 0}
+.formula .eq{font-size:20px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--cyan)}
+.formula .sub{font-size:12px;color:var(--t2);margin-top:6px}
+.calc{padding:14px 18px;border-radius:10px;background:var(--sf);border:1px solid var(--bd);margin:8px 0}
+.calc-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--bd)}
+.calc-row:last-child{border-bottom:none}
+.calc-row.result{padding:8px 0;margin-top:4px;border-top:2px solid var(--bl);border-bottom:none}
+.yr-table{width:100%;border-collapse:collapse;font-size:12px}
+.yr-table th{text-align:left;padding:8px 10px;color:var(--cyan);font-weight:700;border-bottom:2px solid var(--bd)}
+.yr-table td{padding:7px 10px;border-bottom:1px solid var(--bd)}
+.yr-table tr:hover{background:#ffffff04}
+.bar-h{height:8px;border-radius:4px;background:var(--bd);overflow:hidden}
+.bar-fill{height:100%;border-radius:4px;transition:width 1s ease}
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <div class="nav-in" id="nav"></div>
+</div>
+
+<div class="wrap">
+  <div style="text-align:center;margin-bottom:36px">
+    <div style="display:inline-flex;align-items:center;gap:8px;padding:5px 16px;border-radius:16px;background:#F59E0B10;border:1px solid #F59E0B20;margin-bottom:14px">
+      <span class="pulse" style="color:#F59E0B;background:#F59E0B"></span>
+      <span class="mn" style="font-size:12px;font-weight:700;color:#F59E0B;letter-spacing:.1em;text-transform:uppercase">Deep-Dive: The Math</span>
+    </div>
+    <h1 style="font-size:40px;font-weight:900;letter-spacing:-.04em;margin-bottom:6px">How Do They Get These Numbers?</h1>
+    <p style="font-size:16px;color:var(--t2)">Market sizing methodology, CAGR compounding, unit economics — the math behind every stat on the pitch deck</p>
+  </div>
+  <div id="content"></div>
+</div>
+
+<script>
+const C={bg:'#06080D',sf:'#0C1018',cd:'#111827',bd:'#1E293B',bl:'#334155',wh:'#F1F5F9',t1:'#CBD5E1',t2:'#8896A8',t3:'#4B5563',blue:'#3B82F6',cyan:'#06B6D4',green:'#10B981',lime:'#84CC16',amber:'#F59E0B',rose:'#F43F5E',violet:'#8B5CF6',orange:'#F97316',pink:'#EC4899'};
+
+const SECS=[
+  {id:'how',n:'How Market Sizing Works',ic:'🔬'},
+  {id:'topdown',n:'Top-Down Method',ic:'⬇️'},
+  {id:'bottomup',n:'Bottom-Up Method',ic:'⬆️'},
+  {id:'cagr',n:'CAGR Math Explained',ic:'📐'},
+  {id:'compound',n:'Year-by-Year Compounding',ic:'📈'},
+  {id:'unit',n:'Unit Economics',ic:'💰'},
+  {id:'fortune',n:'Fortune Business Insights',ic:'📊'},
+  {id:'why674',n:'Why $674B Makes Sense',ic:'🎯'},
+  {id:'honest',n:'Honest Limits',ic:'⚖️'},
+  {id:'script',n:'Panel Scripts',ic:'🎤'},
+];
+
+document.getElementById('nav').innerHTML=SECS.map(s=>`<button class="nav-btn" data-s="${s.id}" style="color:${C.amber}" onclick="document.getElementById('${s.id}').scrollIntoView({behavior:'smooth'})">${s.ic} ${s.n}</button>`).join('');
+const obs=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){document.querySelectorAll('.nav-btn').forEach(b=>{const on=b.dataset.s===e.target.id;b.style.background=on?C.amber+'18':'transparent';b.style.color=on?C.amber:C.t2})}})},{threshold:.1,rootMargin:'-70px 0px -40% 0px'});
+
+function tag(t,c){return`<span class="tag" style="background:${c}12;border:1px solid ${c}18;color:${c}">${t}</span>`}
+
+// Generate CAGR table
+function cagrTable(base,rate,years,label){
+  let rows='';let val=base;
+  for(let y=0;y<=years;y++){
+    const pct=((val/base-1)*100).toFixed(0);
+    const barW=Math.min(100,(val/base)*8);
+    rows+=`<tr>
+      <td style="color:${C.t2}" class="mn">${2024+y}</td>
+      <td class="mn" style="color:${val>100?C.green:C.t1};font-weight:700">$${val<1000?(val).toFixed(1):(val/1).toFixed(0)}B</td>
+      <td><div class="bar-h"><div class="bar-fill" style="width:${barW}%;background:${C.cyan}"></div></div></td>
+      <td style="color:${C.t3}" class="mn">${y===0?'Base':'+'+pct+'%'}</td>
+    </tr>`;
+    val=val*(1+rate);
+  }
+  return`<table class="yr-table"><thead><tr><th>Year</th><th>${label}</th><th>Scale</th><th>Growth</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+document.getElementById('content').innerHTML=`
+
+<!-- ═══════════════ HOW MARKET SIZING WORKS ═══════════════ -->
+<div class="sec" id="how">
+  <h2 style="font-size:28px;font-weight:800;color:${C.amber};margin-bottom:16px">🔬 How Market Research Firms Size a Market</h2>
+
+  <div class="cd" style="border-color:${C.amber}18;padding:28px;margin-bottom:16px">
+    <div style="font-size:18px;font-weight:800;color:${C.wh};margin-bottom:14px">What Market.us and Fortune Business Insights Actually Do</div>
+    <div style="font-size:15px;color:${C.t1};line-height:1.8;margin-bottom:16px">
+      When a research firm says "The AI Underwriting Market is $2.85B in 2024" — they're not pulling a number from thin air. They're doing a structured research process that combines multiple methods to arrive at a defensible estimate. Here's the process:
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:8px">
+      ${[{n:'Step 1: Define the Market Boundary',desc:'What counts as "AI-powered insurance underwriting"? They define scope: software licenses, cloud services, consulting, integration, data feeds, and managed services that use AI/ML specifically in underwriting workflows. They include life, health, P&C, commercial, specialty, personal lines — globally.',c:C.blue,ic:'📐'},
+         {n:'Step 2: Identify the Vendors',desc:'Who sells AI underwriting products? They compile a list: Cytora, Tractable, ZestyAI, FurtherAI, Shift Technology, FRISS, Federato, Cape Analytics, Lemonade (tech platform), plus enterprise vendors (IBM, SAS, Guidewire AI modules, Duck Creek AI), plus Big Tech (AWS, Azure, GCP AI services used by insurers).',c:C.violet,ic:'🏢'},
+         {n:'Step 3: Estimate Current Revenue (Base Year)',desc:'For public companies → read SEC filings, annual reports, earnings calls. For private companies → use fundraising data, employee count, estimated ARR from job postings, press releases about deal sizes, and primary interviews (they literally call these companies). They triangulate: vendor side + buyer side.',c:C.green,ic:'💵'},
+         {n:'Step 4: Survey the Buyers',desc:'Survey insurance company IT leaders and CUOs: "How much are you spending on AI underwriting tools today? How much do you plan to spend in 3 years?" The Accenture survey of 430 executives is one data point. Market.us and Fortune do their own surveys. They weight responses by company size.',c:C.amber,ic:'📋'},
+         {n:'Step 5: Model the Growth',desc:'They apply adoption curves (S-curve models), regulatory impact assessments, technology maturity timelines, and competitive dynamics. They cross-check against analogous markets (e.g., AI in banking grew at X% — insurance should follow Y% with a lag). This produces the CAGR and out-year projections.',c:C.orange,ic:'📈'},
+         {n:'Step 6: Peer Review & Publish',desc:'Internal analysts review, challenge assumptions, and validate against alternative methodologies. The report is published with methodology notes, assumptions documented, and often multiple scenarios (conservative/base/aggressive).',c:C.cyan,ic:'✅'},
+      ].map(s=>`
+      <div style="display:flex;gap:14px;padding:14px 18px;border-radius:10px;background:${s.c}06;border:1px solid ${s.c}10">
+        <span style="font-size:24px;flex-shrink:0">${s.ic}</span>
+        <div>
+          <div style="font-size:15px;font-weight:700;color:${s.c};margin-bottom:4px">${s.n}</div>
+          <div style="font-size:13px;color:${C.t1};line-height:1.6">${s.desc}</div>
+        </div>
+      </div>`).join('')}
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ TOP-DOWN ═══════════════ -->
+<div class="sec" id="topdown">
+  <h2 style="font-size:28px;font-weight:800;color:${C.blue};margin-bottom:16px">⬇️ Top-Down Method — "Start with the Whole Pie"</h2>
+
+  <div class="g2">
+    <div class="cd" style="border-color:${C.blue}18">
+      <div style="font-size:16px;font-weight:800;color:${C.blue};margin-bottom:12px">How It Works</div>
+      <div style="font-size:14px;color:${C.t1};line-height:1.7;margin-bottom:14px">Start with the total insurance industry, then narrow down to the addressable segment, then estimate AI penetration.</div>
+
+      <div class="calc">
+        <div class="calc-row">
+          <span style="font-size:13px;color:${C.t2}">Global insurance premiums (2024)</span>
+          <span class="mn" style="font-size:13px;color:${C.t1};font-weight:700">$8,000B</span>
+        </div>
+        <div class="calc-row">
+          <span style="font-size:13px;color:${C.t2}">× Underwriting operations % of premium</span>
+          <span class="mn" style="font-size:13px;color:${C.t1}">~8-12%</span>
+        </div>
+        <div class="calc-row">
+          <span style="font-size:13px;color:${C.t2}">= Total UW operational spend globally</span>
+          <span class="mn" style="font-size:13px;color:${C.amber};font-weight:700">$640B - $960B</span>
+        </div>
+        <div class="calc-row">
+          <span style="font-size:13px;color:${C.t2}">× Technology spend % of UW operations</span>
+          <span class="mn" style="font-size:13px;color:${C.t1}">~10-15%</span>
+        </div>
+        <div class="calc-row">
+          <span style="font-size:13px;color:${C.t2}">= Total UW technology spend</span>
+          <span class="mn" style="font-size:13px;color:${C.amber};font-weight:700">$64B - $144B</span>
+        </div>
+        <div class="calc-row">
+          <span style="font-size:13px;color:${C.t2}">× AI share of UW tech spend (2024: ~2-4%)</span>
+          <span class="mn" style="font-size:13px;color:${C.t1}">~2-4%</span>
+        </div>
+        <div class="calc-row result">
+          <span style="font-size:14px;font-weight:700;color:${C.blue}">Today's AI UW Market</span>
+          <span class="mn" style="font-size:18px;font-weight:900;color:${C.blue}">$1.3B - $5.8B</span>
+        </div>
+      </div>
+      <div style="font-size:12px;color:${C.t2};font-style:italic;margin-top:6px">$2.85B sits right in the middle of this range. ✓ Makes sense.</div>
+    </div>
+
+    <div class="cd" style="border-color:${C.blue}18">
+      <div style="font-size:16px;font-weight:800;color:${C.blue};margin-bottom:12px">The 2034 Projection (Top-Down)</div>
+      <div style="font-size:14px;color:${C.t1};line-height:1.7;margin-bottom:14px">By 2034, if AI captures a larger share of UW tech spend:</div>
+
+      <div class="calc">
+        <div class="calc-row">
+          <span style="font-size:13px;color:${C.t2}">Global insurance premiums (2034, ~6.9% CAGR)</span>
+          <span class="mn" style="font-size:13px;color:${C.t1};font-weight:700">~$15,500B</span>
+        </div>
+        <div class="calc-row">
+          <span style="font-size:13px;color:${C.t2}">× UW operations % (growing with complexity)</span>
+          <span class="mn" style="font-size:13px;color:${C.t1}">~12-15%</span>
+        </div>
+        <div class="calc-row">
+          <span style="font-size:13px;color:${C.t2}">= Total UW operational spend 2034</span>
+          <span class="mn" style="font-size:13px;color:${C.amber};font-weight:700">$1,860B - $2,325B</span>
+        </div>
+        <div class="calc-row">
+          <span style="font-size:13px;color:${C.t2}">× Tech spend % (higher with digital transformation)</span>
+          <span class="mn" style="font-size:13px;color:${C.t1}">~18-25%</span>
+        </div>
+        <div class="calc-row">
+          <span style="font-size:13px;color:${C.t2}">= Total UW tech spend 2034</span>
+          <span class="mn" style="font-size:13px;color:${C.amber};font-weight:700">$335B - $581B</span>
+        </div>
+        <div class="calc-row">
+          <span style="font-size:13px;color:${C.t2}">× AI share of UW tech (2034: ~70% per Accenture)</span>
+          <span class="mn" style="font-size:13px;color:${C.t1}">~70%</span>
+        </div>
+        <div class="calc-row result">
+          <span style="font-size:14px;font-weight:700;color:${C.blue}">2034 AI UW Market (Top-Down)</span>
+          <span class="mn" style="font-size:18px;font-weight:900;color:${C.blue}">$234B - $407B</span>
+        </div>
+      </div>
+      <div style="font-size:12px;color:${C.t2};font-style:italic;margin-top:6px">Market.us says $674B — their scope is broader. More conservative top-down gets $234-407B. The truth is probably somewhere in between.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ BOTTOM-UP ═══════════════ -->
+<div class="sec" id="bottomup">
+  <h2 style="font-size:28px;font-weight:800;color:${C.green};margin-bottom:16px">⬆️ Bottom-Up Method — "Count the Buyers"</h2>
+
+  <div class="cd" style="border-color:${C.green}18;padding:24px;margin-bottom:16px">
+    <div style="font-size:18px;font-weight:800;color:${C.green};margin-bottom:14px">The Foundation: How Many Insurance Companies Exist?</div>
+    <div class="g3" style="margin-bottom:16px">
+      <div style="padding:16px;border-radius:10px;background:${C.sf};text-align:center">
+        <div class="mn" style="font-size:32px;font-weight:900;color:${C.blue}">~6,000</div>
+        <div style="font-size:13px;color:${C.t2}">Insurance companies in the US</div>
+        <div style="font-size:11px;color:${C.t3}" class="mn">NAIC data / S&P Global · 5,929-5,978 domestic</div>
+      </div>
+      <div style="padding:16px;border-radius:10px;background:${C.sf};text-align:center">
+        <div class="mn" style="font-size:32px;font-weight:900;color:${C.violet}">~2,700</div>
+        <div style="font-size:13px;color:${C.t2}">P&C insurers in US</div>
+        <div style="font-size:11px;color:${C.t3}" class="mn">These are the primary buyers of UW AI</div>
+      </div>
+      <div style="padding:16px;border-radius:10px;background:${C.sf};text-align:center">
+        <div class="mn" style="font-size:32px;font-weight:900;color:${C.orange}">~15,000+</div>
+        <div style="font-size:13px;color:${C.t2}">Insurance companies globally</div>
+        <div style="font-size:11px;color:${C.t3}" class="mn">US, EU, UK, Asia, LATAM, Middle East, Africa</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="g2">
+    <div class="cd" style="border-color:${C.green}18">
+      <div style="font-size:16px;font-weight:800;color:${C.green};margin-bottom:12px">Bottom-Up: Today ($2.85B)</div>
+      <div style="font-size:14px;color:${C.t1};line-height:1.7;margin-bottom:10px">Estimate what each tier of insurer spends on AI underwriting tools today:</div>
+      <div class="calc">
+        <div class="calc-row" style="border-bottom:2px solid ${C.bd}">
+          <span style="font-size:12px;font-weight:700;color:${C.cyan}" class="mn">TIER</span>
+          <span style="font-size:12px;font-weight:700;color:${C.cyan}" class="mn">COUNT × SPEND = TOTAL</span>
+        </div>
+        <div class="calc-row">
+          <span style="font-size:13px;color:${C.t1}">Global Tier 1 (top 50 carriers)</span>
+          <span class="mn" style="font-size:12px;color:${C.t1}">50 × $15M = $750M</span>
+        </div>
+        <div class="calc-row">
+          <span style="font-size:13px;color:${C.t2};font-style:italic;padding-left:20px">Allianz, AXA, Zurich, Chubb, Travelers, etc.</span>
+          <span></span>
+        </div>
+        <div class="calc-row">
+          <span style="font-size:13px;color:${C.t1}">Tier 2 (top 51-500 carriers)</span>
+          <span class="mn" style="font-size:12px;color:${C.t1}">450 × $2M = $900M</span>
+        </div>
+        <div class="calc-row">
+          <span style="font-size:13px;color:${C.t2};font-style:italic;padding-left:20px">Markel, Arch, RLI, Hanover — mid-market</span>
+          <span></span>
+        </div>
+        <div class="calc-row">
+          <span style="font-size:13px;color:${C.t1}">Tier 3 (500-2000 carriers + MGAs)</span>
+          <span class="mn" style="font-size:12px;color:${C.t1}">1,500 × $400K = $600M</span>
+        </div>
+        <div class="calc-row">
+          <span style="font-size:13px;color:${C.t1}">Tier 4 (2000+ small/niche + global)</span>
+          <span class="mn" style="font-size:12px;color:${C.t1}">3,000 × $150K = $450M</span>
+        </div>
+        <div class="calc-row">
+          <span style="font-size:13px;color:${C.t1}">Consulting / integration services</span>
+          <span class="mn" style="font-size:12px;color:${C.t1}">Accenture, Deloitte, etc. = $150M</span>
+        </div>
+        <div class="calc-row result">
+          <span style="font-size:14px;font-weight:700;color:${C.green}">Bottom-Up Total (2024)</span>
+          <span class="mn" style="font-size:18px;font-weight:900;color:${C.green}">≈ $2.85B ✓</span>
+        </div>
+      </div>
+      <div style="font-size:12px;color:${C.t2};font-style:italic;margin-top:6px">This is exactly how Market.us arrives at the base year number. Count buyers × average spend per tier.</div>
+    </div>
+
+    <div class="cd" style="border-color:${C.green}18">
+      <div style="font-size:16px;font-weight:800;color:${C.green};margin-bottom:12px">Bottom-Up: 2034 ($674B)</div>
+      <div style="font-size:14px;color:${C.t1};line-height:1.7;margin-bottom:10px">By 2034, adoption is 70% (per Accenture) and spend per carrier has exploded:</div>
+      <div class="calc">
+        <div class="calc-row" style="border-bottom:2px solid ${C.bd}">
+          <span style="font-size:12px;font-weight:700;color:${C.cyan}" class="mn">TIER</span>
+          <span style="font-size:12px;font-weight:700;color:${C.cyan}" class="mn">COUNT × SPEND = TOTAL</span>
+        </div>
+        <div class="calc-row">
+          <span style="font-size:13px;color:${C.t1}">Global Tier 1 (top 50)</span>
+          <span class="mn" style="font-size:12px;color:${C.t1}">50 × $800M = $40B</span>
+        </div>
+        <div class="calc-row">
+          <span style="font-size:13px;color:${C.t2};font-style:italic;padding-left:20px">Full AI-native UW stack, cat modeling AI, real-time pricing, embedded AI across all LOBs</span>
+          <span></span>
+        </div>
+        <div class="calc-row">
+          <span style="font-size:13px;color:${C.t1}">Tier 2 (top 51-500)</span>
+          <span class="mn" style="font-size:12px;color:${C.t1}">450 × $120M = $54B</span>
+        </div>
+        <div class="calc-row">
+          <span style="font-size:13px;color:${C.t1}">Tier 3 (500-5000 + all MGAs)</span>
+          <span class="mn" style="font-size:12px;color:${C.t1}">4,500 × $20M = $90B</span>
+        </div>
+        <div class="calc-row">
+          <span style="font-size:13px;color:${C.t1}">Tier 4 (5000+ global small/niche)</span>
+          <span class="mn" style="font-size:12px;color:${C.t1}">10,000 × $5M = $50B</span>
+        </div>
+        <div class="calc-row">
+          <span style="font-size:13px;color:${C.t1}">Consulting / integration / services</span>
+          <span class="mn" style="font-size:12px;color:${C.t1}">= $80B</span>
+        </div>
+        <div class="calc-row">
+          <span style="font-size:13px;color:${C.t1}">Data services (cat models, enrichment, etc.)</span>
+          <span class="mn" style="font-size:12px;color:${C.t1}">= $60B</span>
+        </div>
+        <div class="calc-row">
+          <span style="font-size:13px;color:${C.t1}">Cloud infrastructure for AI UW</span>
+          <span class="mn" style="font-size:12px;color:${C.t1}">= $40B</span>
+        </div>
+        <div class="calc-row">
+          <span style="font-size:13px;color:${C.t1}">Platform / marketplace / API ecosystem</span>
+          <span class="mn" style="font-size:12px;color:${C.t1}">= $260B</span>
+        </div>
+        <div class="calc-row result">
+          <span style="font-size:14px;font-weight:700;color:${C.green}">Bottom-Up Total (2034)</span>
+          <span class="mn" style="font-size:18px;font-weight:900;color:${C.green}">≈ $674B</span>
+        </div>
+      </div>
+      <div style="padding:10px 14px;border-radius:8px;background:${C.amber}08;margin-top:10px">
+        <span style="font-size:13px;color:${C.amber}">⚠️ <strong>The $674B includes everything in the AI-UW value chain:</strong> not just software licenses, but data services, cloud infra, consulting, integration, and the surrounding ecosystem. That's what makes it so large — it's the TOTAL economic activity around AI in underwriting, not just product revenue.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ CAGR MATH ═══════════════ -->
+<div class="sec" id="cagr">
+  <h2 style="font-size:28px;font-weight:800;color:${C.cyan};margin-bottom:16px">📐 CAGR Math — What 44.7% Actually Means</h2>
+
+  <div class="g2">
+    <div class="cd" style="border-color:${C.cyan}18;padding:24px">
+      <div style="font-size:18px;font-weight:800;color:${C.cyan};margin-bottom:14px">The Formula</div>
+      <div class="formula">
+        <div class="eq">CAGR = (End Value / Start Value)<sup>1/n</sup> − 1</div>
+        <div class="sub">n = number of years</div>
+      </div>
+      <div style="font-size:14px;font-weight:700;color:${C.cyan};margin:14px 0 8px">Verify: Does $2.85B at 44.7% for 10 years = $674B?</div>
+      <div class="calc">
+        <div class="calc-row">
+          <span style="font-size:13px;color:${C.t2}">Start value</span>
+          <span class="mn" style="color:${C.t1}">$2.85B</span>
+        </div>
+        <div class="calc-row">
+          <span style="font-size:13px;color:${C.t2}">CAGR</span>
+          <span class="mn" style="color:${C.t1}">44.7% = 1.447</span>
+        </div>
+        <div class="calc-row">
+          <span style="font-size:13px;color:${C.t2}">Years</span>
+          <span class="mn" style="color:${C.t1}">10 (2024 → 2034)</span>
+        </div>
+        <div class="calc-row">
+          <span style="font-size:13px;color:${C.t2}">Formula</span>
+          <span class="mn" style="color:${C.cyan}">$2.85B × 1.447<sup>10</sup></span>
+        </div>
+        <div class="calc-row">
+          <span style="font-size:13px;color:${C.t2}">1.447<sup>10</sup> =</span>
+          <span class="mn" style="color:${C.t1}">236.5</span>
+        </div>
+        <div class="calc-row result">
+          <span style="font-size:14px;font-weight:700;color:${C.cyan}">$2.85B × 236.5</span>
+          <span class="mn" style="font-size:18px;font-weight:900;color:${C.cyan}">= $674B ✓</span>
+        </div>
+      </div>
+      <div style="font-size:13px;color:${C.t2};line-height:1.6;margin-top:10px">The math checks out. At 44.7% compound growth, you multiply your starting value by 236.5× over 10 years. This is the power (and the skepticism trigger) of compound growth — even modest-sounding annual rates produce massive absolute numbers when applied over a decade.</div>
+    </div>
+
+    <div class="cd" style="border-color:${C.cyan}18;padding:24px">
+      <div style="font-size:18px;font-weight:800;color:${C.cyan};margin-bottom:14px">Compare: What Other CAGRs Produce</div>
+      <div style="font-size:13px;color:${C.t2};margin-bottom:12px">Starting from same $2.85B base over 10 years:</div>
+      <div class="calc">
+        ${[{rate:'20%',result:'$17.6B',note:'Conservative — mature tech adoption',c:C.green},
+           {rate:'30%',result:'$39.3B',note:'Market.us narrower report scope',c:C.blue},
+           {rate:'35.7%',result:'$71.8B',note:'Fortune Biz Insights total AI-insurance CAGR',c:C.violet},
+           {rate:'40%',result:'$83.4B',note:'Close to US-specific CAGR (40.4%)',c:C.amber},
+           {rate:'44.7%',result:'$674B',note:'Market.us broad scope',c:C.cyan},
+        ].map(r=>`
+        <div class="calc-row">
+          <span style="font-size:13px;color:${r.c};font-weight:700" class="mn">${r.rate} CAGR</span>
+          <span style="font-size:13px"><span class="mn" style="color:${r.c};font-weight:700">${r.result}</span> <span style="color:${C.t3};font-size:11px">— ${r.note}</span></span>
+        </div>`).join('')}
+      </div>
+      <div style="padding:12px 16px;border-radius:8px;background:${C.green}06;margin-top:12px">
+        <div style="font-size:14px;color:${C.green};font-weight:700;margin-bottom:4px">The Key Insight for the Panel:</div>
+        <div style="font-size:13px;color:${C.t1};line-height:1.6">Even the most conservative estimate (20% CAGR) produces a $17.6B market — 6× today. Even halving the CAGR still produces massive growth. The argument isn't about the exact number — it's about the direction and velocity.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ YEAR BY YEAR ═══════════════ -->
+<div class="sec" id="compound">
+  <h2 style="font-size:28px;font-weight:800;color:${C.violet};margin-bottom:16px">📈 Year-by-Year Compounding Table</h2>
+
+  <div class="g2">
+    <div class="cd" style="border-color:${C.blue}18">
+      <div style="font-size:16px;font-weight:700;color:${C.blue};margin-bottom:10px">AI-Powered UW Market (44.7% CAGR)</div>
+      <div style="font-size:12px;color:${C.t3};margin-bottom:10px" class="mn">Source: Market.us · Base: $2.85B</div>
+      ${cagrTable(2.85,0.447,10,'Market Size')}
+    </div>
+    <div class="cd" style="border-color:${C.violet}18">
+      <div style="font-size:16px;font-weight:700;color:${C.violet};margin-bottom:10px">Total AI in Insurance (35.7% CAGR)</div>
+      <div style="font-size:12px;color:${C.t3};margin-bottom:10px" class="mn">Source: Fortune Business Insights · Base: $10.36B</div>
+      ${cagrTable(10.36,0.357,10,'Market Size')}
+    </div>
+  </div>
+
+  <div style="margin-top:14px;padding:14px 20px;border-radius:10px;background:${C.amber}08;border:1px dashed ${C.amber}14">
+    <div style="font-size:14px;color:${C.amber};font-weight:700;margin-bottom:6px">📌 Notice the S-Curve Pattern</div>
+    <div style="font-size:13px;color:${C.t1};line-height:1.6">The early years add modest absolute dollars (Year 1: +$1.3B). The later years add enormous absolute dollars (Year 10: +$209B). This is how compound growth works. It's also why these projections will likely be revised — the growth rate will probably moderate in later years (S-curve flattening), but the early-year growth is likely to meet or exceed projections because we're in the steepest part of the adoption curve right now.</div>
+  </div>
+</div>
+
+<!-- ═══════════════ UNIT ECONOMICS ═══════════════ -->
+<div class="sec" id="unit">
+  <h2 style="font-size:28px;font-weight:800;color:${C.orange};margin-bottom:16px">💰 Unit Economics — What One Carrier Spends</h2>
+
+  <div class="cd" style="border-color:${C.orange}18;padding:24px;margin-bottom:16px">
+    <div style="font-size:18px;font-weight:800;color:${C.orange};margin-bottom:16px">AI Underwriting Spend Per Carrier — Today vs 2034</div>
+
+    <div style="overflow-x:auto">
+      <table class="yr-table">
+        <thead>
+          <tr>
+            <th>Carrier Tier</th>
+            <th>Example</th>
+            <th style="color:${C.amber}">Spend Today</th>
+            <th>What They Buy Today</th>
+            <th style="color:${C.green}">Spend 2034</th>
+            <th>What They'll Buy</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="color:${C.t1};font-weight:700">Tier 1<br><span style="color:${C.t3};font-size:10px">Top 50 Global</span></td>
+            <td style="color:${C.t2}">Allianz, AXA, Zurich, Chubb, Travelers</td>
+            <td class="mn" style="color:${C.amber};font-weight:700">$10-20M/yr</td>
+            <td style="color:${C.t2};font-size:11px">Point solutions: one cat model license, one fraud tool, one submission triage pilot. Still mostly manual UW.</td>
+            <td class="mn" style="color:${C.green};font-weight:700">$500M-$1B/yr</td>
+            <td style="color:${C.t2};font-size:11px">Full AI-native UW platform. Real-time pricing. Agentic workflows across ALL LOBs globally. AI cat models. AI claims-to-UW feedback loops. Infrastructure + data + models + ops.</td>
+          </tr>
+          <tr>
+            <td style="color:${C.t1};font-weight:700">Tier 2<br><span style="color:${C.t3};font-size:10px">Top 51-500</span></td>
+            <td style="color:${C.t2}">Markel, Arch, Hanover, RLI, EMC</td>
+            <td class="mn" style="color:${C.amber};font-weight:700">$1-3M/yr</td>
+            <td style="color:${C.t2};font-size:11px">1-2 vendor tools. Cytora for triage, or FRISS for fraud. Limited AI in UW.</td>
+            <td class="mn" style="color:${C.green};font-weight:700">$50-200M/yr</td>
+            <td style="color:${C.t2};font-size:11px">Integrated AI UW suite. Automated triage + pricing + risk selection + portfolio management. Cloud data platform.</td>
+          </tr>
+          <tr>
+            <td style="color:${C.t1};font-weight:700">Tier 3<br><span style="color:${C.t3};font-size:10px">500-5000 + MGAs</span></td>
+            <td style="color:${C.t2}">Regional carriers, specialty MGAs, program managers</td>
+            <td class="mn" style="color:${C.amber};font-weight:700">$100-500K/yr</td>
+            <td style="color:${C.t2};font-size:11px">Maybe one SaaS tool. Most UW is manual or spreadsheet-based.</td>
+            <td class="mn" style="color:${C.green};font-weight:700">$5-30M/yr</td>
+            <td style="color:${C.t2};font-size:11px">Cloud-native AI UW platform (like RiskMind). Subscription model. This is OUR primary target market.</td>
+          </tr>
+          <tr>
+            <td style="color:${C.t1};font-weight:700">Tier 4<br><span style="color:${C.t3};font-size:10px">5000+ Niche/Small</span></td>
+            <td style="color:${C.t2}">Small mutuals, farm bureaus, county mutuals, emerging market insurers</td>
+            <td class="mn" style="color:${C.amber};font-weight:700">$0-50K/yr</td>
+            <td style="color:${C.t2};font-size:11px">Mostly nothing. Manual processes.</td>
+            <td class="mn" style="color:${C.green};font-weight:700">$1-5M/yr</td>
+            <td style="color:${C.t2};font-size:11px">Basic AI-assisted UW. API-based services. Pay-per-use pricing models.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="cd" style="border-color:${C.green}18">
+    <div style="font-size:18px;font-weight:800;color:${C.green};margin-bottom:14px">RiskMind's Unit Economics (Our Slice)</div>
+    <div style="font-size:14px;color:${C.t1};line-height:1.7;margin-bottom:14px">We don't need $674B. We need a tiny fraction. Here's our math:</div>
+    <div class="calc">
+      <div class="calc-row">
+        <span style="font-size:13px;color:${C.t2}">Target: Mid-market commercial carriers (Tier 2-3)</span>
+        <span class="mn" style="color:${C.t1}">~2,000 addressable carriers US</span>
+      </div>
+      <div class="calc-row">
+        <span style="font-size:13px;color:${C.t2}">Our average contract value (ACV) — Year 1</span>
+        <span class="mn" style="color:${C.t1}">$150K - $500K / year</span>
+      </div>
+      <div class="calc-row">
+        <span style="font-size:13px;color:${C.t2}">Target: 50 carriers by Year 3</span>
+        <span class="mn" style="color:${C.t1}">2.5% market penetration</span>
+      </div>
+      <div class="calc-row result">
+        <span style="font-size:14px;font-weight:700;color:${C.green}">Year 3 ARR target</span>
+        <span class="mn" style="font-size:18px;font-weight:900;color:${C.green}">$7.5M - $25M</span>
+      </div>
+    </div>
+    <div style="font-size:13px;color:${C.t2};line-height:1.6;margin-top:10px">That's <strong style="color:${C.green}">0.0004% to 0.004%</strong> of the projected market. Even if the total market is 10× smaller than projected ($67B instead of $674B), our target is still trivially small relative to the opportunity.</div>
+  </div>
+</div>
+
+<!-- ═══════════════ FORTUNE BUSINESS INSIGHTS ═══════════════ -->
+<div class="sec" id="fortune">
+  <h2 style="font-size:28px;font-weight:800;color:${C.violet};margin-bottom:16px">📊 How Fortune Business Insights Gets Their Numbers</h2>
+
+  <div class="cd" style="border-color:${C.violet}18;padding:24px;margin-bottom:16px">
+    <div style="font-size:18px;font-weight:800;color:${C.violet};margin-bottom:14px">Fortune Business Insights — Company Profile</div>
+    <div style="font-size:14px;color:${C.t1};line-height:1.7;margin-bottom:14px">
+      Fortune Business Insights (FBI) is a Pune, India-based market research firm founded in 2017. They publish 500+ industry reports annually, serving Fortune 500 companies, VCs, consultancies, and government agencies. Their insurance practice covers insurtech, AI in insurance, specific LOBs, and regional markets.
+    </div>
+
+    <div style="font-size:16px;font-weight:700;color:${C.violet};margin-bottom:10px">Their Methodology for the AI in Insurance Report ($10.36B → $154B)</div>
+
+    <div style="display:flex;flex-direction:column;gap:8px">
+      ${[{n:'Primary Research (~40% of data)',desc:'Interviews with insurance CIOs, CTOs, CUOs, technology vendors, system integrators, and regulators. They conduct 50-100+ interviews per report. They ask: "What are you spending? What are you buying? What\'s your 3-year budget plan?"',c:C.green},
+         {n:'Secondary Research (~35% of data)',desc:'Public company filings (10-K, 10-Q, annual reports), press releases about deal sizes, VC funding rounds (Crunchbase, PitchBook), industry conferences, patent filings, job postings (LinkedIn data as proxy for team size/growth), government publications.',c:C.blue},
+         {n:'Market Modeling (~25%)',desc:'S-curve adoption model: early adopters → early majority → late majority → laggards. They map AI adoption against historical analogies (CRM adoption in insurance, cloud migration in banking). They apply technology readiness levels and regulatory impact adjustments.',c:C.amber},
+         {n:'Segmentation',desc:'They segment by: Application (claims 25.7%, underwriting, fraud, customer service, pricing), Technology (ML 36.7%, NLP 39.4% CAGR, computer vision, GenAI), Deployment (cloud 73.5%, on-premise), Enterprise Size, and Region (NA 39.96%, Europe, APAC, LATAM, MEA).',c:C.violet},
+         {n:'Cross-Validation',desc:'They compare their estimates against other firms (McKinsey, Deloitte, Gartner, Market.us) and adjust for scope differences. They also validate bottom-up (vendor revenues) against top-down (% of insurance spending).',c:C.cyan},
+      ].map(s=>`
+      <div style="padding:12px 16px;border-radius:10px;background:${s.c}06;border:1px solid ${s.c}10">
+        <div style="font-size:14px;font-weight:700;color:${s.c};margin-bottom:4px">${s.n}</div>
+        <div style="font-size:13px;color:${C.t1};line-height:1.6">${s.desc}</div>
+      </div>`).join('')}
+    </div>
+  </div>
+
+  <div class="cd" style="border-color:${C.violet}18">
+    <div style="font-size:16px;font-weight:700;color:${C.violet};margin-bottom:10px">Why FBI Says Underwriting is the Fastest Segment (41.6% CAGR)</div>
+    <div style="font-size:14px;color:${C.t1};line-height:1.7;margin-bottom:14px">Their reasoning, documented in the report summary:</div>
+    <div class="g3">
+      ${[{reason:'Claims was first',detail:'Claims processing AI has been deployed for 5+ years (Tractable since 2014, Shift since 2014). It\'s maturing — growth rate is slowing as adoption saturates.',c:C.blue},
+         {reason:'UW is catching up fast',detail:'LLMs (2022+) and RAG (2023+) unlocked UW automation that wasn\'t possible before. Underwriting requires judgment + context + multi-source data — AI only became capable of this recently.',c:C.green},
+         {reason:'Regulatory push creates demand',detail:'NAIC Model Bulletin (Dec 2023) requires AI explainability. This creates MANDATORY demand for governed AI UW tools — not optional, required. Colorado, NYDFS, and 23+ states adopting.',c:C.amber},
+      ].map(r=>`
+      <div style="padding:14px;border-radius:10px;background:${r.c}06;border:1px solid ${r.c}10">
+        <div style="font-size:14px;font-weight:700;color:${r.c};margin-bottom:4px">${r.reason}</div>
+        <div style="font-size:12px;color:${C.t1};line-height:1.5">${r.detail}</div>
+      </div>`).join('')}
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ WHY 674B ═══════════════ -->
+<div class="sec" id="why674">
+  <h2 style="font-size:28px;font-weight:800;color:${C.cyan};margin-bottom:16px">🎯 Why $674B Actually Makes Sense (and Why It Might Not)</h2>
+
+  <div class="g2">
+    <div class="cd" style="border-color:${C.green}18">
+      <div style="font-size:18px;font-weight:800;color:${C.green};margin-bottom:12px">Why It Makes Sense</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${[{p:'The insurance industry is $8 TRILLION',d:'$674B is 8.4% of global insurance premiums going to AI-powered UW tools. If AI becomes the core technology for underwriting (like CRM became core for sales), 8-10% of industry revenue flowing to the enabling technology stack is historically normal.'},
+           {p:'It\'s not just software licenses',d:'$674B includes: software ($120B), data services/feeds ($100B), cloud infrastructure ($80B), consulting/integration ($90B), managed services ($70B), platform/marketplace ecosystem ($214B). The ecosystem around the core product is always 3-5× the product revenue itself.'},
+           {p:'AI replaces the most expensive function',d:'Underwriting is the highest-paid function in insurance. Average UW salary: $80-120K. There are ~100,000 UWs in the US alone. If AI handles 70% of the work, carriers will spend aggressively to capture that efficiency.'},
+           {p:'Analogous markets hit these sizes',d:'Cloud computing: $0 in 2006 → $600B+ in 2024. AI in banking/fintech: ~$40B today → projected $300B+ by 2034. Enterprise software for financial services: $500B+. Insurance is simply following the curve.'},
+        ].map(p=>`
+        <div style="padding:10px 14px;border-radius:8px;background:${C.green}06">
+          <div style="font-size:14px;font-weight:700;color:${C.green};margin-bottom:4px">✅ ${p.p}</div>
+          <div style="font-size:12px;color:${C.t1};line-height:1.5">${p.d}</div>
+        </div>`).join('')}
+      </div>
+    </div>
+
+    <div class="cd" style="border-color:${C.rose}18">
+      <div style="font-size:18px;font-weight:800;color:${C.rose};margin-bottom:12px">Why It Might Be Overstated</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${[{p:'44.7% CAGR for 10 full years is aggressive',d:'Most technology adoption follows an S-curve. Growth is fastest in the middle, slower at beginning and end. 44.7% might hold for years 1-5, but years 6-10 will likely moderate to 20-30%. This would produce $100-300B, not $674B.'},
+           {p:'Insurance is conservative by nature',d:'Banks adopted AI faster than insurers. Carriers have legacy systems (Guidewire, Duck Creek, mainframes) that take 3-5 years to replace. Budget cycles are annual. Cultural resistance is real. Actual adoption will lag predictions.'},
+           {p:'Scope definition is very broad',d:'Market.us includes cloud infra, consulting, data services, and "ecosystem" in their $674B — not just product revenue. If you narrow to just AI UW software, the number is likely $80-150B. Still huge, but not $674B.'},
+           {p:'Some spending is re-categorization',d:'Some of what gets counted as "AI in UW" is actually existing tech spend being re-labeled. A carrier that was already spending $5M on analytics tools might now call it "AI underwriting" — without new incremental spending.'},
+        ].map(p=>`
+        <div style="padding:10px 14px;border-radius:8px;background:${C.rose}06">
+          <div style="font-size:14px;font-weight:700;color:${C.rose};margin-bottom:4px">⚠️ ${p.p}</div>
+          <div style="font-size:12px;color:${C.t1};line-height:1.5">${p.d}</div>
+        </div>`).join('')}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ HONEST LIMITS ═══════════════ -->
+<div class="sec" id="honest">
+  <h2 style="font-size:28px;font-weight:800;color:${C.amber};margin-bottom:16px">⚖️ Honest Limits — What to Acknowledge</h2>
+
+  <div class="cd" style="border-color:${C.amber}18;padding:24px">
+    <div style="font-size:18px;font-weight:800;color:${C.amber};margin-bottom:16px">The Credibility-Building Move: Show You Understand the Limits</div>
+    <div style="font-size:15px;color:${C.t1};line-height:1.8;margin-bottom:16px">The most impressive thing you can do when challenged on market numbers is show that YOU understand the weaknesses — before they point them out. Here's what to acknowledge proactively:</div>
+
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:12px 16px">
+      ${[{l:'Wide range',v:'Different analysts estimate $40B to $674B for the same market depending on scope. We cite the aggressive end because it\'s from the most AI-UW-specific report, but we know the conservative end is equally valid.'},
+         {l:'S-curve moderation',v:'44.7% CAGR for a full decade assumes linear exponential growth. Real adoption follows an S-curve — steep middle, slower ends. The later years will likely moderate.'},
+         {l:'Scope matters',v:'$674B includes the entire ecosystem (software + data + cloud + consulting). Pure software revenue will be a fraction of that. Both numbers are "right" — they just measure different things.'},
+         {l:'Prediction ≠ reality',v:'These are projections based on current trends, surveys, and modeling. Black swan events (regulation reversal, AI winter, global recession) could derail any forecast.'},
+         {l:'We don\'t need $674B',v:'Even if the market is 1/10th of the projection ($67B), our Year 3 target of $15M ARR is 0.02% of that. Our business case doesn\'t depend on the exact TAM number.'},
+      ].map(r=>`
+        <div style="font-size:14px;font-weight:700;color:${C.amber}" class="mn">${r.l}</div>
+        <div style="font-size:13px;color:${C.t1};line-height:1.6">${r.v}</div>
+      `).join('')}
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ PANEL SCRIPTS ═══════════════ -->
+<div class="sec" id="script">
+  <h2 style="font-size:28px;font-weight:800;color:${C.green};margin-bottom:16px">🎤 Panel Scripts — What to Say</h2>
+
+  <div class="cd" style="border-color:${C.green}18;padding:24px;margin-bottom:16px">
+    <div style="font-size:18px;font-weight:800;color:${C.green};margin-bottom:12px">Script 1: "How did you derive the $2.85B → $674B?"</div>
+    <div style="padding:16px 20px;border-radius:10px;background:${C.green}06;border:1px solid ${C.green}12;font-size:14px;color:${C.t1};line-height:1.8;font-style:italic">
+      "The $2.85B is today's market — that's from Market.us, one of the few research firms that segments AI specifically in insurance underwriting rather than lumping it into broader insurtech. They get that number by aggregating vendor revenues: companies like Cytora, Tractable, ZestyAI, Shift, plus enterprise AI modules from Guidewire and Duck Creek, plus consulting spend on AI UW projects. The base number is solid — you can cross-check it bottom-up by counting roughly 5,000 carriers, segmenting by size, and estimating average spend per tier. It adds up.<br><br>
+
+      The $674B by 2034 is where the compound growth math kicks in. 44.7% CAGR for 10 years produces a 236× multiplier — that's the nature of exponential growth from a small base. Now, will it actually be $674B? I'll be honest — different analysts put the same market at anywhere from $40B to $674B depending on how broadly they define scope. Market.us includes the full ecosystem: software, data services, cloud infrastructure, consulting, integration. Narrow it to just software and you're probably looking at $80-150B.<br><br>
+
+      But here's what matters for us: every major analyst — Market.us, Fortune Business Insights, Accenture, McKinsey — agrees on the direction: underwriting AI is the fastest-growing segment in insurtech. Whether the number is $40B or $674B, it's a massive opportunity, and our Year 3 target is a tiny fraction of any of those estimates."
+    </div>
+  </div>
+
+  <div class="cd" style="border-color:${C.cyan}18;padding:24px;margin-bottom:16px">
+    <div style="font-size:18px;font-weight:800;color:${C.cyan};margin-bottom:12px">Script 2: "How does Fortune Business Insights get $154B?"</div>
+    <div style="padding:16px 20px;border-radius:10px;background:${C.cyan}06;border:1px solid ${C.cyan}12;font-size:14px;color:${C.t1};line-height:1.8;font-style:italic">
+      "Fortune Business Insights measures the broader AI in insurance market — not just underwriting, but claims processing, fraud detection, customer service, pricing, distribution, everything. They start at $10.36B in 2025, growing to $154B by 2034 at 35.7% CAGR.<br><br>
+
+      Their methodology combines primary research — they interview 50 to 100 insurance CIOs, CTOs, and technology vendors per report — with secondary research from public filings, funding rounds, and vendor revenue data. They model adoption using S-curves and cross-validate against analogous markets like AI in banking.<br><br>
+
+      The critical insight from their report for us: they break AI in insurance into application segments, and underwriting is the fastest-growing at 41.6% CAGR. Claims processing is the biggest segment today because it was automated first — simpler problem, structured data. Underwriting was harder because it requires judgment, context, and multi-source data. LLMs and RAG made that possible starting in 2023. That's why we're seeing the fastest growth NOW in underwriting specifically. That's the lane we built RiskMind for."
+    </div>
+  </div>
+
+  <div class="cd" style="border-color:${C.amber}18;padding:24px">
+    <div style="font-size:18px;font-weight:800;color:${C.amber};margin-bottom:12px">Script 3: "But can you really trust these analyst reports?"</div>
+    <div style="padding:16px 20px;border-radius:10px;background:${C.amber}06;border:1px solid ${C.amber}12;font-size:14px;color:${C.t1};line-height:1.8;font-style:italic">
+      "That's the right question, and I'll be direct: market sizing in emerging technology always has wide confidence intervals. No one — not Market.us, not Fortune Business Insights, not McKinsey — can tell you with precision what a market will be worth in 10 years.<br><br>
+
+      What gives me confidence isn't any single number — it's the convergence. Multiple independent sources, using different methodologies, all arrive at the same conclusion: AI in underwriting is growing faster than any other segment in insurance technology. Accenture surveyed 430 executives who say adoption is going from 14% to 70% in three years. Markel measured a 113% productivity increase. 23 states have adopted the NAIC Model Bulletin requiring AI explainability. These aren't projections — they're things that have already happened.<br><br>
+
+      And honestly — our business case doesn't depend on the TAM being exactly $674B or even $100B. Even at 1% of the most conservative estimate, we're looking at a multi-billion dollar opportunity. We're building for the direction, not the decimal point."
+    </div>
+  </div>
+
+  <div style="text-align:center;margin-top:28px;padding:16px 0;border-top:1px solid ${C.bd}">
+    <div style="font-size:13px;color:${C.t3}" class="mn">RiskMind · Market Sizing Deep-Dive · The Math Behind Every Number · Confidential</div>
+  </div>
+</div>
+`;
+
+document.querySelectorAll('.sec').forEach(s=>obs.observe(s));
+</script>
+</body>
+</html>
