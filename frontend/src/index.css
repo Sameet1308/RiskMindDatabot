@@ -84,9 +84,9 @@ body {
 
 /* ==================== HEADER ==================== */
 .app-header {
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 35%, #27192a 60%, #1a1030 80%, #0f172a 100%);
-  border-bottom: 1px solid rgba(255, 90, 95, 0.12);
-  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.3), 0 0 24px rgba(255, 90, 95, 0.04);
+  background: linear-gradient(135deg, #ffffff 0%, #fdfbfc 35%, #faf7f8 70%, #ffffff 100%);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04), 0 0 16px rgba(255, 90, 95, 0.03);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -124,7 +124,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 10px rgba(255, 90, 95, 0.4), 0 0 20px rgba(255, 90, 95, 0.15);
+  box-shadow: 0 2px 8px rgba(255, 90, 95, 0.3), 0 0 12px rgba(255, 90, 95, 0.1);
 }
 
 .brand-icon svg { width: 1rem; height: 1rem; }
@@ -142,7 +142,7 @@ body {
 
 .brand-subtitle {
   font-size: 0.68rem;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--text-muted);
   margin-top: 0;
   letter-spacing: 0.05em;
   font-weight: 500;
@@ -161,10 +161,10 @@ body {
   align-items: center;
   gap: 0.35rem;
   padding: 0.35rem 0.75rem;
-  border-radius: 0.4rem;
+  border-radius: 0.5rem;
   font-size: 0.75rem;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--text-muted);
   text-decoration: none;
   transition: all 0.2s ease;
   white-space: nowrap;
@@ -172,17 +172,17 @@ body {
 }
 
 .nav-link:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.9);
-  border-color: rgba(255, 255, 255, 0.08);
+  background: var(--bg-hover);
+  color: var(--text);
+  border-color: var(--border);
 }
 
 .nav-link.active {
-  background: linear-gradient(135deg, var(--primary), #c2303a);
-  color: white;
+  background: rgba(255, 90, 95, 0.08);
+  color: var(--primary);
   font-weight: 600;
-  box-shadow: 0 2px 10px rgba(255, 90, 95, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 90, 95, 0.3);
+  box-shadow: 0 1px 4px rgba(255, 90, 95, 0.1);
+  border-color: rgba(255, 90, 95, 0.2);
 }
 
 .nav-icon {
@@ -213,24 +213,24 @@ body {
   align-items: center;
   gap: 0.35rem;
   padding: 0.3rem 0.65rem;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 0.4rem;
-  color: rgba(255, 255, 255, 0.75);
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  color: var(--text-secondary);
   font-size: 0.75rem;
 }
 
 .header-user-name {
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text);
 }
 
 .header-user-role {
   font-size: 0.65rem;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--text-muted);
   text-transform: capitalize;
   padding-left: 0.35rem;
-  border-left: 1px solid rgba(255, 255, 255, 0.15);
+  border-left: 1px solid var(--border);
   margin-left: 0.15rem;
 }
 
@@ -240,17 +240,17 @@ body {
   justify-content: center;
   width: 1.75rem;
   height: 1.75rem;
-  border-radius: 0.4rem;
+  border-radius: 0.5rem;
   border: none;
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.5);
+  background: var(--surface-alt);
+  color: var(--text-muted);
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .header-logout-btn:hover {
-  background: rgba(239, 68, 68, 0.2);
-  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.08);
+  color: var(--danger);
 }
 
 /* ==================== CARDS ==================== */
@@ -328,8 +328,8 @@ body {
 
 .panel-header.chat-header {
   padding: 0.75rem 1rem;
-  background: linear-gradient(135deg, #0f172a 0%, #1a1035 40%, #1e1b4b 70%, #1a1035 100%);
-  border-bottom: 2px solid rgba(255, 90, 95, 0.25);
+  background: linear-gradient(135deg, #ffffff 0%, #fdfbfc 40%, #faf7f9 70%, #ffffff 100%);
+  border-bottom: 1px solid var(--border);
   border-radius: 0.85rem 0.85rem 0 0;
 }
 
@@ -343,22 +343,22 @@ body {
 }
 
 .chat-header .panel-title-sub {
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--text-muted);
   font-size: 0.65rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .chat-header .chat-history-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.15);
-  color: rgba(255, 255, 255, 0.7);
+  background: var(--surface-alt);
+  border-color: var(--border);
+  color: var(--text-muted);
 }
 
 .chat-header .chat-history-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
-  color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.3);
+  background: var(--bg-hover);
+  color: var(--text);
+  border-color: var(--border-dark);
 }
 
 .chat-bot-avatar {
@@ -383,7 +383,7 @@ body {
   height: 0.5rem;
   border-radius: 50%;
   background: #22c55e;
-  border: 2px solid #1e1b4b;
+  border: 2px solid #ffffff;
 }
 
 .panel-title {
