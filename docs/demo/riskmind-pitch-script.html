@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RiskMind — Pitch Script (Teams Call)</title>
+<title>RiskMind — Pitch Talk Script</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -11,715 +11,499 @@
     background: #0f0f14;
     color: #e2e2e8;
     line-height: 1.7;
-    padding: 0;
   }
 
-  /* ── Top Nav ── */
+  /* ── Top Bar ── */
   .top-bar {
     position: sticky; top: 0; z-index: 100;
     background: rgba(15, 15, 20, 0.95);
     backdrop-filter: blur(12px);
     border-bottom: 1px solid rgba(255, 90, 95, 0.15);
-    padding: 0.6rem 1.5rem;
-    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.5rem 1.25rem;
+    display: flex; align-items: center; gap: 1rem;
   }
   .top-bar h1 {
-    font-size: 1rem; font-weight: 700;
+    font-size: 0.9rem; font-weight: 700; white-space: nowrap;
     background: linear-gradient(135deg, #FF7A7E, #FF5A5F);
     -webkit-background-clip: text; -webkit-text-fill-color: transparent;
   }
-  .top-bar .timer {
-    font-size: 0.8rem; color: #aaa;
-    font-family: 'Cascadia Code', monospace;
-  }
   .nav-pills {
-    display: flex; gap: 0.35rem; flex-wrap: wrap;
+    display: flex; gap: 0.25rem; flex-wrap: wrap; flex: 1;
   }
   .nav-pills a {
-    font-size: 0.7rem; padding: 0.3rem 0.65rem;
+    font-size: 0.65rem; padding: 0.25rem 0.55rem;
     border-radius: 1rem; text-decoration: none;
-    color: #aaa; border: 1px solid #333;
-    transition: all 0.2s;
+    color: #888; border: 1px solid #2a2a35;
+    transition: all 0.2s; white-space: nowrap;
   }
-  .nav-pills a:hover, .nav-pills a.active {
-    background: rgba(255, 90, 95, 0.15);
-    border-color: rgba(255, 90, 95, 0.4);
-    color: #FF5A5F;
+  .nav-pills a:hover { color: #FF5A5F; border-color: rgba(255, 90, 95, 0.3); }
+  .timer {
+    font-size: 0.75rem; color: #666;
+    font-family: 'Cascadia Code', monospace;
+    white-space: nowrap;
   }
 
   /* ── Container ── */
   .container {
-    max-width: 860px;
+    max-width: 840px;
     margin: 0 auto;
-    padding: 2rem 1.5rem 6rem;
+    padding: 1.75rem 1.5rem 5rem;
   }
 
-  /* ── Section ── */
-  .section {
-    margin-bottom: 3rem;
-    scroll-margin-top: 4rem;
+  /* ── Slide Section ── */
+  .slide-section {
+    margin-bottom: 2.5rem;
+    scroll-margin-top: 3.5rem;
   }
-  .section-header {
-    display: flex; align-items: center; gap: 0.75rem;
-    margin-bottom: 1.25rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid #222;
+  .slide-header {
+    display: flex; align-items: center; gap: 0.65rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid #1e1e28;
   }
-  .section-num {
-    width: 2.25rem; height: 2.25rem;
+  .slide-num {
+    width: 2rem; height: 2rem;
     border-radius: 50%;
     background: linear-gradient(135deg, #FF5A5F, #c2303a);
-    color: white; font-weight: 700; font-size: 0.9rem;
+    color: white; font-weight: 700; font-size: 0.8rem;
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
   }
-  .section-title {
-    font-size: 1.3rem; font-weight: 700; color: #fff;
+  .slide-title {
+    font-size: 1.15rem; font-weight: 700; color: #fff;
   }
-  .section-time {
-    font-size: 0.7rem; color: #666;
+  .slide-time {
+    font-size: 0.65rem; color: #555;
     font-family: monospace;
     margin-left: auto;
-    background: #1a1a22;
-    padding: 0.2rem 0.6rem;
+    background: #16161e;
+    padding: 0.15rem 0.5rem;
     border-radius: 1rem;
   }
+  .slide-note {
+    font-size: 0.72rem; color: #555;
+    margin-bottom: 0.75rem;
+    padding: 0.4rem 0.75rem;
+    background: #12121a;
+    border-radius: 0.5rem;
+    border-left: 3px solid #333;
+    font-family: monospace;
+  }
 
-  /* ── Script Block ── */
-  .speak {
+  /* ── Say Block ── */
+  .say {
     background: #16161e;
     border-left: 3px solid #FF5A5F;
-    border-radius: 0 0.75rem 0.75rem 0;
-    padding: 1rem 1.25rem;
-    margin-bottom: 1rem;
-    font-size: 0.95rem;
-    line-height: 1.8;
+    border-radius: 0 0.65rem 0.65rem 0;
+    padding: 0.85rem 1.1rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.92rem;
+    line-height: 1.85;
   }
-  .speak em {
+  .say em {
     color: #FF7A7E;
     font-style: normal;
     font-weight: 600;
   }
-  .speak strong {
+  .say strong {
     color: #ffffff;
   }
-  .speak .pause {
-    display: inline-block;
-    color: #555;
-    font-size: 0.7rem;
+  .say .p {
+    display: inline;
+    color: #444;
+    font-size: 0.65rem;
     font-family: monospace;
-    margin: 0 0.25rem;
-    vertical-align: middle;
   }
 
-  /* ── Stage Direction ── */
-  .action {
-    background: rgba(124, 58, 237, 0.08);
-    border: 1px solid rgba(124, 58, 237, 0.2);
-    border-radius: 0.65rem;
-    padding: 0.65rem 1rem;
-    margin-bottom: 1rem;
-    font-size: 0.8rem;
-    color: #a78bfa;
-    display: flex; align-items: flex-start; gap: 0.5rem;
+  /* ── Transition Cue ── */
+  .cue {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.45rem 0.85rem;
+    margin-bottom: 0.75rem;
+    background: rgba(59, 130, 246, 0.06);
+    border: 1px solid rgba(59, 130, 246, 0.15);
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+    color: #60a5fa;
   }
-  .action::before {
-    content: '>>>';
-    font-family: monospace;
-    font-weight: 700;
-    color: #7c3aed;
+  .cue::before {
+    content: '▶';
+    font-size: 0.6rem;
     flex-shrink: 0;
   }
 
-  /* ── Tip / Note ── */
-  .tip {
-    background: rgba(6, 182, 212, 0.06);
-    border: 1px solid rgba(6, 182, 212, 0.15);
+  /* ── Key Line ── */
+  .key {
+    background: linear-gradient(135deg, rgba(255, 90, 95, 0.07), rgba(124, 58, 237, 0.05));
+    border: 1px solid rgba(255, 90, 95, 0.18);
     border-radius: 0.65rem;
-    padding: 0.6rem 1rem;
-    margin-bottom: 1rem;
-    font-size: 0.8rem;
-    color: #67e8f9;
-  }
-  .tip::before {
-    content: 'TIP: ';
-    font-weight: 700;
-    color: #06b6d4;
-  }
-
-  /* ── Bullet Points ── */
-  .points {
-    margin: 0.5rem 0 1rem 1.25rem;
-    display: grid; gap: 0.35rem;
-    font-size: 0.9rem;
-  }
-  .points li {
-    color: #ccc;
-  }
-  .points li strong {
-    color: #fff;
-  }
-
-  /* ── Stat Card Row ── */
-  .stat-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 0.75rem;
-    margin: 1rem 0;
-  }
-  .stat-card {
-    background: #16161e;
-    border: 1px solid #222;
-    border-radius: 0.75rem;
-    padding: 1rem;
-    text-align: center;
-  }
-  .stat-card .stat-val {
-    font-size: 1.5rem;
-    font-weight: 800;
-    color: #FF5A5F;
-    line-height: 1.2;
-  }
-  .stat-card .stat-label {
-    font-size: 0.7rem;
-    color: #888;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    margin-top: 0.25rem;
-  }
-
-  /* ── Comparison Table ── */
-  .compare-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 1rem 0;
-    font-size: 0.85rem;
-  }
-  .compare-table th {
-    background: #1a1a22;
-    color: #aaa;
-    font-weight: 600;
-    padding: 0.6rem 0.75rem;
-    text-align: left;
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-  }
-  .compare-table td {
-    padding: 0.6rem 0.75rem;
-    border-bottom: 1px solid #1e1e28;
-    color: #ccc;
-  }
-  .compare-table tr:hover td { background: rgba(255, 90, 95, 0.03); }
-  .compare-table .check { color: #22c55e; }
-  .compare-table .cross { color: #ef4444; }
-
-  /* ── Divider ── */
-  .divider {
-    height: 1px;
-    background: linear-gradient(90deg, transparent, #333, transparent);
-    margin: 2.5rem 0;
-  }
-
-  /* ── Key Line (memorize this) ── */
-  .key-line {
-    background: linear-gradient(135deg, rgba(255, 90, 95, 0.08), rgba(124, 58, 237, 0.06));
-    border: 1px solid rgba(255, 90, 95, 0.2);
-    border-radius: 0.75rem;
-    padding: 1.25rem 1.5rem;
-    margin: 1.25rem 0;
-    font-size: 1.05rem;
+    padding: 1rem 1.25rem;
+    margin: 0.75rem 0;
+    font-size: 1rem;
     font-weight: 600;
     color: #fff;
     text-align: center;
     line-height: 1.6;
   }
-  .key-line .highlight {
-    color: #FF5A5F;
+  .key .hl { color: #FF5A5F; }
+
+  /* ── Tip ── */
+  .tip {
+    background: rgba(251, 191, 36, 0.06);
+    border: 1px solid rgba(251, 191, 36, 0.12);
+    border-radius: 0.5rem;
+    padding: 0.45rem 0.85rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.75rem;
+    color: #fbbf24;
+  }
+  .tip::before { content: 'TIP: '; font-weight: 700; }
+
+  /* ── Divider ── */
+  .divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, #2a2a35, transparent);
+    margin: 2rem 0;
   }
 
   /* ── FAQ ── */
-  .faq {
-    margin: 1rem 0;
-  }
-  .faq-item {
-    margin-bottom: 0.75rem;
-  }
-  .faq-q {
-    font-weight: 700;
-    color: #FF7A7E;
-    font-size: 0.9rem;
-    margin-bottom: 0.25rem;
-  }
+  .faq-q { font-weight: 700; color: #FF7A7E; font-size: 0.85rem; margin-bottom: 0.2rem; }
   .faq-a {
-    font-size: 0.85rem;
-    color: #bbb;
-    padding-left: 1rem;
-    border-left: 2px solid #333;
+    font-size: 0.82rem; color: #bbb;
+    padding-left: 0.85rem; border-left: 2px solid #2a2a35;
+    margin-bottom: 0.85rem;
   }
 </style>
 </head>
 <body>
 
-<!-- ── Top Nav ── -->
 <div class="top-bar">
-  <h1>RiskMind Pitch Script</h1>
+  <h1>Pitch Talk Script</h1>
   <div class="nav-pills">
-    <a href="#s1">Hook</a>
+    <a href="#s1">Title</a>
     <a href="#s2">Problem</a>
     <a href="#s3">Solution</a>
-    <a href="#s4">Demo</a>
-    <a href="#s5">Glass Box</a>
+    <a href="#s4">Platform</a>
+    <a href="#s5">Replaces</a>
     <a href="#s6">Market</a>
-    <a href="#s7">Compliance</a>
-    <a href="#s8">Close</a>
-    <a href="#faq">FAQ</a>
+    <a href="#s7">Differentiator</a>
+    <a href="#s8">How It Works</a>
+    <a href="#s9">Impact</a>
+    <a href="#s10">Architecture</a>
+    <a href="#s11">The Ask</a>
   </div>
-  <span class="timer">~15 min pitch + 5 min demo + 5 min Q&A</span>
+  <span class="timer">~20 min total</span>
 </div>
 
 <div class="container">
 
-<!-- ═══════════════════════════════════════════════════════ -->
-<!-- SECTION 1: OPENING HOOK -->
-<!-- ═══════════════════════════════════════════════════════ -->
-<div class="section" id="s1">
-  <div class="section-header">
-    <div class="section-num">1</div>
-    <div class="section-title">Opening Hook</div>
-    <span class="section-time">0:00 — 2 min</span>
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SLIDE 1: TITLE -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="slide-section" id="s1">
+  <div class="slide-header">
+    <div class="slide-num">1</div>
+    <div class="slide-title">Title Slide</div>
+    <span class="slide-time">0:00 — 1 min</span>
+  </div>
+  <div class="slide-note">DECK: Title slide with RiskMind logo, 6 tag pills, tagline</div>
+
+  <div class="say">
+    Good [morning/afternoon], everyone. Thank you for making time today. <span class="p">[pause]</span><br><br>
+    I'm [Your Name], and I'm here to show you <em>RiskMind</em> — an AI-powered underwriting co-pilot built specifically for commercial insurance.<br><br>
+    You'll see a few tags on screen — <em>Glass Box AI</em>, <em>9 Specialized Agents</em>, <em>42 Derived KPIs</em>, <em>Self-Learning</em>, <em>NAIC Compliant</em>, <em>One Platform</em>. I'm going to unpack each of those in the next 20 minutes.<br><br>
+    But the idea in one line: <strong>AI recommends. The underwriter decides. The Glass Box proves why.</strong>
   </div>
 
-  <div class="speak">
-    Thanks for making time today. I want to start with a number. <span class="pause">[pause]</span><br><br>
-    <em>Seventy percent.</em><br><br>
-    That's how much of a commercial underwriter's day is spent <strong>not underwriting</strong>. They're hunting through claims systems, reading 40-page PDFs, copying numbers into spreadsheets, cross-referencing guideline manuals, drafting memos. <span class="pause">[pause]</span><br><br>
-    The actual judgment — the <em>"should we write this risk or walk away"</em> — that's maybe 30% of their day. We built RiskMind to flip that ratio.
-  </div>
-
-  <div class="key-line">
-    RiskMind is an <span class="highlight">AI-powered Underwriting Co-Pilot</span> that gives your underwriters instant, <span class="highlight">transparent, evidence-backed</span> risk intelligence — in a single conversation.
-  </div>
+  <div class="cue">Click → to advance to PROBLEM slide</div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════ -->
-<!-- SECTION 2: THE PROBLEM -->
-<!-- ═══════════════════════════════════════════════════════ -->
-<div class="section" id="s2">
-  <div class="section-header">
-    <div class="section-num">2</div>
-    <div class="section-title">The Problem</div>
-    <span class="section-time">2:00 — 4 min</span>
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SLIDE 2: PROBLEM -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="slide-section" id="s2">
+  <div class="slide-header">
+    <div class="slide-num">2</div>
+    <div class="slide-title">The Problem</div>
+    <span class="slide-time">1:00 — 3 min</span>
+  </div>
+  <div class="slide-note">DECK: Three problem cards — 70% stat, knowledge loss, regulators</div>
+
+  <div class="say">
+    Three problems every insurance executive in this room already knows. <span class="p">[pause]</span><br><br>
+    <strong>Number one</strong> — and you can see that big red <em>70%</em> on screen. <span class="p">[point]</span><br>
+    That's how much of an underwriter's day is spent <em>not underwriting</em>. They're hunting data across disconnected systems, reading 40-page PDFs, copy-pasting into spreadsheets. The actual risk judgment — the part that requires human expertise — gets squeezed into the remaining 30%. <span class="p">[pause]</span><br><br>
+    <strong>Number two</strong> — the door emoji says it all. <span class="p">[point to middle card]</span><br>
+    When your best senior underwriter retires, <em>20 years of institutional judgment walks out the door</em>. The guidelines exist on paper, sure — but they aren't embedded in the workflow. The patterns, the intuitions, the "I've seen this before" — that lives in people's heads, not in your systems. <span class="p">[pause]</span><br><br>
+    <strong>Number three</strong> — and this one has a deadline. <span class="p">[point to bottom card]</span><br>
+    The <em>NAIC</em> — National Association of Insurance Commissioners — issued a Model Bulletin in December 2023 mandating explainable AI in insurance. It's now adopted in <em>23 states plus DC</em>. If your AI tool can't explain how it reaches its conclusions, it won't survive the next audit cycle. Black-box scoring tools have an expiration date.
   </div>
 
-  <div class="speak">
-    Let me paint the picture of what underwriting looks like today at most mid-market carriers. <span class="pause">[pause]</span><br><br>
-    Your underwriter gets a submission. To assess it, they need to open <strong>five to seven different systems</strong>: the policy admin system for exposure data, the claims system for loss history, a separate spreadsheet for loss ratios, a PDF for the underwriting manual, maybe a GIS tool for catastrophe exposure, and then they draft everything into a memo in Word. <span class="pause">[pause]</span><br><br>
-    Every one of those is a <em>context switch</em>. Every one is a chance for something to get missed.
-  </div>
-
-  <div class="stat-row">
-    <div class="stat-card">
-      <div class="stat-val">5-7</div>
-      <div class="stat-label">Disconnected Tools</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-val">70%</div>
-      <div class="stat-label">Time on Data Hunting</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-val">20 yrs</div>
-      <div class="stat-label">Knowledge Walks Out the Door</div>
-    </div>
-  </div>
-
-  <div class="speak">
-    And here's the real risk: <span class="pause">[pause]</span><br><br>
-    When your best senior underwriter retires, <em>20 years of institutional judgment walks out the door</em>. The patterns they've learned, the industries they know are trouble, the broker relationships — gone. The junior UW gets the same data but none of that context.<br><br>
-    So carriers are turning to AI. But the tools available today? They have a trust problem.
-  </div>
-
-  <div class="speak">
-    There are basically <strong>two flavors</strong> of AI underwriting tools on the market right now:<br><br>
-    <em>Flavor one: Black-box scoring.</em> Give you a number — "Risk Score: 73" — with zero explanation. Your underwriter can't trust it because they can't see inside it. Your auditor can't verify it. And your regulator won't accept it. <span class="pause">[pause]</span><br><br>
-    <em>Flavor two: ChatGPT-on-your-database.</em> You let AI write SQL queries against your live data. Sounds clever, until it hallucinates a query, returns wrong numbers, and those wrong numbers end up in a memo that someone signs. One bad query and you've got a compliance problem. <span class="pause">[pause]</span><br><br>
-    Neither approach works for underwriting. Underwriting demands <em>trust, transparency, and auditability</em>. That's exactly what we built.
-  </div>
-
-  <table class="compare-table">
-    <thead>
-      <tr>
-        <th>Capability</th>
-        <th>Black-Box Scoring</th>
-        <th>ChatGPT-on-DB</th>
-        <th>RiskMind</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>Shows data sources</td>
-        <td class="cross">No</td>
-        <td class="cross">Sometimes</td>
-        <td class="check">Always (Glass Box)</td>
-      </tr>
-      <tr>
-        <td>Cites specific guidelines</td>
-        <td class="cross">No</td>
-        <td class="cross">No</td>
-        <td class="check">Section codes + quotes</td>
-      </tr>
-      <tr>
-        <td>Hallucination risk</td>
-        <td>N/A</td>
-        <td class="cross">High (SQL errors)</td>
-        <td class="check">Near zero (deterministic)</td>
-      </tr>
-      <tr>
-        <td>Regulator-ready audit trail</td>
-        <td class="cross">No</td>
-        <td class="cross">No</td>
-        <td class="check">Built-in</td>
-      </tr>
-      <tr>
-        <td>Human-in-the-loop</td>
-        <td class="cross">Auto-decision</td>
-        <td>Partial</td>
-        <td class="check">AI recommends, UW decides</td>
-      </tr>
-    </tbody>
-  </table>
+  <div class="cue">Click → to advance to SOLUTION slide</div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════ -->
-<!-- SECTION 3: THE SOLUTION -->
-<!-- ═══════════════════════════════════════════════════════ -->
-<div class="section" id="s3">
-  <div class="section-header">
-    <div class="section-num">3</div>
-    <div class="section-title">The Solution — RiskMind</div>
-    <span class="section-time">4:00 — 3 min</span>
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SLIDE 3: SOLUTION -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="slide-section" id="s3">
+  <div class="slide-header">
+    <div class="slide-num">3</div>
+    <div class="slide-title">The Solution</div>
+    <span class="slide-time">4:00 — 2 min</span>
+  </div>
+  <div class="slide-note">DECK: 6 capability cards in 2x3 grid — Ask, See, Recommend, Analyze, Evidence, Document</div>
+
+  <div class="say">
+    So what does RiskMind actually do? Six capabilities on screen — let me walk through them quickly. <span class="p">[pause]</span><br><br>
+    <em>Top left — Ask anything in English.</em> No query language. No forms. Your underwriter types "How is my construction book performing?" or "Should I renew this policy?" and gets an instant, intelligent response. <span class="p">[pause]</span><br><br>
+    <em>Top middle — See the reasoning.</em> This is the Glass Box. Every response shows which database tables were queried, which guideline sections were cited, what evidence was used, and a confidence score. The underwriter can challenge the AI or agree with it. <span class="p">[pause]</span><br><br>
+    <em>Top right — Get recommendations, not just data.</em> "Accept at $180K premium." "Refer for senior review — loss ratio trend worsening." "Decline — breaches 3 guideline thresholds." Actionable outputs. <span class="p">[pause]</span><br><br>
+    <em>Bottom row</em> — interactive portfolio analytics without SQL, evidence review for uploaded photos and PDFs, and <em>automatic document generation</em> — underwriting memos produced as a byproduct of the analysis, not typed manually.<br><br>
+    And the green bar at the bottom is the key workflow: <strong>AI recommends. Underwriter decides. Audit trail is automatic.</strong>
   </div>
 
-  <div class="speak">
-    RiskMind is a <em>Glass Box AI</em>. Not a black box. <span class="pause">[pause]</span><br><br>
-    The idea is simple: your underwriter asks a question in plain English — <strong>"Why is this construction policy high risk?"</strong> — and gets back an instant analysis with four things no other tool gives you:
-  </div>
-
-  <ul class="points">
-    <li><strong>The numbers</strong> — KPIs computed deterministically from your actual data. Loss ratio, claim frequency, severity trends. AI never touches the database. Deterministic code does all the math.</li>
-    <li><strong>The evidence</strong> — The actual claim photos, PDFs, inspection reports that support the analysis. Not just text. Visual evidence.</li>
-    <li><strong>The guidelines</strong> — Specific section codes from your underwriting manual cited with exact quotes. "Section 4.1 says loss ratio above 80% triggers mandatory surcharge."</li>
-    <li><strong>The confidence</strong> — A transparent score showing how confident the AI is and why. If it's unsure, it asks for clarification instead of guessing.</li>
-  </ul>
-
-  <div class="speak">
-    <em>AI recommends. The underwriter decides. Glass Box proves why.</em><br><br>
-    That's the model. The AI does the data hunting, the cross-referencing, the memo drafting. The underwriter does what only a human can do: exercise judgment and make the call. <span class="pause">[pause]</span><br><br>
-    And everything is saved. Every analysis, every decision, every piece of evidence — it's all in the audit trail. When a regulator or auditor asks <em>"Why did you accept this risk?"</em> — you don't scramble. You click one button and show them.
-  </div>
-
-  <div class="key-line">
-    <span class="highlight">Glass Box:</span> See through it. Trust it. Prove it to a regulator.
-  </div>
+  <div class="cue">Click → to advance to PLATFORM slide</div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════ -->
-<!-- SECTION 4: LIVE DEMO WALKTHROUGH -->
-<!-- ═══════════════════════════════════════════════════════ -->
-<div class="section" id="s4">
-  <div class="section-header">
-    <div class="section-num">4</div>
-    <div class="section-title">Live Demo</div>
-    <span class="section-time">7:00 — 5 min</span>
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SLIDE 4: PLATFORM — DAY IN THE LIFE -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="slide-section" id="s4">
+  <div class="slide-header">
+    <div class="slide-num">4</div>
+    <div class="slide-title">A Day in the Life</div>
+    <span class="slide-time">6:00 — 2 min</span>
+  </div>
+  <div class="slide-note">DECK: Timeline — 8 AM to 2 PM, 6 activity cards with emoji icons</div>
+
+  <div class="say">
+    This slide shows what a day looks like with RiskMind. I'll be quick. <span class="p">[pause]</span><br><br>
+    <em>8 AM</em> — you open your Workbench. It's your command center. Book of business, renewals, new submissions, broker messages — all with AI risk insights <em>already attached</em>. No hunting. <span class="p">[pause]</span><br><br>
+    <em>8:15</em> — new submission from Titan Construction. You ask: "Should I quote this?" In <em>3 seconds</em>, RiskMind pulls their claims history, applies your underwriting guidelines, checks past decisions on similar risks, and recommends Accept at $180K with conditions. <span class="p">[pause]</span><br><br>
+    <em>9 AM</em> — you want to understand why your construction book is deteriorating. One question. AI finds the 3 policies driving 80% of losses, cites the specific guideline threshold breach, suggests refer or decline.<br><br>
+    <em>10:30</em> — portfolio analytics. Slice by industry, region, year — spot that Texas commercial is 15% above target loss ratio. No SQL. <span class="p">[pause]</span><br><br>
+    <em>11 AM</em> — generate the underwriting memo from the analysis that already exists. What took 40 minutes now takes 3.<br><br>
+    <em>2 PM</em> — and here's the one executives love. An auditor asks for the decision trail on a policy. <em>Glass Box already has it.</em> Data sources, guideline citations, confidence scores. Zero prep.
   </div>
 
-  <div class="tip">Share your screen BEFORE this section. Have RiskMind open and logged in as Sarah Mitchell. Be on the main chat page with empty canvas.</div>
-
-  <!-- Demo Step: Data Connector -->
-  <h3 style="color:#fff; font-size:1rem; margin:1.25rem 0 0.5rem;">Step 1 — Data Connector</h3>
-  <div class="action">Show the Data Connector splash — 4-step animated progress. Point out "6 tables, 145 records, 122 AI indexed." Click "Continue to RiskMind."</div>
-  <div class="speak">
-    First thing the underwriter sees after login is the <em>Data Connector</em>. It shows exactly what data sources are connected — how many tables, how many records, how many are AI-indexed for semantic search. Full transparency from the first screen.
-  </div>
-
-  <!-- Demo Step: Ask a question -->
-  <h3 style="color:#fff; font-size:1rem; margin:1.25rem 0 0.5rem;">Step 2 — Ask "Why is COMM-2024-016 high risk?"</h3>
-  <div class="action">Type the question in the chat. Wait for canvas to populate. Point to KPI tiles, key drivers, and the Glass Box panel.</div>
-  <div class="speak">
-    Watch what happens. I ask a plain English question. <span class="pause">[wait for response]</span><br><br>
-    In under 3 seconds, the canvas shows me: <em>four KPI tiles</em> — policy number, claims count, total loss amount, loss ratio. Below that, <em>key risk drivers</em> — why this policy is flagged. And in the chat, a full <em>AI narrative</em> explaining the risk in underwriter language.<br><br>
-    But here's what matters — <strong>scroll down to the Glass Box</strong>.
-  </div>
-  <div class="action">Scroll to Glass Box panel. Point to each card: Data Lineage, Guideline Citations, Evidence Items, Confidence Score.</div>
-  <div class="speak">
-    <em>This is the Glass Box.</em> It shows me exactly which database tables were queried, which underwriting guideline sections are relevant — with exact quotes — and even the claim photos and PDF evidence supporting this analysis. And the confidence score: 82%, with reason codes explaining why.<br><br>
-    This isn't a black box number. This is a <em>fully auditable, evidence-backed assessment</em>.
-  </div>
-
-  <!-- Demo Step: Decision -->
-  <h3 style="color:#fff; font-size:1rem; margin:1.25rem 0 0.5rem;">Step 3 — "Should we renew COMM-2024-016?"</h3>
-  <div class="action">Type the renewal question. Show the decision canvas with Accept/Refer/Decline buttons.</div>
-  <div class="speak">
-    Now I ask: <em>"Should we renew this?"</em> <span class="pause">[wait]</span><br><br>
-    RiskMind gives me a recommendation — in this case, <strong>Refer</strong> — with the reasoning: loss ratio is above 60%, claims are escalating. But notice — it doesn't auto-decide. It shows me <em>three buttons</em>: Accept, Refer, Decline. The underwriter makes the call. The AI just did the homework.
-  </div>
-
-  <!-- Demo Step: Geo Map -->
-  <h3 style="color:#fff; font-size:1rem; margin:1.25rem 0 0.5rem;">Step 4 — "Show me the geographic risk map"</h3>
-  <div class="action">Type the geo query. Show the Leaflet map with colored markers. Click a marker to show details.</div>
-  <div class="speak">
-    One more thing — I say <em>"show me the geographic risk map"</em> and instantly I get an interactive map with every policy plotted. <em>Red is high risk, gold is medium, green is low</em>. I can click any marker and see the policy details. On the right, AI highlights the top risk zones and industry concentrations.<br><br>
-    This would normally take a GIS analyst half a day to build. Here it's one sentence.
-  </div>
-
-  <!-- Demo Step: Workbench -->
-  <h3 style="color:#fff; font-size:1rem; margin:1.25rem 0 0.5rem;">Step 5 — Quick Workbench Flash</h3>
-  <div class="action">Click "Workbench" in the nav. Show Overview tab briefly, then flip to Submissions tab showing AI risk scores.</div>
-  <div class="speak">
-    And beyond the chat, there's a full <em>Workbench</em> — your underwriter's daily command center. Five tabs: Portfolio Overview with KPIs, New Submissions with <em>AI-scored risk triage</em>, Renewals with AI pricing recommendations, Quote Decisions, and Broker Communications with AI-drafted responses.<br><br>
-    Every tab has AI insights. The underwriter sees the full picture without switching tools.
-  </div>
-
-  <div class="tip">If time is tight, skip the Workbench and go straight to Section 5. The chat demo is the strongest part.</div>
+  <div class="cue">Click → to advance to REPLACES slide</div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════ -->
-<!-- SECTION 5: GLASS BOX DEEP DIVE -->
-<!-- ═══════════════════════════════════════════════════════ -->
-<div class="section" id="s5">
-  <div class="section-header">
-    <div class="section-num">5</div>
-    <div class="section-title">Why Glass Box Matters</div>
-    <span class="section-time">12:00 — 3 min</span>
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SLIDE 5: WHAT IT REPLACES -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="slide-section" id="s5">
+  <div class="slide-header">
+    <div class="slide-num">5</div>
+    <div class="slide-title">What It Replaces</div>
+    <span class="slide-time">8:00 — 1.5 min</span>
+  </div>
+  <div class="slide-note">DECK: Side-by-side — 7 legacy tools → 7 RiskMind equivalents</div>
+
+  <div class="say">
+    This slide speaks for itself. On the left, the <em>red column</em> — the 5 to 7 disconnected tools your underwriters use today. On the right, the <em>green column</em> — how RiskMind replaces each one. <span class="p">[pause]</span><br><br>
+    Claims management system — replaced by <em>"Show me claims for Titan Construction"</em> in chat.<br>
+    Underwriting guidelines PDF — <em>guidelines cited automatically</em> in every response via RAG.<br>
+    Loss run spreadsheets — <em>computed live</em>: loss ratio, severity, frequency, trends.<br>
+    Past decisions folder — <em>past accept/refer/decline decisions surfaced</em> in context.<br>
+    GIS mapping tool — <em>geographic risk map</em> with color-coded markers, one sentence.<br>
+    Broker email portal — <em>AI-drafted responses</em> in the Workbench.<br>
+    BI reporting tool — <em>self-service Analytics Playground</em>, no SQL. <span class="p">[pause]</span><br><br>
+    Seven tools. <strong>One platform.</strong> That's the value proposition in a single slide.
   </div>
 
-  <div class="speak">
-    Let me explain why the Glass Box architecture is the real differentiator here, and why it matters for your business. <span class="pause">[pause]</span><br><br>
-    In most AI tools, the AI writes queries, crunches numbers, and gives you results. The problem is — if the AI makes a mistake in the query, <em>you'd never know</em>. The numbers look plausible. They show up in a memo. Someone signs it. <span class="pause">[pause]</span><br><br>
-    In RiskMind, <em>the AI never touches the database</em>. All the math — loss ratios, claim severity, frequency analysis, risk scoring — that's all <strong>deterministic code</strong>. Pre-computed. Verified. The AI's job is only to <em>explain</em> what the code already calculated. It can't hallucinate a loss ratio because it didn't compute it.
-  </div>
-
-  <div class="speak">
-    Think of it this way: <span class="pause">[pause]</span><br><br>
-    The Glass Box has <em>four layers of proof</em> on every single response:<br><br>
-    <strong>Layer one — Data Lineage:</strong> Which tables were queried. "This answer used policies, claims, and decisions tables." Full provenance.<br><br>
-    <strong>Layer two — Guideline Citations:</strong> Section 4.1 of your underwriting manual says X. Section 5.2 says Y. Exact section codes your auditor can verify in 30 seconds.<br><br>
-    <strong>Layer three — Evidence:</strong> The actual claim photos, inspection PDFs, damage reports. Visual proof. Not just "the AI said so" — here's the crane collapse photo, here's the adjuster's report.<br><br>
-    <strong>Layer four — Confidence Score:</strong> 82% confidence with transparent reason codes. If the AI isn't sure — below 50% — it doesn't guess. It asks for clarification. That alone prevents 90% of hallucination problems.
-  </div>
-
-  <div class="key-line">
-    Auditor asks <span class="highlight">"Why did you accept this?"</span><br>
-    One click. Full evidence trail. <span class="highlight">Zero prep.</span>
-  </div>
+  <div class="cue">Click → to advance to MARKET slide</div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════ -->
-<!-- SECTION 6: MARKET OPPORTUNITY -->
-<!-- ═══════════════════════════════════════════════════════ -->
-<div class="section" id="s6">
-  <div class="section-header">
-    <div class="section-num">6</div>
-    <div class="section-title">Market Opportunity</div>
-    <span class="section-time">15:00 — 2 min</span>
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SLIDE 6: MARKET OPPORTUNITY -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="slide-section" id="s6">
+  <div class="slide-header">
+    <div class="slide-num">6</div>
+    <div class="slide-title">Market Opportunity</div>
+    <span class="slide-time">9:30 — 2 min</span>
+  </div>
+  <div class="slide-note">DECK: 3 market cards (top), 2 stat cards (bottom) — adoption + Markel</div>
+
+  <div class="say">
+    The market context. Three numbers at the top. <span class="p">[point to cards]</span><br><br>
+    <em>AI underwriting specifically</em> — $2.85 billion today, projected to <em>$674 billion by 2034</em>. That's a 44.7% compound annual growth rate. This is the fastest-growing segment in insurance AI. <span class="p">[pause]</span><br><br>
+    Why? Because claims automation has been happening for 5-plus years. Underwriting is where the <em>LLM plus RAG revolution</em> is landing right now. The technology to automate judgment plus context finally exists. <span class="p">[pause]</span><br><br>
+    Now look at the bottom two cards. <span class="p">[point]</span><br><br>
+    <em>Left card</em> — AI adoption in underwriting is going from 14% to 70% in three years. That's from a survey of 430 senior executives across 11 countries. This isn't a prediction — the adoption curve is already accelerating. <span class="p">[pause]</span><br><br>
+    <em>Right card</em> — the number that turns heads. <em>Markel</em> measured a <strong>113% increase</strong> in written premium per underwriter after deploying AI assistance. Not 10%. Not 20%. Their underwriters <em>more than doubled</em> their output. That's the kind of leverage we're talking about.
   </div>
 
-  <div class="speak">
-    Let me give you the market context. <span class="pause">[pause]</span><br><br>
-    AI in insurance is a <em>$10 billion market today</em>, projected to hit <em>$154 billion by 2034</em>. Within that, AI-powered underwriting is the <strong>fastest growing segment</strong> — 41.6% compound annual growth. Why? Because claims automation has been happening for five-plus years. Underwriting is where the LLM revolution is landing <em>right now</em>.
-  </div>
-
-  <div class="stat-row">
-    <div class="stat-card">
-      <div class="stat-val">$154B</div>
-      <div class="stat-label">AI in Insurance by 2034</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-val">41.6%</div>
-      <div class="stat-label">CAGR UW AI Segment</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-val">113%</div>
-      <div class="stat-label">Productivity Gain (Markel)</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-val">14% &rarr; 70%</div>
-      <div class="stat-label">Adoption in 3 Years</div>
-    </div>
-  </div>
-
-  <div class="speak">
-    And the results early movers are seeing are dramatic. <em>Markel</em> measured a <strong>113% increase in written premium per underwriter</strong> after deploying AI assistance. Not 10%. Not 20%. <em>113%.</em> <span class="pause">[pause]</span><br><br>
-    The carriers who adopt transparent AI underwriting in the next 12-18 months will have a <em>structural advantage</em> — faster decisions, better pricing consistency, lower compliance risk, and the ability to scale without linearly scaling headcount.
-  </div>
+  <div class="cue">Click → to advance to DIFFERENTIATOR slide</div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════ -->
-<!-- SECTION 7: REGULATORY ALIGNMENT -->
-<!-- ═══════════════════════════════════════════════════════ -->
-<div class="section" id="s7">
-  <div class="section-header">
-    <div class="section-num">7</div>
-    <div class="section-title">Regulatory Readiness</div>
-    <span class="section-time">17:00 — 2 min</span>
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SLIDE 7: DIFFERENTIATOR -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="slide-section" id="s7">
+  <div class="slide-header">
+    <div class="slide-num">7</div>
+    <div class="slide-title">The Differentiator</div>
+    <span class="slide-time">11:30 — 2 min</span>
+  </div>
+  <div class="slide-note">DECK: 3 columns — Black Box (red) vs ChatGPT-on-DB (amber) vs Glass Box (green)</div>
+
+  <div class="say">
+    This is the most important slide in the deck. <span class="p">[pause]</span><br><br>
+    Three columns. Two competitors' approaches. And ours.<br><br>
+    <em>Column one — Black-Box Scoring.</em> <span class="p">[point to red card]</span> "Risk Score: 73." That's it. No explanation. The underwriter can't trust what they can't see. The auditor can't verify it. The regulator won't accept it. <span class="p">[pause]</span><br><br>
+    <em>Column two — ChatGPT on your database.</em> <span class="p">[point to amber card]</span> The AI writes SQL, executes it, explains the results. Sounds clever. Until it hallucinates a JOIN condition, returns wrong numbers, and those wrong numbers end up in a memo that someone signs. One bad query. One compliance problem. <span class="p">[pause]</span><br><br>
+    <em>Column three — RiskMind Glass Box.</em> <span class="p">[point to green card]</span> The AI <em>never touches the database</em>. Deterministic code handles all the computation — loss ratios, severity, frequency, trends. The AI only <em>reads the pre-computed findings</em> and writes the narrative. It can't hallucinate your numbers because it didn't compute them. <span class="p">[pause]</span><br><br>
+    Read the bottom line on the green card with me: <strong>"See through it. Trust it. Prove it to a regulator."</strong>
   </div>
 
-  <div class="speak">
-    And this is where timing really matters. <span class="pause">[pause]</span><br><br>
-    In December 2023, the <em>NAIC — the National Association of Insurance Commissioners</em> — issued a Model Bulletin on AI governance. It's now been adopted by <strong>23 states plus DC</strong>. And it's not optional — it <em>mandates</em> transparency, explainability, human oversight, and fairness in any AI used for underwriting decisions.<br><br>
-    Most AI tools on the market right now? <em>They weren't built for this.</em> Black-box scoring tools can't explain themselves. ChatGPT wrappers don't have audit trails. <span class="pause">[pause]</span><br><br>
-    RiskMind was <em>designed from the ground up</em> for NAIC compliance.
+  <div class="key">
+    Competitors build black boxes. <span class="hl">We built the opposite.</span>
   </div>
 
-  <table class="compare-table">
-    <thead>
-      <tr>
-        <th>NAIC Requirement</th>
-        <th>How RiskMind Delivers</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><strong>Transparency & Explainability</strong></td>
-        <td>Glass Box on every response — data sources, citations, confidence scores, evidence</td>
-      </tr>
-      <tr>
-        <td><strong>Human Oversight</strong></td>
-        <td>AI recommends, underwriter clicks Accept/Refer/Decline. AI never auto-executes.</td>
-      </tr>
-      <tr>
-        <td><strong>Fairness</strong></td>
-        <td>Analysis uses only actuarial factors — loss ratio, frequency, severity. No demographic scoring.</td>
-      </tr>
-      <tr>
-        <td><strong>Consumer Notification</strong></td>
-        <td>Glass Box generates the "why" — insurer can share specific factors with policyholders.</td>
-      </tr>
-      <tr>
-        <td><strong>Third-Party AI Oversight</strong></td>
-        <td>Full pipeline transparency. 8 documented agents. Audit log of every AI interaction.</td>
-      </tr>
-      <tr>
-        <td><strong>Data Governance</strong></td>
-        <td>Read-only DB. Deterministic computation. Source tracking on all data. No AI-generated SQL.</td>
-      </tr>
-    </tbody>
-  </table>
+  <div class="cue">Click → to advance to HOW IT WORKS slide</div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════ -->
-<!-- SECTION 8: THE CLOSE -->
-<!-- ═══════════════════════════════════════════════════════ -->
-<div class="section" id="s8">
-  <div class="section-header">
-    <div class="section-num">8</div>
-    <div class="section-title">The Close</div>
-    <span class="section-time">19:00 — 2 min</span>
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SLIDE 8: HOW IT WORKS -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="slide-section" id="s8">
+  <div class="slide-header">
+    <div class="slide-num">8</div>
+    <div class="slide-title">How It Works</div>
+    <span class="slide-time">13:30 — 2 min</span>
+  </div>
+  <div class="slide-note">DECK: 2-column — Left: non-technical 7-step flow, Right: CTO technical detail</div>
+
+  <div class="say">
+    Two versions of the same story. <em>Left column</em> for the business audience — 30 seconds. <em>Right column</em> for the CTO — full technical detail. <span class="p">[pause]</span><br><br>
+    Let me walk the left side quickly. <span class="p">[point to left column]</span><br><br>
+    Underwriter asks a question. System figures out what they need — rule-based, under 10 milliseconds, no AI cost. Pulls the right data from your database — deterministic. Finds relevant guidelines and past decisions. <em>Then</em> — and only then — the AI reads the pre-computed findings and writes the narrative. Response comes back with real numbers, sources, and a confidence score. Underwriter verifies and acts.<br><br>
+    And the blue box at the bottom is the key: <strong>the AI never touches your database. It never makes up numbers. It only explains what the data layer already computed.</strong> <span class="p">[pause]</span><br><br>
+    For the technical folks — <span class="p">[gesture to right column]</span> — eight-node LangGraph pipeline, three-source RAG, confidence scoring that routes uncertain queries to clarification instead of guessing, and a four-provider LLM fallback chain so the system never goes blank. About <em>80% of queries cost nothing</em> in AI spend — the pipeline does the heavy lifting.
   </div>
 
-  <div class="speak">
-    So let me bring it together. <span class="pause">[pause]</span><br><br>
-    Your underwriters spend <em>70% of their day</em> doing work that AI can do better and faster — hunting data, cross-referencing PDFs, drafting memos. That's not a technology problem anymore. That's an <em>adoption problem</em>.<br><br>
-    The tools available until now couldn't be trusted — they were black boxes or they hallucinated. RiskMind is different because it's a <em>Glass Box</em>. <span class="pause">[pause]</span><br><br>
-    Every insight comes with proof. Every recommendation is backed by your own guidelines. Every decision is audit-ready. And the underwriter stays in control — always.
-  </div>
-
-  <div class="key-line">
-    One platform replaces <span class="highlight">7 disconnected tools</span>.<br>
-    Every insight is <span class="highlight">transparent and auditable</span>.<br>
-    AI recommends. Underwriter decides. <span class="highlight">Glass Box proves why.</span>
-  </div>
-
-  <div class="speak">
-    What I'd love to do next is <strong>set up a pilot</strong> — connect RiskMind to a subset of your actual portfolio data, let two or three of your underwriters use it for two weeks, and measure the impact on their throughput and decision consistency.<br><br>
-    Does that sound like a reasonable next step? <span class="pause">[pause — wait for response]</span>
-  </div>
-
-  <div class="tip">If they ask about pricing: "We price per seat, starting at $X per underwriter per month. For a pilot, we typically do a fixed-fee 30-day engagement. Happy to send over a proposal."</div>
-  <div class="tip">If they ask about integration: "We connect to any SQL database — Snowflake, PostgreSQL, Oracle, SQL Server. Read-only access. We also ingest your underwriting manual PDFs for guideline citations. Typical setup is 2-3 days."</div>
+  <div class="tip">If they want to go deeper on architecture, say "I have a full technical deep-dive I can share after the call."</div>
+  <div class="cue">Click → to advance to IMPACT slide</div>
 </div>
 
-<div class="divider"></div>
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SLIDE 9: BUSINESS IMPACT & BUYERS -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="slide-section" id="s9">
+  <div class="slide-header">
+    <div class="slide-num">9</div>
+    <div class="slide-title">Impact & Buyers</div>
+    <span class="slide-time">15:30 — 2 min</span>
+  </div>
+  <div class="slide-note">DECK: Left column — 6 pain→impact rows. Right column — 4 buyer personas + regulatory card</div>
 
-<!-- ═══════════════════════════════════════════════════════ -->
-<!-- FAQ / OBJECTION HANDLING -->
-<!-- ═══════════════════════════════════════════════════════ -->
-<div class="section" id="faq">
-  <div class="section-header">
-    <div class="section-num">?</div>
-    <div class="section-title">Objection Handling & FAQ</div>
-    <span class="section-time">Q&A prep</span>
+  <div class="say">
+    Two sides of the same story. <em>Left column</em> — pain points your team has today, crossed out, replaced by how RiskMind solves them. <span class="p">[pause]</span><br><br>
+    40-minute research per policy → <em>3-second AI response</em>.<br>
+    Junior UW misses a guideline → <em>guidelines cited automatically</em> in every response.<br>
+    Pricing inconsistency → same data, same rules, same AI → <em>consistent</em>.<br>
+    Audit asks "why did you accept?" → Glass Box trail <em>already exists</em>.<br>
+    Senior UW leaves → knowledge lives in the RAG, <em>not in someone's head</em>.<br>
+    Regulator: "Is your AI explainable?" → <em>Yes.</em> Confidence scores, data lineage, citations. <span class="p">[pause]</span><br><br>
+    <em>Right column</em> — who buys this. <span class="p">[point]</span><br><br>
+    The <strong>Chief Underwriting Officer</strong> is the primary buyer — they own UW quality and profitability. <strong>Underwriters</strong> are the daily users. The <strong>CRO</strong> cares about portfolio visibility and regulatory compliance. And the <strong>VP of Insurance Technology</strong> is the IT sponsor who validates the architecture.<br><br>
+    And notice the pink card at the bottom — <em>regulatory tailwind</em>. NAIC mandate plus anticipated third-party AI oversight law in 2026. Glass Box is already compliant. We're ahead of the curve.
   </div>
 
-  <div class="faq">
-    <div class="faq-item">
-      <div class="faq-q">"How is this different from what we get with our existing claims analytics?"</div>
-      <div class="faq-a">Claims analytics tells you what happened. RiskMind tells you what to do about it — and backs it up with your own guidelines, evidence, and confidence scoring. It's the difference between a dashboard and a co-pilot.</div>
-    </div>
+  <div class="cue">Click → to advance to ARCHITECTURE slide</div>
+</div>
 
-    <div class="faq-item">
-      <div class="faq-q">"What if the AI gives a wrong recommendation?"</div>
-      <div class="faq-a">Two safeguards. First, the AI never auto-decides — the underwriter always makes the final call. Second, the Glass Box shows exactly what data and guidelines led to the recommendation. If something looks off, the underwriter can see why in 5 seconds and override it. Plus, our confidence scoring — if the AI is below 50% certain, it won't even recommend. It'll ask for clarification instead.</div>
-    </div>
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SLIDE 10: ARCHITECTURE -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="slide-section" id="s10">
+  <div class="slide-header">
+    <div class="slide-num">10</div>
+    <div class="slide-title">Architecture</div>
+    <span class="slide-time">17:30 — 1.5 min</span>
+  </div>
+  <div class="slide-note">DECK: 9-agent pipeline strip, 3 infra cards, 4 cost cards, green pills</div>
 
-    <div class="faq-item">
-      <div class="faq-q">"We're worried about data security. Where does our data go?"</div>
-      <div class="faq-a">Your data stays in your environment. RiskMind connects to your database with read-only access — we never write to it, never copy it externally. The AI models can run on AWS Bedrock within your VPC, or we can deploy fully on-premise. No data leaves your perimeter.</div>
-    </div>
+  <div class="say">
+    Quick architecture overview. <span class="p">[pause]</span><br><br>
+    At the top — our <em>9-agent LangGraph pipeline</em>. Each agent has a specialized role: Cortex for reasoning, Schema for data understanding, RAG for knowledge retrieval, Sentinel for guardrails, GlassBox for transparency. They work as a state machine — each node passes context to the next. <span class="p">[pause]</span><br><br>
+    Three infrastructure layers below. <strong>Edge</strong> — CloudFront CDN, WAF, Cognito for auth. <strong>Compute</strong> — Lambda with the 9 agents, Step Functions for orchestration. <strong>Data + AI</strong> — Aurora Serverless with pgvector for embeddings, ElastiCache for caching, Claude Direct API. <span class="p">[pause]</span><br><br>
+    And the four cost boxes — this is what gets attention. <span class="p">[point to bottom row]</span><br><br>
+    <em>$15 a month</em> in dev. <em>$65 in production</em>. Even at <em>10,000 queries a day</em>, it's $180. Per query? <em>$0.003</em>. Three-tenths of a cent. Because 80% of processing is deterministic code — the LLM is only the last step.
+  </div>
 
-    <div class="faq-item">
-      <div class="faq-q">"Our underwriters are not tech-savvy. Will they actually use this?"</div>
-      <div class="faq-a">It's a chat interface. If they can type a question in English, they can use RiskMind. No SQL, no query builders, no training on a new dashboard tool. We've designed it so a 30-minute onboarding session is all they need. And the Workbench gives them a familiar dashboard view for daily tasks.</div>
-    </div>
+  <div class="tip">If audience is non-technical, spend 20 seconds here max. Just hit the cost numbers.</div>
+  <div class="cue">Click → to advance to THE ASK slide</div>
+</div>
 
-    <div class="faq-item">
-      <div class="faq-q">"How long does implementation take?"</div>
-      <div class="faq-a">For a pilot: 2-3 days to connect your database, ingest your underwriting manual, and configure user roles. Full production deployment is typically 2-4 weeks including custom tuning and integration testing.</div>
-    </div>
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SLIDE 11: THE ASK / CLOSE -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="slide-section" id="s11">
+  <div class="slide-header">
+    <div class="slide-num">11</div>
+    <div class="slide-title">The Ask</div>
+    <span class="slide-time">19:00 — 2 min</span>
+  </div>
+  <div class="slide-note">DECK: RiskMind logo, 7 checkmark bullets, MVP statement, closing line</div>
 
-    <div class="faq-item">
-      <div class="faq-q">"Can it handle our specific lines of business?"</div>
-      <div class="faq-a">Currently optimized for commercial property and casualty. The guideline RAG system is line-agnostic — we index whatever underwriting manuals you use. So specialty lines, professional liability, marine — all work. The analytics and risk scoring adapt to whatever schema your data uses.</div>
-    </div>
+  <div class="say">
+    So let me bring it together. <span class="p">[pause]</span><br><br>
+    Seven checkmarks on screen. <span class="p">[gesture]</span><br><br>
+    <em>Glass Box</em> — every claim verifiable, every source cited.<br>
+    <em>9 specialized agents</em> — not a generic chatbot on your data.<br>
+    <em>Insurance-trained</em> — speaks your language, knows your KPIs.<br>
+    <em>Self-learning</em> — gets smarter the more your team uses it.<br>
+    <em>Any scale</em> — 50 policies to 50,000, same pipeline.<br>
+    <em>NAIC compliant</em> — ahead of the regulatory curve.<br>
+    <em>Replaces 5-7 tools</em> — one conversational platform. <span class="p">[pause]</span><br><br>
+    We have a <strong>working MVP</strong>. Conversational AI, Glass Box evidence, analytics playground, geo risk maps, memo generation, PDF export, user-scoped access. This isn't a wireframe — everything I've described is built and running. <span class="p">[pause]</span><br><br>
+    What I'd love to do next is explore how RiskMind fits <em>your</em> underwriting workflow. Whether that's a pilot with 2-3 underwriters, a technical deep-dive with your engineering team, or just a live demo on your data — I'm happy to take whatever next step makes sense for you. <span class="p">[pause]</span><br><br>
+    I'm open for questions.
+  </div>
 
-    <div class="faq-item">
-      <div class="faq-q">"What about SOC 2 / compliance certifications?"</div>
-      <div class="faq-a">We're building toward SOC 2 Type II. For the pilot phase, we deploy within your AWS environment using Bedrock, so your existing compliance posture covers the AI layer. No external API calls — everything stays inside your VPC.</div>
-    </div>
-
-    <div class="faq-item">
-      <div class="faq-q">"We already have Guidewire / Duck Creek / Majesco. Why add another tool?"</div>
-      <div class="faq-a">RiskMind doesn't replace your policy admin system — it sits on top of it. Think of it as the intelligence layer. It reads from Guidewire, but gives your underwriter a conversational interface with AI-powered analysis, guideline citations, and evidence — things your PAS was never designed to do.</div>
-    </div>
+  <div class="key">
+    AI recommends. Underwriter decides. <span class="hl">Glass Box proves why.</span>
   </div>
 </div>
 
 <div class="divider"></div>
 
-<!-- ═══════════════════════════════════════════════════════ -->
-<!-- CHEAT SHEET -->
-<!-- ═══════════════════════════════════════════════════════ -->
-<div class="section" id="cheat">
-  <div class="section-header">
-    <div class="section-num">&bull;</div>
-    <div class="section-title">Quick Reference — Key Numbers</div>
+<!-- ═══════════════════════════════════════════════ -->
+<!-- OBJECTION HANDLING -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="slide-section" id="faq">
+  <div class="slide-header">
+    <div class="slide-num">?</div>
+    <div class="slide-title">Q&A — Ready Answers</div>
+    <span class="slide-time">Keep deck on Slide 11 during Q&A</span>
   </div>
 
-  <table class="compare-table">
-    <thead>
-      <tr><th>Stat</th><th>Number</th><th>Source</th></tr>
-    </thead>
-    <tbody>
-      <tr><td>UW time on non-UW tasks</td><td><strong>70%</strong></td><td>McKinsey, Accenture</td></tr>
-      <tr><td>AI in Insurance market (2034)</td><td><strong>$154B</strong></td><td>Fortune Business Insights</td></tr>
-      <tr><td>UW AI segment CAGR</td><td><strong>41.6%</strong></td><td>Market.us</td></tr>
-      <tr><td>Markel productivity gain</td><td><strong>113%</strong></td><td>Markel public disclosure</td></tr>
-      <tr><td>AI adoption in insurance (3yr)</td><td><strong>14% &rarr; 70%</strong></td><td>Capgemini (430 execs, 11 countries)</td></tr>
-      <tr><td>NAIC adoption</td><td><strong>23 states + DC</strong></td><td>NAIC Model Bulletin Dec 2023</td></tr>
-      <tr><td>Tools replaced</td><td><strong>5-7</strong></td><td>RiskMind platform analysis</td></tr>
-      <tr><td>Typical pilot setup</td><td><strong>2-3 days</strong></td><td>RiskMind deployment SLA</td></tr>
-    </tbody>
-  </table>
+  <div class="faq-q">"How is this different from our existing analytics/claims system?"</div>
+  <div class="faq-a">Your claims system tells you what happened. RiskMind tells you what to do about it — and backs it with your own guidelines, evidence, and confidence scoring. Dashboard vs. co-pilot.</div>
+
+  <div class="faq-q">"What if the AI gives a wrong recommendation?"</div>
+  <div class="faq-a">Two safeguards. First, the AI never auto-decides — the underwriter makes the final call. Second, the Glass Box shows exactly what data and guidelines led to the recommendation. If something looks wrong, the underwriter sees why in 5 seconds. Plus, confidence scoring below 50% triggers clarification — it won't guess.</div>
+
+  <div class="faq-q">"What about data security?"</div>
+  <div class="faq-a">Your data stays in your environment. Read-only database access. LLM calls use AWS Bedrock within your VPC — no data leaves your perimeter. We can deploy fully on-premise if needed.</div>
+
+  <div class="faq-q">"Our underwriters aren't tech-savvy."</div>
+  <div class="faq-a">It's a chat interface. If they can type a question, they can use RiskMind. 30-minute onboarding. The Workbench gives a familiar dashboard for daily tasks.</div>
+
+  <div class="faq-q">"How long to implement?"</div>
+  <div class="faq-a">Pilot: 2-3 days to connect your database, ingest your underwriting manual, configure roles. Full production: 2-4 weeks including tuning and integration testing.</div>
+
+  <div class="faq-q">"What does it cost?"</div>
+  <div class="faq-a">Per seat pricing, starting at $X per underwriter per month. For a pilot, we typically do a fixed-fee 30-day engagement. Happy to send a proposal.</div>
+
+  <div class="faq-q">"We already have Guidewire / Duck Creek / Majesco."</div>
+  <div class="faq-a">RiskMind doesn't replace your policy admin system — it sits on top. Think of it as the intelligence layer. It reads from Guidewire but gives your underwriter conversational AI, guideline citations, and evidence — things your PAS was never built to do.</div>
+
+  <div class="faq-q">"What LLM do you use? Can we use our own?"</div>
+  <div class="faq-a">LangChain abstraction layer — swap models without code changes. We support Claude, Bedrock, Gemini, OpenAI. If you have a preferred provider or internal model, we plug it in.</div>
 </div>
 
 </div><!-- /container -->
