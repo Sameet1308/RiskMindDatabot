@@ -97,7 +97,7 @@ const VIZ_OPTIONS: [Viz, any][] = [
 ]
 
 export default function Analytics() {
-    const gridIdRef = useRef(1)
+    const gridIdRef = useRef(2)
     const makeGrid = (): GridPanel => {
         const num = gridIdRef.current++
         return {
