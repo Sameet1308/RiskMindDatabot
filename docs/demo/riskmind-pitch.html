@@ -243,7 +243,10 @@ function s_market(){return`<div class="${gc(5)}">
   <div class="a1"><span class="kk" style="color:var(--green)">Market Opportunity & Timing</span>
     <div class="sh" style="font-size:40px">A <span style="color:var(--green)">$674B</span> market — and the wave is now</div></div>
   <div class="g3 a2" style="margin-top:20px">
-    ${[{t:'AI Underwriting',n:'$2.85B',f:'$674B',g:'44.7%',c:'var(--green)',s:'Market.us'},{t:'AI in Insurance',n:'$10.36B',f:'$154B',g:'35.7%',c:'var(--blue)',s:'Fortune Business Insights'},{t:'Global Insurtech',n:'$19.06B',f:'$132.71B',g:'24.1%',c:'var(--violet)',s:'Fortune Business Insights'}].map(m=>`
+    ${[{t:'AI Underwriting',n:'$2.85B',f:'$674B',g:'44.7%',c:'var(--green)',s:'Market.us',ex:'Insurers will spend 236x more on AI underwriting tools by 2034 — fastest-growing segment in insurance AI'},
+      {t:'AI in Insurance',n:'$10.36B',f:'$154B',g:'35.7%',c:'var(--blue)',s:'Fortune Business Insights',ex:'The broader AI insurance wave — fraud, claims, service. RiskMind targets the highest-value slice: underwriting decisions'},
+      {t:'Global Insurtech',n:'$19.06B',f:'$132.71B',g:'24.1%',c:'var(--violet)',s:'Fortune Business Insights',ex:'Insurers are actively spending on tech modernization — the budget exists and the appetite is there'}
+    ].map(m=>`
     <div class="cd" style="border-color:${m.c}18;box-shadow:0 0 30px ${m.c}06">
       <div style="font-size:12px;color:${m.c};font-family:var(--mn);font-weight:500;margin-bottom:12px">${m.t}</div>
       <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px">
@@ -252,7 +255,8 @@ function s_market(){return`<div class="${gc(5)}">
         <span style="font-size:36px;font-weight:900;color:${m.c};font-family:var(--mn)">${m.f}</span>
       </div>
       <span class="tag" style="background:${m.c}14;color:${m.c};font-size:13px;font-family:var(--mn)">CAGR ${m.g}</span>
-      <div class="src" style="margin-top:8px">— ${m.s}</div>
+      <div style="font-size:12px;color:var(--t1);margin-top:10px;line-height:1.5;font-style:italic">${m.ex}</div>
+      <div class="src" style="margin-top:6px">— ${m.s}</div>
     </div>`).join('')}
   </div>
   <div class="g2 a3" style="margin-top:16px;flex:1">
@@ -264,13 +268,15 @@ function s_market(){return`<div class="${gc(5)}">
       </div>
       <div><div style="font-size:20px;font-weight:700">AI adoption: 14% → 70% in 3 years</div>
         <div style="font-size:14px;color:var(--t2);margin-top:4px">430 senior UW executives, 11 countries</div>
-        <div class="src">— Accenture "Underwriting Rewritten" 2024</div></div>
+        <div style="font-size:12px;color:var(--t1);margin-top:6px;font-style:italic">The industry has already decided to use AI for underwriting — the question is which tool</div>
+        <div class="src" style="margin-top:4px">— Accenture "Underwriting Rewritten" 2024</div></div>
     </div>
     <div class="cd" style="border-color:#84CC1618;display:flex;align-items:center;gap:20px">
       <div style="font-size:56px;font-weight:900;color:var(--lime);font-family:var(--mn);min-width:120px;text-align:center;line-height:1">113%</div>
       <div><div style="font-size:20px;font-weight:700">Markel's productivity boost</div>
         <div style="font-size:14px;color:var(--t2);margin-top:4px">Written premium per FTE more than doubled with AI underwriting</div>
-        <div class="src">— Insurance Journal</div></div>
+        <div style="font-size:12px;color:var(--t1);margin-top:6px;font-style:italic">Same team, same hours — twice the revenue. That's the business case for AI underwriting</div>
+        <div class="src" style="margin-top:4px">— Insurance Journal</div></div>
     </div>
   </div>
 </div>`}
